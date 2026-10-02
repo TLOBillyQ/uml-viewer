@@ -264,6 +264,11 @@
 (defn- op-maps [names]
   (mapv (fn [name] {:name name :text name}) names))
 
+(defn- source-name
+  "Every Rust source file is named by its filename."
+  [file]
+  (.getName (io/file file)))
+
 (defn- mentions-crate? [source lib-name]
   (when lib-name
     (boolean (re-find (re-pattern (str "\\b" (Pattern/quote lib-name) "::"))
@@ -296,7 +301,7 @@
                    vec)
         requires (vec (distinct (concat mod-ids use-targets (when mentioned [mentioned]))))]
     (assoc current
-      :name (graph/module-name (:id current))
+      :name (source-name file)
       :lang :rust
       :file (graph/relative-path file)
       :ops (op-maps (:ops surface))

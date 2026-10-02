@@ -488,12 +488,13 @@ for the cross-language link.
 **Rust** (`uml-viewer.rust-language.graph-rust`) walks the modules
 reachable from `lib.rs` and `main.rs` through `mod`. The `[lib] name` in
 `Cargo.toml` is the crate name, so `bookwriter_lib::run()` in `main.rs`
-depends on the lib class. `pub fn` functions are `:ops`. `pub(crate)`
-functions are not, unless they are `#[tauri::command]` functions, which
-are `:ops` even when private. `impl Trait for Type` is `:implements` when
-the trait resolves to a project module. The first segment of a `use`,
-other than `crate`, `self`, `super`, or the lib crate, is a foreign
-crate.
+depends on the lib class. Every Rust class is named by its source
+file. The directory box keeps the namespace segment. `pub fn` functions
+are `:ops`. `pub(crate)` functions are not,
+unless they are `#[tauri::command]` functions, which are `:ops` even when
+private. `impl Trait for Type` is `:implements` when the trait resolves
+to a project module. The first segment of a `use`, other than `crate`,
+`self`, `super`, or the lib crate, is a foreign crate.
 
 **Python** (`uml-viewer.python-language.graph-python`) emits one class per
 `.py` module. `__init__.py` is the package. Point `:src` at the package
@@ -524,7 +525,10 @@ tools. The overlay joins a snapshot to the class whose `:ns` equals that
 namespace. Otherwise the class id owns that name (`bookwriter.model`
 owns `model`), a dotted child rolls up (`pdf` owns `pdf.Layout`), and
 the policy prefix belongs to the single undotted Rust class. `::` is
-read as `.`. A class with no CRAP or mutation data is red.
+read as `.`. A source file drawn inside its directory keeps its own
+CRAP and mutation scores. The directory box still rolls up the worst
+descendant, and a descendant with no data is red. A class with no CRAP
+or mutation data is red.
 
 ## IR
 

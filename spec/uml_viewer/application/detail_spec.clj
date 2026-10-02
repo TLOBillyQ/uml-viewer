@@ -86,6 +86,56 @@
       (should-be-nil (detail/member-at rows (:y cls)))
       (should= "hide" (detail/member-at rows (+ (:y hide) 1)))))
 
+  (it "names the file in the card by the source file, not its directory"
+    (let [s (compose/compile-diagram
+              (ir/normalize
+                {:title "Bookwriter"
+                 :packages
+                 [{:id :p :label "rust"
+                   :classes [{:id :rust :name "lib.rs"
+                              :ns "bookwriter.rust"
+                              :file "src-tauri/src/lib.rs"}]}]}))
+          rows (detail/rows (detail/model s :rust))]
+      (should= "lib.rs" (:text (first (filter #(= :name (:kind %)) rows))))
+      (should= "lib.rs" (:text (first (filter :module rows))))))
+
+  (it "names every Rust file on the card by its filename"
+    (let [s (compose/compile-diagram
+              (ir/normalize
+                {:packages
+                 [{:id :p :label "rust"
+                   :classes [{:id :rust.proto :name "proto.rs"
+                              :ns "bookwriter.rust.proto"
+                              :file "src-tauri/src/proto.rs"}]}]}))
+          rows (detail/rows (detail/model s :rust.proto))]
+      (should= "proto.rs" (:text (first (filter #(= :name (:kind %)) rows))))
+      (should= "proto.rs" (:text (first (filter :module rows))))))
+
+  (it "keeps the namespace on the card when the file stem matches it"
+    (let [s (compose/compile-diagram
+              (ir/normalize
+                {:packages
+                 [{:id :p :label "internals"
+                   :classes [{:id :internals.model :name "Model"
+                              :ns "bookwriter.internals.model"
+                              :file "src/internals/model.ts"}]}]}))
+          rows (detail/rows (detail/model s :internals.model))]
+      (should= "bookwriter.internals.model"
+               (:text (first (filter :module rows))))))
+
+  (it "keeps the namespace on the card for a hyphenated Clojure file"
+    (let [s (compose/compile-diagram
+              (ir/normalize
+                {:packages
+                 [{:id :p :label "python-language"
+                   :classes [{:id :graph-python :name "GraphPython"
+                              :ns "uml-viewer.python-language.graph-python"
+                              :file "src/uml_viewer/python_language/graph_python.clj"}]}]}))
+          rows (detail/rows (detail/model s :graph-python))]
+      (should= "GraphPython" (:text (first (filter #(= :name (:kind %)) rows))))
+      (should= "uml-viewer.python-language.graph-python"
+               (:text (first (filter :module rows))))))
+
   (it "shows killed and survived when an older snapshot omitted sites"
     (let [s (compose/compile-diagram
               (ir/normalize

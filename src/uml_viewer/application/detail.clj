@@ -1,5 +1,6 @@
 (ns uml-viewer.application.detail
-  (:require [uml-viewer.engine.hit :as hit]
+  (:require [clojure.string :as str]
+            [uml-viewer.engine.hit :as hit]
             [uml-viewer.engine.layout :as layout]
             [uml-viewer.application.overlay :as overlay]))
 
@@ -31,6 +32,26 @@
 (defn- rel-phrase [kind outgoing?]
   (let [[out in] (get rel-phrases kind ["to" "from"])]
     (if outgoing? out in)))
+
+(defn- file-base
+  "Source file name shown on the card, without its directory."
+  [path]
+  (when (seq (str path))
+    (let [n (peek (str/split (str/replace (str path) #"\\" "/") #"/"))]
+      (when-not (str/blank? n) n))))
+
+(defn- module-label
+  "A Rust source file is named by its filename. Other modules keep
+  the namespace. A directory always keeps the namespace."
+  [model]
+  (let [c (:class model)
+        ns-name (:ns model)
+        base (file-base (:file model))]
+    (if (and base
+             (not (:drill? c))
+             (str/ends-with? (str/lower-case base) ".rs"))
+      base
+      ns-name)))
 
 (defn member-ident
   "Source-window identity for a class card. `member-name` may be nil."
@@ -190,8 +211,8 @@
           acc (if-let [st (:stereotype c)]
                 (emit acc :muted (str "«" (name st) "»") {})
                 acc)
-          acc (if-let [ns-name (:ns model)]
-                (emit acc :module ns-name {:module true})
+          acc (if-let [label (module-label model)]
+                (emit acc :module label {:module true})
                 acc)
           acc (emit acc :muted pack {})
           acc (if-let [t (:title model)]

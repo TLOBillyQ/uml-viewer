@@ -52,7 +52,9 @@
         (should= #{:rust :rust.proto :rust.main :tauri}
                  (set (keys by-id)))
         (should= "bookwriter.rust" (:ns (by-id :rust)))
-        (should= "Rust" (:name (by-id :rust)))
+        (should= "lib.rs" (:name (by-id :rust)))
+        (should= "main.rs" (:name (by-id :rust.main)))
+        (should= "proto.rs" (:name (by-id :rust.proto)))
         (should= :rust (:lang (by-id :rust)))
         (should (str/ends-with? (:file (by-id :rust)) "src/lib.rs"))
         (should= ["read_text" "run"] (map :name (:ops (by-id :rust))))

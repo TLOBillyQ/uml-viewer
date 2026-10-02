@@ -391,6 +391,96 @@
       (should= 9 (:killed layout))
       (should= 1 (:survived layout))))
 
+  (it "keeps a source file's own CRAP when a nested file is worse"
+    (let [g (update graph :classes
+                    (fn [cs]
+                      (mapv (fn [c]
+                              (case (:id c)
+                                :source.clojure (assoc c :crap {:mu 8.0 :max 9.0 :sigma 2.0})
+                                :source (assoc c :crap {:mu 1.0 :max 1.0 :sigma 0.0})
+                                c))
+                            cs)))
+          doc (policy/apply-policy policy g)
+          inner (hierarchy/view-at doc [:source])
+          source (first (filter #(= :source (:id %))
+                                (mapcat :classes (:packages inner))))
+          child (first (filter #(= :source.clojure (:id %))
+                               (mapcat :classes (:packages inner))))]
+      (should= {:mu 1.0 :max 1.0 :sigma 0.0} (:crap source))
+      (should= {:mu 8.0 :max 9.0 :sigma 2.0} (:crap child))))
+
+  (it "keeps a source file's own CRAP when a nested file has none"
+    (let [g (update graph :classes
+                    (fn [cs]
+                      (mapv (fn [c]
+                              (if (= :source (:id c))
+                                (assoc c :crap {:mu 1.0 :max 1.0 :sigma 0.0})
+                                c))
+                            cs)))
+          doc (policy/apply-policy policy g)
+          inner (hierarchy/view-at doc [:source])
+          root (hierarchy/view-at doc [])
+          source (first (filter #(= :source (:id %))
+                                (mapcat :classes (:packages inner))))
+          directory (first (filter #(= :source (:id %))
+                                   (mapcat :classes (:packages root))))]
+      (should= {:mu 1.0 :max 1.0 :sigma 0.0} (:crap source))
+      (should-be-nil (:crap directory))))
+
+  (it "keeps a source file's own mutants when a nested file is worse"
+    (let [g (update graph :classes
+                    (fn [cs]
+                      (mapv (fn [c]
+                              (case (:id c)
+                                :source.clojure (assoc c :killed 1 :survived 1)
+                                :source (assoc c :killed 8 :survived 0)
+                                c))
+                            cs)))
+          doc (policy/apply-policy policy g)
+          inner (hierarchy/view-at doc [:source])
+          source (first (filter #(= :source (:id %))
+                                (mapcat :classes (:packages inner))))]
+      (should= 8 (:killed source))
+      (should= 0 (:survived source))))
+
+  (it "names every Rust file by its filename and the directory by the namespace"
+    (let [g {:classes [{:id :rust :name "Rust"
+                        :ns "bookwriter.rust"
+                        :file "src-tauri/src/lib.rs"}
+                       {:id :rust.main :name "Main"
+                        :ns "bookwriter.rust.main"
+                        :file "src-tauri/src/main.rs"}
+                       {:id :rust.proto :name "Proto"
+                        :ns "bookwriter.rust.proto"
+                        :file "src-tauri/src/proto.rs"}]
+             :edges []}
+          doc (policy/apply-policy {:title "Bookwriter" :hierarchical true} g)
+          root (hierarchy/view-at doc [])
+          inner (hierarchy/view-at doc [:rust])
+          directory (first (filter #(= :rust (:id %))
+                                   (mapcat :classes (:packages root))))
+          named (fn [id classes]
+                  (:name (first (filter #(= id (:id %)) classes))))]
+      (should= "Rust" (:name directory))
+      (should= "lib.rs" (named :rust (mapcat :classes (:packages inner))))
+      (should= "main.rs" (named :rust.main (mapcat :classes (:packages inner))))
+      (should= "proto.rs" (named :rust.proto (mapcat :classes (:packages inner))))
+      (should= "lib.rs" (named :rust (:contents directory)))
+      (should= "main.rs" (named :rust.main (:contents directory)))
+      (should= "proto.rs" (named :rust.proto (:contents directory)))))
+
+  (it "keeps a hyphenated Clojure filename as the namespace segment"
+    (let [g {:classes [{:id :graph-python
+                        :name "GraphPython"
+                        :ns "uml-viewer.python-language.graph-python"
+                        :file "src/uml_viewer/python_language/graph_python.clj"}]
+             :edges []}
+          doc (policy/apply-policy {:hierarchical true} g)
+          view (hierarchy/view-at doc [])
+          c (first (filter #(= :graph-python (:id %))
+                           (mapcat :classes (:packages view))))]
+      (should= "GraphPython" (:name c))))
+
   (it "treats a child with no CRAP as the worst (red) score"
     (let [g (update graph :classes
                     (fn [cs]

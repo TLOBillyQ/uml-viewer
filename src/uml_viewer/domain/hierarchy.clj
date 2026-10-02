@@ -53,6 +53,28 @@
     (or (:name c) (node-label (:id c)))
     (node-label (:id c))))
 
+(defn- file-base
+  "Last path segment of `file`, or nil."
+  [file]
+  (when (seq (str file))
+    (let [n (peek (str/split (str/replace (str file) #"\\" "/") #"/"))]
+      (when-not (str/blank? n) n))))
+
+(defn- rust-file?
+  "True when `file` is a Rust source file."
+  [file]
+  (when-let [base (file-base file)]
+    (str/ends-with? (str/lower-case base) ".rs")))
+
+(defn- box-name
+  "Directory boxes use the namespace segment. Every Rust source file
+  is named by its filename."
+  [leaf id directory?]
+  (let [file (:file leaf)]
+    (if (and (not directory?) (rust-file? file))
+      (file-base file)
+      (node-label id))))
+
 (defn- has-descendants? [id classes]
   (let [pfx (str (name id) ".")]
     (boolean (some #(str/starts-with? (name (:id %)) pfx) classes))))
@@ -77,13 +99,15 @@
 (defn- contents-of [classes path node-id]
   (let [next-path (conj (vec path) (last-seg node-id))
         kids (nodes-at classes next-path)
-        others (remove #(= % node-id) kids)]
+        others (remove #(= % node-id) kids)
+        by-id (index-classes classes)]
     (when (seq others)
       (mapv (fn [cid]
-              {:id cid
-               :name (node-label cid)
-               :drill? (and (not= cid node-id)
-                            (has-descendants? cid classes))})
+              (let [directory? (and (not= cid node-id)
+                                    (has-descendants? cid classes))]
+                {:id cid
+                 :name (box-name (get by-id cid) cid directory?)
+                 :drill? directory?}))
             kids))))
 
 (defn- under-id? [c id]
@@ -122,16 +146,29 @@
     (when (seq lvs)
       (apply max lvs))))
 
+(defn- own-crap
+  "CRAP map on this source file, or nil. Files do not inherit."
+  [leaf]
+  (when (:mu (:crap leaf))
+    (:crap leaf)))
+
+(defn- own-mutants
+  "Mutation counts on this source file, or nil. Files do not inherit."
+  [leaf]
+  (let [m (select-keys (or leaf {}) [:killed :survived :uncovered])]
+    (when (or (:killed m) (:survived m))
+      m)))
+
 (defn- view-class [idx classes path id]
   (let [leaf (get idx id)
         kids (contents-of classes path id)
         drill? (boolean (seq kids))
         hide? drill?
-        crap (rolled-crap classes id)
-        mut (rolled-mutants classes id)
+        crap (if drill? (rolled-crap classes id) (own-crap leaf))
+        mut (if drill? (rolled-mutants classes id) (own-mutants leaf))
         lv (rolled-level classes id)]
     (cond-> {:id id
-             :name (node-label id)
+             :name (box-name leaf id drill?)
              :drill? drill?}
       (:ns leaf) (assoc :ns (:ns leaf))
       (:lang leaf) (assoc :lang (:lang leaf))
