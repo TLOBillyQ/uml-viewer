@@ -410,6 +410,34 @@
   (q/text-size 13)
   (q/text label (geom/cx r) (geom/cy r)))
 
+(defn- draw-real-diagram-row [state w selected]
+  (let [real (layout/real-diagram-rect w)
+        real-on? (nil? selected)
+        real-label (or (get-in state [:doc :title]) "Real diagram")]
+    (when real-on?
+      (rgb gold 40)
+      (q/no-stroke)
+      (q/rect (:x real) (:y real) (:w real) (:h real) 3))
+    (q/text-align :left :center)
+    (q/text-size 12)
+    (rgb (if real-on? gold ink))
+    (q/text real-label (+ (:x real) 6) (geom/cy real))))
+
+(defn- draw-proposal-row [w selected i p]
+  (let [r (layout/proposal-row-rect w i)]
+    (when (= selected (:id p))
+      (rgb gold 40)
+      (q/no-stroke)
+      (q/rect (:x r) (:y r) (:w r) (:h r) 3))
+    (q/text-align :left :center)
+    (q/text-size 12)
+    (rgb (if (= selected (:id p)) gold ink))
+    (q/text (or (:name p) (name (:id p)))
+            (+ (:x r) 6) (geom/cy r))))
+
+(defn- declutter-button-label [state]
+  (get declutter-label (or (:declutter state) :full) "Declutter none"))
+
 (defn- draw-sidebar-chrome [state]
   (let [w (q/width)
         h (q/height)
@@ -428,36 +456,15 @@
     (q/text-size 16)
     (rgb gold)
     (q/text "Inspector" (+ x 16) 16)
-    (let [real (layout/real-diagram-rect w)
-          real-on? (nil? selected)
-          real-label (or (get-in state [:doc :title]) "Real diagram")]
-      (when real-on?
-        (rgb gold 40)
-        (q/no-stroke)
-        (q/rect (:x real) (:y real) (:w real) (:h real) 3))
-      (q/text-align :left :center)
-      (q/text-size 12)
-      (rgb (if real-on? gold ink))
-      (q/text real-label (+ (:x real) 6) (geom/cy real)))
+    (draw-real-diagram-row state w selected)
     (q/text-align :left :top)
     (q/text-size 11)
     (rgb muted)
     (q/text "Proposals" (+ x 16) layout/proposals-label-y)
-    (doseq [[i p] (map-indexed vector ps)
-            :let [r (layout/proposal-row-rect w i)]]
-      (when (= selected (:id p))
-        (rgb gold 40)
-        (q/no-stroke)
-        (q/rect (:x r) (:y r) (:w r) (:h r) 3))
-      (q/text-align :left :center)
-      (q/text-size 12)
-      (rgb (if (= selected (:id p)) gold ink))
-      (q/text (or (:name p) (name (:id p)))
-              (+ (:x r) 6) (geom/cy r)))
+    (doseq [[i p] (map-indexed vector ps)]
+      (draw-proposal-row w selected i p))
     (draw-btn (layout/new-proposal-rect w n) "New Proposal")
-    (draw-btn (layout/declutter-rect w n)
-              (get declutter-label (or (:declutter state) :full)
-                   "Declutter none"))
+    (draw-btn (layout/declutter-rect w n) (declutter-button-label state))
     x))
 
 (defn- draw-sidebar-empty [x y]
@@ -580,70 +587,107 @@
     (q/text-size 18)
     (q/text document/waiting-message (/ vw 2.0) (/ vh 2.0))))
 
-(defn draw-state [state]
-  (apply q/background bg)
-  (when (:waiting state)
-    (draw-waiting))
-  (q/push-matrix)
+(defn- world-view [state]
   (let [z (double (or (:zoom state) 1.0))
         cam-x (:cam-x state 0)
         cam-y (:cam-y state 0)
         vw (max 0 (- (q/width) layout/sidebar-w))
-        vh (q/height)
-        world-w (/ vw z)
-        world-h (/ vh z)
+        vh (q/height)]
+    {:z z
+     :cam-x cam-x
+     :cam-y cam-y
+     :world-w (/ vw z)
+     :world-h (/ vh z)}))
+
+(defn- selected-box-id [hit]
+  (cond
+    (= :class (:kind hit)) (:id hit)
+    (= :child (:kind hit)) (:parent hit)
+    (= :port (:kind hit)) (:parent hit)
+    (= :package (:kind hit)) (:id hit)
+    :else nil))
+
+(defn- hovered-box-id [hit]
+  (cond
+    (= :class (:kind hit)) (:id hit)
+    (= :child (:kind hit)) (:parent hit)
+    (= :port (:kind hit)) (:parent hit)
+    :else nil))
+
+(defn- package-chosen? [state p]
+  (and (= :package (get-in state [:selected :kind]))
+       (= (:id p) (get-in state [:selected :id]))))
+
+(defn- edge-visible? [e cam-x cam-y world-w world-h]
+  (let [b (:draw-bounds e)]
+    (or (nil? b) (in-view? b cam-x cam-y world-w world-h))))
+
+(defn- edge-hot? [e sel-id hover]
+  (or (= sel-id (:from e))
+      (= sel-id (:to e))
+      (contains? (:via-ids e) sel-id)
+      (and (= :edge (:kind hover))
+           (= (:from e) (:from hover))
+           (= (:to e) (:to hover)))))
+
+(defn- class-visible? [c cam-x cam-y world-w world-h]
+  (or (in-view? (:rect c) cam-x cam-y world-w world-h)
+      (some #(in-view? (:rect %) cam-x cam-y world-w world-h)
+            (concat (:in-ports c) (:out-ports c)))))
+
+(defn- draw-package-bodies [scene state cam-x cam-y world-w world-h]
+  (doseq [p (:packages scene)
+          :when (in-view? (:rect p) cam-x cam-y world-w world-h)]
+    (draw-package-body p (package-chosen? state p))))
+
+(defn- draw-scene-edges [scene sel-id hover cam-x cam-y world-w world-h]
+  (when-not (get-in scene [:diagram :hide-edges])
+    (doseq [e (:edges scene)
+            :when (edge-visible? e cam-x cam-y world-w world-h)]
+      (draw-edge e (edge-hot? e sel-id hover) scene))))
+
+(defn- draw-sections [scene]
+  (doseq [sec (:sections scene)]
+    (rgb gold)
+    (q/text-align :left :top)
+    (q/text-size 20)
+    (q/text (or (:title sec) "") layout/pad (:title-y sec))))
+
+(defn- draw-package-titles [scene cam-x cam-y world-w world-h]
+  (doseq [p (:packages scene)
+          :when (in-view? (:rect p) cam-x cam-y world-w world-h)]
+    (draw-package-title p)))
+
+(defn- draw-scene-classes [scene sel-id hover-id hover sel cam-x cam-y world-w world-h]
+  (doseq [c (remove :dummy? (:classes scene))
+          :when (class-visible? c cam-x cam-y world-w world-h)]
+    (draw-class c
+                (= sel-id (:id c))
+                (= hover-id (:id c))
+                hover
+                sel)))
+
+(defn- draw-dep-indicators [scene]
+  (doseq [ind (:dep-indicators scene)]
+    (draw-dep-triangle ind)))
+
+(defn- draw-world [state]
+  (let [{:keys [z cam-x cam-y world-w world-h]} (world-view state)
         scene (:scene state)
         sel (:selected state)
         hover (:hover state)
-        sel-id (cond
-                 (= :class (:kind sel)) (:id sel)
-                 (= :child (:kind sel)) (:parent sel)
-                 (= :port (:kind sel)) (:parent sel)
-                 (= :package (:kind sel)) (:id sel)
-                 :else nil)
-        hover-id (cond
-                   (= :class (:kind hover)) (:id hover)
-                   (= :child (:kind hover)) (:parent hover)
-                   (= :port (:kind hover)) (:parent hover)
-                   :else nil)]
+        sel-id (selected-box-id sel)
+        hover-id (hovered-box-id hover)]
     (q/scale z)
     (q/translate (- cam-x) (- cam-y))
-    (doseq [p (:packages scene)
-            :when (in-view? (:rect p) cam-x cam-y world-w world-h)]
-      (draw-package-body p (and (= :package (get-in state [:selected :kind]))
-                                (= (:id p) (get-in state [:selected :id])))))
-    (when-not (get-in scene [:diagram :hide-edges])
-      (doseq [e (:edges scene)
-              :when (let [b (:draw-bounds e)]
-                      (or (nil? b) (in-view? b cam-x cam-y world-w world-h)))]
-        (draw-edge e
-                   (or (= sel-id (:from e)) (= sel-id (:to e))
-                       (contains? (:via-ids e) sel-id)
-                       (and (= :edge (:kind hover))
-                            (= (:from e) (:from hover))
-                            (= (:to e) (:to hover))))
-                   scene)))
-    (doseq [sec (:sections scene)]
-      (rgb gold)
-      (q/text-align :left :top)
-      (q/text-size 20)
-      (q/text (or (:title sec) "") layout/pad (:title-y sec)))
-    (doseq [p (:packages scene)
-            :when (in-view? (:rect p) cam-x cam-y world-w world-h)]
-      (draw-package-title p))
-    (doseq [c (remove :dummy? (:classes scene))
-            :when (or (in-view? (:rect c) cam-x cam-y world-w world-h)
-                      (some #(in-view? (:rect %) cam-x cam-y world-w world-h)
-                            (concat (:in-ports c) (:out-ports c))))]
-      (draw-class c
-                  (= sel-id (:id c))
-                  (= hover-id (:id c))
-                  hover
-                  sel))
-    (doseq [ind (:dep-indicators scene)]
-      (draw-dep-triangle ind)))
-  (q/pop-matrix)
-  (draw-sidebar state)
+    (draw-package-bodies scene state cam-x cam-y world-w world-h)
+    (draw-scene-edges scene sel-id hover cam-x cam-y world-w world-h)
+    (draw-sections scene)
+    (draw-package-titles scene cam-x cam-y world-w world-h)
+    (draw-scene-classes scene sel-id hover-id hover sel cam-x cam-y world-w world-h)
+    (draw-dep-indicators scene)))
+
+(defn- draw-diagram-banner [state]
   (when (and (not (:waiting state))
              (get-in state [:scene :diagram :title]))
     (q/text-align :left :top)
@@ -657,7 +701,9 @@
       (do
         (rgb muted)
         (q/text-size 12)
-        (q/text (get-in state [:scene :diagram :title]) 12 8))))
+        (q/text (get-in state [:scene :diagram :title]) 12 8)))))
+
+(defn- draw-nav-label [state]
   (when (or (seq (:focus state)) (:open-layer state))
     (rgb gold)
     (q/text-align :left :top)
@@ -666,7 +712,18 @@
                   (str/join "." (map name (:focus state)))
                   (or (get-in state [:scene :diagram :title])
                       (name (:open-layer state))))]
-      (q/text (str "← " label) 12 28)))
+      (q/text (str "← " label) 12 28))))
+
+(defn draw-state [state]
+  (apply q/background bg)
+  (when (:waiting state)
+    (draw-waiting))
+  (q/push-matrix)
+  (draw-world state)
+  (q/pop-matrix)
+  (draw-sidebar state)
+  (draw-diagram-banner state)
+  (draw-nav-label state)
   (draw-edge-popup (:hover state) (:pointer state)))
 
 (defn- detail-row-color [row]
@@ -693,26 +750,43 @@
     :cc muted
     muted))
 
-(defn- draw-detail-cells [row y]
+(defn- detail-column-visible? [row col]
+  (or (= :col-header (:kind row))
+      (not (and (:mut-note row) (= :mutation (:group col))))))
+
+(defn- detail-cell-text [row col]
+  (if (= :col-header (:kind row))
+    (:label col)
+    (get row (:key col))))
+
+(defn- detail-cell-ink [row col]
+  (if (= :col-header (:kind row))
+    gold
+    (cell-color row col)))
+
+(defn- draw-detail-cell [row col y]
+  (when-let [s (detail-cell-text row col)]
+    (q/text-align :right :top)
+    (q/text-size 13)
+    (rgb (detail-cell-ink row col))
+    (q/text s (:right col) y)))
+
+(defn- draw-detail-columns [row y]
   (doseq [col (detail/column-layout)
-          :when (or (= :col-header (:kind row))
-                    (not (and (:mut-note row) (= :mutation (:group col)))))]
-    (let [s (if (= :col-header (:kind row))
-              (:label col)
-              (get row (:key col)))]
-      (when s
-        (q/text-align :right :top)
-        (q/text-size 13)
-        (rgb (if (= :col-header (:kind row))
-               gold
-               (cell-color row col)))
-        (q/text s (:right col) y))))
+          :when (detail-column-visible? row col)]
+    (draw-detail-cell row col y)))
+
+(defn- draw-mut-note [row y]
   (when (and (not= :col-header (:kind row)) (:mut-note row))
     (when-let [g (first (filter #(= :mutation (:id %)) (detail/group-layout)))]
       (q/text-align :right :top)
       (q/text-size 13)
       (rgb muted)
       (q/text (:mut-note row) (:right g) y))))
+
+(defn- draw-detail-cells [row y]
+  (draw-detail-columns row y)
+  (draw-mut-note row y))
 
 (defn- draw-detail-groups [y]
   (doseq [g (detail/group-layout)]

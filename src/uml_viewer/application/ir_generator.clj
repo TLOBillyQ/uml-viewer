@@ -47,7 +47,8 @@
 
 (defn generate
   "Write the IR document for `policy-path` using `graph-impl`. Returns the output path.
-  A policy with `:sources` selects each scanner itself."
+  The path is `out-path` or the policy `:out`. The caller supplies a path when
+  both are absent. A policy with `:sources` selects each scanner itself."
   ([graph-impl policy-path] (generate graph-impl policy-path nil))
   ([graph-impl policy-path out-path]
    (let [policy (read-policy policy-path)
@@ -55,7 +56,7 @@
          extra (policy/unassigned policy graph)
          doc (assoc (policy/apply-policy policy graph)
                :policy-file policy-path)
-         out (or out-path (:out policy) "examples/uml-viewer.edn")]
+         out (or out-path (:out policy))]
      (when (seq extra)
        (binding [*out* *err*]
          (println "Unassigned namespaces:"

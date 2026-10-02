@@ -165,6 +165,34 @@
       (should-not (some #{:jvm.cli :quil-swing} (map :id (:classes pkg))))
       (should (some #{[:jvm.sketch :quil] [:jvm.sketch :quil.core]} ends))))
 
+  (it "names a nested proposal group from its label"
+    (let [p (assoc policy
+              :proposals [{:id :split :name "split"
+                           :layers [{:id :jvm :label "JVM"
+                                     :nses [{:id :outer :label "Outer"
+                                             :nses [{:id :quil-swing
+                                                     :label "Quil/Swing"
+                                                     :nses [:jvm.sketch]}]}]}]}]
+              :order [:jvm])
+          g {:classes [{:id :jvm.sketch :name "Sketch" :ns "demo.jvm.sketch"}]}
+          doc (policy/apply-policy p g)
+          view (hierarchy/proposal-view doc :split)
+          outer (first (filter #(= :outer (:id %))
+                               (mapcat :classes (:packages view))))]
+      (should= "Quil/Swing" (:name (first (:contents outer))))))
+
+  (it "restamps from the first proposal when none is chosen"
+    (let [restamp (ns-resolve 'uml-viewer.domain.hierarchy 'restamp-visible-edges)
+          doc {:proposals [{:id :first :name "first"
+                            :layers [{:id :a :nses [:left]}
+                                     {:id :b :nses [:right]}]}
+                           {:id :second :name "second"
+                            :layers [{:id :b :nses [:right]}
+                                     {:id :a :nses [:left]}]}]
+               :edges [{:from :left :to :right :kind :dependency}]}
+          edges (restamp doc nil {:foreign []} [{:id :left} {:id :right}])]
+      (should (some :violating edges))))
+
   (it "does not wrap a top-level layer in a same-named inner component"
     (let [p (assoc policy
               :proposals [{:id :layers :name "layers"

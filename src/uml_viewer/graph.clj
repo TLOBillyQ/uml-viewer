@@ -72,6 +72,86 @@
       (subs path (count prefix))
       path)))
 
+(defn file-base
+  "Last path segment of `file`, or nil."
+  [file]
+  (when (seq (str file))
+    (let [n (peek (str/split (str/replace (str file) #"\\" "/") #"/"))]
+      (when-not (str/blank? n) n))))
+
+(defn ns-join
+  "Dotted name of `relative` under `ns-prefix`."
+  [ns-prefix relative]
+  (cond
+    (str/blank? relative) (str ns-prefix)
+    (str/blank? ns-prefix) relative
+    :else (str ns-prefix "." relative)))
+
+(defn foreign-class
+  "A class that lives outside the scanned project."
+  [id]
+  {:id id :name (name id) :ns (name id) :foreign true})
+
+(defn member-edges
+  "Edges from `c` for each `[key kind]` pair."
+  [c pairs]
+  (mapcat (fn [[k kind]]
+            (map (fn [to] {:from (:id c) :to to :kind kind}) (get c k)))
+          pairs))
+
+(defn next-char
+  [source i]
+  (let [j (inc i)]
+    (when (< j (count source))
+      (.charAt ^String source j))))
+
+(defn line-comment?
+  [c nxt]
+  (and (= c \/) (= nxt \/)))
+
+(defn block-comment?
+  [c nxt]
+  (and (= c \/) (= nxt \*)))
+
+(defn- blank-span [sb n]
+  (dotimes [_ n] (.append ^StringBuilder sb \space)))
+
+(defn mask-line-comment
+  "Index just after the line comment that starts at `i`."
+  [source sb i n]
+  (let [j (or (str/index-of source \newline i) n)]
+    (blank-span sb (- j i))
+    j))
+
+(defn- comment-mask-char [c]
+  (if (= c \newline) \newline \space))
+
+(defn mask-block-comment
+  "Index just after the block comment that starts at `i`."
+  [source sb i n]
+  (let [j (or (str/index-of source "*/" (+ i 2)) (- n 2))
+        end (min n (+ j 2))]
+    (doseq [k (range i end)]
+      (.append ^StringBuilder sb (comment-mask-char (.charAt ^String source k))))
+    end))
+
+(defn copy-span
+  "Copy `source` from `i` to `end` and record that range as a hole."
+  [sb source holes i end]
+  (.append ^StringBuilder sb (subs source i end))
+  {:i end :holes (conj holes [i end])})
+
+(defn scan-quoted
+  "Index just after the quoted literal that opens at `i`."
+  [source i quote n]
+  (loop [j (inc i) esc false]
+    (cond
+      (>= j n) n
+      esc (recur (inc j) false)
+      (= (.charAt ^String source j) \\) (recur (inc j) true)
+      (= (.charAt ^String source j) quote) (inc j)
+      :else (recur (inc j) false))))
+
 (defn merge-scans
   "Combine language scans into one graph.
   Each scan is `{:classes :edges :commands :invokes}`.

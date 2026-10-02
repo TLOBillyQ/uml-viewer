@@ -50,6 +50,32 @@
       (should-be-nil (:return (second (:defs surface))))
       (should= ["Animal"] (:bases (nth (:defs surface) 2)))))
 
+  (it "keeps escapes, raw strings, and brackets from hiding the next import"
+    (let [surface (py/read-module
+                    (str "s = \"say \\\"import hidden\\\"\"\n"
+                         "t = r'raw\\nimport hidden'\n"
+                         "q = r'it\\'import hidden'\n"
+                         "u = f\"a {'import hidden'}\"\n"
+                         "def load(xs=[1], row={}):\n"
+                         "    return xs\n"
+                         "import os"))]
+      (should= ["os"] (mapcat #(map :name (:modules %)) (:imports surface)))
+      (should= ["load"] (map :name (:defs surface)))))
+
+  (it "reads string prefixes before the quote"
+    (let [open (ns-resolve 'uml-viewer.python-language.graph-python 'string-open)]
+      (should= {:raw false :f true} (open "f\"hi\"" 1))
+      (should= {:raw false :f true} (open "F\"hi\"" 1))
+      (should= {:raw true :f true} (open "rf\"hi\"" 2))
+      (should= {:raw true :f false} (open "r'hi'" 1))
+      (should= {:raw false :f false} (open "u\"hi\"" 1))
+      (should= {:raw false :f false} (open "b'hi'" 1))))
+
+  (it "stops an unclosed string at the end of the file"
+    (let [surface (py/read-module "s = \"import hidden")]
+      (should= [] (mapcat #(map :name (:modules %)) (:imports surface)))
+      (should= [] (:defs surface))))
+
   (it "keeps a quote inside an f-string from swallowing the next import"
     (let [surface (py/read-module
                     (str "s = f\"say {'import nope'}\"\n"
@@ -141,4 +167,19 @@
         (should= "app.model" (:ns (by-id :model)))
         (should= "app.dogs.kennel" (:ns (by-id :dogs.kennel)))
         (should (contains? edges [:dogs.kennel :model :inheritance]))
-        (should-not (contains? (set (keys by-id)) :cli))))))
+        (should-not (contains? (set (keys by-id)) :cli)))))
+
+  (it "resolves a dotted base through the imported module"
+    (let [dir (temp-root)]
+      (spit-file dir "src/app/__init__.py" "")
+      (spit-file dir "src/app/model.py" "class Animal:\n    pass\n")
+      (spit-file dir "src/app/extra.py"
+                 (str "import app.model\n"
+                      "from . import model\n"
+                      "class Dog(app.model.Animal):\n"
+                      "    pass\n"))
+      (let [g (graph/scan (graph/lookup :python) (io/file dir "src")
+                          {:prefix "app"})
+            edges (set (map (juxt :from :to :kind) (:edges g)))]
+        (should (contains? edges [:extra :model :dependency]))
+        (should (contains? edges [:extra :model :inheritance]))))))

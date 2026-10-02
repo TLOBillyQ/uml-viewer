@@ -8,6 +8,7 @@
             [uml-viewer.application.document :as document]
             [uml-viewer.application.events :as events]
             [uml-viewer.domain.geom :as geom]
+            [uml-viewer.engine.layout :as layout]
             [uml-viewer.domain.ir :as ir]
             [uml-viewer.adapters.sketch :as sketch]
             [uml-viewer.adapters.source-window :as source-window]
@@ -72,7 +73,7 @@
    :hover nil
    :cam-x 0
    :cam-y 0
-   :path "examples/library.edn"
+   :path nil
    :mtime 0})
 
 (defn- class-xy [s id]
@@ -81,6 +82,10 @@
 
 (defn- a-model []
   (detail/model (:scene (state)) :a))
+
+(defn- at [r button]
+  (cond-> {:x (+ (:x r) 1) :y (+ (:y r) 1) :count 1}
+    button (assoc :button button)))
 
 (defn- quiet-quil [f]
   (with-redefs [q/frame-rate (fn [_])
@@ -852,4 +857,216 @@
           (should (some #(= ["set-option" "-p" "-t" (str sid ":0.0") "remain-on-exit" "on"] %) @calls))
           (should (some #(= ["set-hook" "-t" sid "pane-died" "respawn-pane -k"] %) @calls))
           (should-not (some #{"uml-viewer-grok"} flat))))))))
+
+(describe "detail card pointer"
+  (before (reset! sketch/!bridge (empty-bridge)))
+
+  (it "clamps detail scroll to the card"
+    (let [model (a-model)]
+      (reset! sketch/!bridge {:model model})
+      (with-redefs [detail/height 10]
+        (let [max-y (max 0 (- (detail/content-h (detail/rows model)) 10))
+              capped (:scroll (call 'detail-scroll {:scroll 0} 100000))]
+          (should= max-y capped)
+          (should (pos? max-y))
+          (should= max-y (:scroll (call 'detail-scroll {:scroll max-y} 3)))
+          (should= 0 (:scroll (call 'detail-scroll {:scroll 4} {:count -100})))))))
+
+  (it "hovers the module row and defaults a missing scroll"
+    (let [model (a-model)
+          rows (detail/rows model)
+          go (first (filter :op-name rows))
+          mod (first (filter :module rows))]
+      (reset! sketch/!bridge {:model model})
+      (should= :module (:hover (call 'detail-mouse-moved {:scroll 0}
+                                     {:y (+ (:y mod) 1)})))
+      (should= "go" (:hover (call 'detail-mouse-moved {}
+                                  {:y (+ (:y go) 1)})))
+      (should= (detail/member-ident model)
+               (let [opened (atom nil)]
+                 (with-redefs [source-window/open-member-window!
+                               (fn [_ ident] (reset! opened ident))]
+                   (call 'detail-mouse-pressed {} {:y (+ (:y mod) 1)})
+                   @opened))))))
+
+(describe "popup anchor and proposal ops"
+  (before (reset! sketch/!bridge (empty-bridge)))
+
+  (it "reads a processing event, the applet event, or nothing"
+    (let [pe (MouseEvent. nil 0 MouseEvent/PRESS 0 1 2 1 1)]
+      (should= pe (call 'processing-mouse pe))
+      (with-redefs [applet/current-applet (fn [] (->FakeCurrent pe))]
+        (should= pe (call 'processing-mouse {:x 1})))
+      (with-redefs [applet/current-applet (fn [] (->FakeCurrent nil))]
+        (should-be-nil (call 'processing-mouse {:x 1})))
+      (with-redefs [applet/current-applet (fn [] nil)]
+        (should-be-nil (call 'processing-mouse {})))
+      (with-redefs [applet/current-applet (fn [] (throw (Exception. "gone")))]
+        (should-be-nil (call 'processing-mouse {})))))
+
+  (it "anchors on the awt event, a container, a component, or nothing"
+    (let [panel (javax.swing.JPanel.)
+          canvas (java.awt.Canvas.)
+          awt (java.awt.event.MouseEvent.
+                panel java.awt.event.MouseEvent/MOUSE_PRESSED
+                0 0 41 17 1 false)]
+      (should= panel (call 'popup-invoker awt nil))
+      (should= panel (call 'popup-invoker nil panel))
+      (should-be-nil (call 'popup-invoker nil :native))
+      (should-be-nil (call 'popup-invoker nil nil))
+      (should= {:invoker panel :x 41 :y 17} (call 'anchor-at awt panel 0 0))
+      (let [in (.getInsets panel)
+            anchor (call 'anchor-at nil panel 10 20)]
+        (should= panel (:invoker anchor))
+        (should= (+ 10 (.left in)) (:x anchor))
+        (should= (+ 20 (.top in)) (:y anchor)))
+      (should= {:invoker canvas :x 8 :y 9} (call 'anchor-at nil canvas 8 9))
+      (should= {:invoker nil :x 4 :y 5} (call 'anchor-at nil nil 4 5))
+      (with-redefs [applet/current-applet
+                    (fn [] (->FakeApplet false (->FakeSurface panel nil)))]
+        (let [anchor (call 'popup-anchor {} 10 20)
+              in (.getInsets panel)]
+          (should= panel (:invoker anchor))
+          (should= (+ 10 (.left in)) (:x anchor))
+          (should= (+ 20 (.top in)) (:y anchor))))
+      (with-redefs [applet/current-applet
+                    (fn [] (->FakeApplet false (->FakeSurface canvas nil)))]
+        (should= {:invoker canvas :x 8 :y 9} (call 'popup-anchor {} 8 9)))
+      (with-redefs [applet/current-applet (fn [] nil)]
+        (should= {:invoker nil :x 4 :y 5} (call 'popup-anchor {} 4 5)))
+      (with-redefs [applet/current-applet (fn [] (throw (Exception. "gone")))]
+        (should= {:invoker nil :x 1 :y 2} (call 'popup-anchor {} 1 2)))
+      (with-redefs [applet/current-applet
+                    (fn [] (->FakeApplet false (->FakeSurface panel nil)))]
+        (should= panel (call 'popup-native)))))
+
+  (it "renames, deletes, or ignores a proposal op"
+    (should-be-nil (call 'rename-op :ccp nil))
+    (should-be-nil (call 'rename-op :ccp ""))
+    (should-be-nil (call 'rename-op :ccp "   "))
+    (should= {:op :rename :id :ccp :name "New"}
+             (call 'rename-op :ccp "  New  "))
+    (with-redefs [uml-viewer.adapters.sketch/ask-proposal-name (fn [_] "  New  ")]
+      (call 'choose-rename! :ccp "Old")
+      (should= {:op :rename :id :ccp :name "New"} (:proposal-op @sketch/!bridge)))
+    (reset! sketch/!bridge (empty-bridge))
+    (with-redefs [uml-viewer.adapters.sketch/ask-proposal-name (fn [_] nil)]
+      (call 'choose-rename! :ccp "Old")
+      (should-be-nil (:proposal-op @sketch/!bridge)))
+    (call 'choose-delete! :ccp)
+    (should= {:op :delete :id :ccp} (:proposal-op @sketch/!bridge))
+    (let [ops (atom [])]
+      (with-redefs [events/rename-proposal
+                    (fn [s id name]
+                      (swap! ops conj [:rename id name])
+                      (assoc s :renamed [id name]))
+                    events/delete-proposal
+                    (fn [s id]
+                      (swap! ops conj [:delete id])
+                      (assoc s :deleted id))]
+        (should= [:a "N"] (:renamed (call 'apply-proposal-op {} {:op :rename :id :a :name "N"})))
+        (should= :a (:deleted (call 'apply-proposal-op {} {:op :delete :id :a})))
+        (should= {:kept true} (call 'apply-proposal-op {:kept true} {:op :nope}))
+        (should= [[:rename :a "N"] [:delete :a]] @ops))))
+
+  (it "builds the proposal menu and shows it at the anchor"
+    (let [shown (atom nil)]
+      (with-redefs [uml-viewer.adapters.sketch/later! (fn [f] (f))
+                    uml-viewer.adapters.sketch/show-popup!
+                    (fn [menu invoker x y]
+                      (let [items (vec (.getSubElements menu))
+                            text #(.getText ^javax.swing.JMenuItem %)]
+                        (reset! shown {:labels (mapv text items)
+                                       :invoker invoker :x x :y y})
+                        (with-redefs [uml-viewer.adapters.sketch/ask-proposal-name (fn [_] "Zed")]
+                          (.doClick ^javax.swing.JMenuItem (first items)))
+                        (.doClick ^javax.swing.JMenuItem (second items))))
+                    applet/current-applet (fn [] nil)]
+        (call 'popup-proposal-menu! {} 12 34 :ccp "CCP")
+        (should= ["Rename" "Delete"] (:labels @shown))
+        (should-be-nil (:invoker @shown))
+        (should= 12 (:x @shown))
+        (should= 34 (:y @shown))
+        (should= {:op :delete :id :ccp} (:proposal-op @sketch/!bridge))))))
+
+(describe "main window press"
+  (before (reset! sketch/!bridge (empty-bridge)))
+
+  (it "requests regen from the inspector button"
+    (quiet-quil
+      (fn []
+        (let [r (layout/regen-button 1500 920)
+              woke (atom nil)]
+          (with-redefs [uml-viewer.adapters.sketch/request-regen!
+                        (fn [root] (reset! woke root) {:woke? true})]
+            (should= "Regen requested."
+                     (:mail-status (call 'on-main-press (state) (at r nil)))))
+          (with-redefs [uml-viewer.adapters.sketch/request-regen!
+                        (fn [_root] {:woke? false})]
+            (should= "Regen queued; Grok session not attached."
+                     (:mail-status (call 'on-main-press (state) (at r nil)))))
+          (should (string? @woke))))))
+
+  (it "handles inspector clicks and a proposal right-click"
+    (quiet-quil
+      (fn []
+        (let [s (assoc (state) :doc {:proposals [{:id :ccp :name "CCP"}]})
+              mailed (atom [])
+              menus (atom [])
+              w 1500]
+          (with-redefs [uml-viewer.adapters.sketch/mail-context! (fn [st] (swap! mailed conj st) st)
+                        uml-viewer.adapters.sketch/popup-proposal-menu!
+                        (fn [_e x y id pname] (swap! menus conj [x y id pname]))]
+            (let [next (call 'on-main-press s (at (layout/proposal-row-rect w 0) :right))]
+              (should= [[(+ (:x (layout/proposal-row-rect w 0)) 1)
+                         (+ (:y (layout/proposal-row-rect w 0)) 1)
+                         :ccp "CCP"]]
+                       @menus)
+              (should= s next)
+              (should= [] @mailed))
+            (let [next (call 'on-main-press s (at (layout/proposal-row-rect w 0) nil))]
+              (should= :ccp (:proposal-id next))
+              (should= :ccp (:proposal-id (last @mailed))))
+            (let [next (call 'on-main-press (assoc s :proposal-id :ccp)
+                             (at (layout/real-diagram-rect w) nil))]
+              (should-be-nil (:proposal-id next))
+              (should (some #(nil? (:proposal-id %)) @mailed)))
+            (reset! menus [])
+            (call 'on-main-press s (at (layout/real-diagram-rect w) :right))
+            (should= [] @menus)
+            (let [before (count @mailed)
+                  next (call 'on-main-press s (at (layout/declutter-rect w 1) nil))]
+              (should= :arrows (:declutter next))
+              (should= before (count @mailed)))
+            (let [bare (assoc (state) :doc nil)
+                  before (count @mailed)]
+              (call 'on-main-press bare (at (layout/new-proposal-rect w 0) nil))
+              (should= (inc before) (count @mailed)))
+            (let [next (call 'on-main-press s {:x 1400 :y 0 :count 1})]
+              (should= s next)))))))
+
+  (it "right-clicks a child, a proposal package, or anything else"
+    (let [shown (atom [])
+          pinned (atom [])
+          s (state)]
+      (with-redefs [uml-viewer.adapters.sketch/popup-element-menu!
+                    (fn [_ _ _ _ sel] (swap! shown conj sel))
+                    uml-viewer.adapters.sketch/pin-card! (fn [on?] (swap! pinned conj on?))
+                    uml-viewer.adapters.sketch/ensure-detail-window! (fn [_])]
+        (with-redefs [events/on-press
+                      (fn [state _ _]
+                        (assoc state :selected {:kind :child :id :child :parent :engine}))]
+          (call 'on-main-press s {:x 10 :y 10 :count 1 :button :right})
+          (should= :child (:kind (last @shown))))
+        (with-redefs [events/on-press
+                      (fn [state _ _]
+                        (assoc state :selected {:kind :package :id :proposal.ccp}))]
+          (call 'on-main-press s {:x 10 :y 10 :count 1 :button :right})
+          (should= :proposal.ccp (:id (last @shown))))
+        (with-redefs [events/on-press
+                      (fn [state _ _]
+                        (assoc state :selected {:kind :package :id :p}))]
+          (call 'on-main-press s {:x 10 :y 10 :count 1 :button :right})
+          (should= [false] @pinned)
+          (should= 2 (count @shown)))))))
 

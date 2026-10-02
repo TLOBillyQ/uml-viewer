@@ -21,7 +21,7 @@
    :hover nil
    :cam-x 0
    :cam-y 0
-   :path "examples/library.edn"
+   :path nil
    :mtime 0})
 
 (describe "card-scene"
@@ -82,7 +82,7 @@
                          {:id :engine :name "Engine" :ns "demo.engine"}]
                :edges []
                :order [:domain :engine]}
-          s {:doc doc :path "examples/library.edn" :focus [] :proposal-id :ccp
+          s {:doc doc :path nil :focus [] :proposal-id :ccp
              :proposal true :scene {:classes []} :cam-x 0 :cam-y 0 :selected nil}
           w 1500
           real (layout/real-diagram-rect w)
@@ -227,6 +227,8 @@
   (it "reads wheel amount from a map and ignores junk"
     (let [s (assoc (state) :scene {:size {:h 4000 :w 800}})]
       (should= 96.0 (:cam-y (events/on-scroll s {:count 2} 900)))
+      (should= 96.0 (:cam-y (events/on-scroll s 2 {})))
+      (should= 0.0 (:cam-y (events/on-scroll s {} 900)))
       (should= 0.0 (:cam-y (events/on-scroll s :nope 900)))))
 
   (it "zooms 10% with ctrl+ and ctrl- and restores with ctrl+0"
@@ -269,7 +271,7 @@
                :classes [{:id :layout :name "Layout" :ns "uml-viewer.engine.layout"
                           :ops [{:name "place" :text "place"}]}]
                :edges []}
-          s {:doc doc :scene {:classes []} :path "examples/library.edn"}
+          s {:doc doc :scene {:classes []} :path nil}
           rows (detail/rows (detail/model (events/card-scene s) :layout))]
       (should (some #(= "place" (:op-name %)) rows))))
 
@@ -301,7 +303,7 @@
                :edges []}
           s {:doc doc
              :focus []
-             :path "examples/library.edn"
+             :path nil
              :scene (scene)
              :cam-x 10 :cam-y 10}
           opened (events/drill s :source)]
@@ -310,3 +312,31 @@
       (should= [] (:focus (events/on-key opened :esc)))
       (should= [] (:focus (events/back opened)))
       (should= s (events/back s)))))
+
+(describe "inspector presses"
+  (it "switches proposal, adds one, cycles declutter, or ignores the hit"
+    (let [doc {:hierarchical true :title "T" :classes [] :edges [] :order []
+               :proposals [{:id :old :name "Old" :layers []}]}
+          s {:doc doc :path nil :focus [:x] :open-layer :z
+             :proposal true :proposal-id :old}
+          shown (events/on-inspector-press s {:kind :proposal :id :old})
+          added (events/on-inspector-press s {:kind :new-proposal})
+          cleared (events/on-inspector-press {:declutter :full} {:kind :declutter})]
+      (should= :old (:proposal-id shown))
+      (should (:proposal shown))
+      (should= [] (:focus shown))
+      (should-be-nil (:open-layer shown))
+      (should (:proposal-id added))
+      (should= 2 (count (get-in added [:doc :proposals])))
+      (should= :arrows (:declutter cleared))
+      (should= s (events/on-inspector-press s {:kind :nope}))
+      (should= s (events/on-inspector-press s nil)))))
+
+(describe "zoom key names"
+  (it "reads keyword, character, string, and other keys"
+    (should= :out (events/zoom-dir :minus {}))
+    (should= :in (events/zoom-dir \+ {}))
+    (should= :in (events/zoom-dir "=" {}))
+    (should= :reset (events/zoom-dir "0" {}))
+    (should-be-nil (events/zoom-dir 45 {}))
+    (should-be-nil (events/zoom-dir nil {}))))

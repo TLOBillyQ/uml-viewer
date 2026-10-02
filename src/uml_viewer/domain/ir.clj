@@ -41,48 +41,64 @@
                                  (double x))
     :else (throw (ex-info "cc must be a non-negative number" {:value x}))))
 
+(defn- member-text [x]
+  (or (:text x)
+      (str (:name x)
+           (when (seq (:args x))
+             (str "(" (str/join ", " (:args x)) ")"))
+           (when (:type x) (str " : " (:type x)))
+           (when (:returns x) (str " : " (:returns x))))))
+
+(defn- with-member-counts [m x]
+  (cond-> m
+    (contains? x :coverage) (assoc :coverage (as-coverage (:coverage x)))
+    (contains? x :killed) (assoc :killed (as-count (:killed x)))
+    (contains? x :survived) (assoc :survived (as-count (:survived x)))
+    (contains? x :uncovered) (assoc :uncovered (as-count (:uncovered x)))
+    (contains? x :sites) (assoc :sites (as-count (:sites x)))))
+
+(defn- with-member-metrics [m x]
+  (cond-> m
+    (contains? x :cc) (assoc :cc (as-cc (:cc x)))
+    (contains? x :crap) (assoc :crap (as-crap (:crap x)))
+    (true? (:private x)) (assoc :private true)
+    (contains? x :name) (assoc :name (:name x))))
+
 (defn- as-member [x]
   (cond
     (string? x) {:text x}
-    (map? x) (cond-> {:text (or (:text x)
-                                (str (:name x)
-                                     (when (seq (:args x))
-                                       (str "(" (str/join ", " (:args x)) ")"))
-                                     (when (:type x) (str " : " (:type x)))
-                                     (when (:returns x) (str " : " (:returns x)))))}
-               (contains? x :coverage) (assoc :coverage (as-coverage (:coverage x)))
-               (contains? x :killed) (assoc :killed (as-count (:killed x)))
-               (contains? x :survived) (assoc :survived (as-count (:survived x)))
-               (contains? x :uncovered) (assoc :uncovered (as-count (:uncovered x)))
-               (contains? x :sites) (assoc :sites (as-count (:sites x)))
-               (contains? x :cc) (assoc :cc (as-cc (:cc x)))
-               (contains? x :crap) (assoc :crap (as-crap (:crap x)))
-               (true? (:private x)) (assoc :private true)
-               (contains? x :name) (assoc :name (:name x)))
+    (map? x) (-> {:text (member-text x)}
+                 (with-member-counts x)
+                 (with-member-metrics x))
     :else (throw (ex-info "member must be a string or map" {:value x}))))
+
+(defn- with-class-source [m c]
+  (cond-> m
+    (:ns c) (assoc :ns (str (:ns c)))
+    (:lang c) (assoc :lang (keyword (:lang c)))
+    (:file c) (assoc :file (str (:file c)))
+    (some? (:level c)) (assoc :level (long (:level c)))))
 
 (defn- as-class [c]
   (let [name (or (:name c) (some-> (:id c) name))]
     (when-not name
       (throw (ex-info "class needs :name or :id" {:class c})))
-    (cond-> {:id (as-id (or (:id c) name))
-             :name name
-             :shape (when (or (:foreign c) (= :oval (keyword (:shape c)))) :oval)
-             :stereotype (:stereotype c)
-             :crap (as-crap (:crap c))
-             :coverage (as-coverage (:coverage c))
-             :cc (as-cc (:cc c))
-             :killed (as-count (:killed c))
-             :survived (as-count (:survived c))
-             :uncovered (as-count (:uncovered c))
-             :sites (as-count (:sites c))
-             :hide-members (boolean (:hide-members c))
-             :fields (mapv as-member (:fields c))
-             :ops (mapv as-member (:ops c))}
-      (:ns c) (assoc :ns (str (:ns c)))
-      (:lang c) (assoc :lang (keyword (:lang c)))
-      (:file c) (assoc :file (str (:file c)))
-      (some? (:level c)) (assoc :level (long (:level c))))))
+    (with-class-source
+      {:id (as-id (or (:id c) name))
+       :name name
+       :shape (when (or (:foreign c) (= :oval (keyword (:shape c)))) :oval)
+       :stereotype (:stereotype c)
+       :crap (as-crap (:crap c))
+       :coverage (as-coverage (:coverage c))
+       :cc (as-cc (:cc c))
+       :killed (as-count (:killed c))
+       :survived (as-count (:survived c))
+       :uncovered (as-count (:uncovered c))
+       :sites (as-count (:sites c))
+       :hide-members (boolean (:hide-members c))
+       :fields (mapv as-member (:fields c))
+       :ops (mapv as-member (:ops c))}
+      c)))
 
 (defn- as-package [p]
   (let [label (or (:label p) (some-> (:id p) name))]

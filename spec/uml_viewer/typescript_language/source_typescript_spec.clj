@@ -2,7 +2,7 @@
   (:require [clojure.java.io :as io]
             [speclj.core :refer :all]
             [uml-viewer.source :as source]
-            [uml-viewer.typescript-language.source-typescript :as ts]))
+            [uml-viewer.typescript-language.source-typescript]))
 
 (describe "typescript extractor"
   (it "finds an exported function and opens the file named on the ident"
@@ -21,7 +21,14 @@
         (should (re-find #"export function loadBook" (:body found))))))
 
   (it "returns nil when the member is not in the file"
-    (should-be-nil (ts/extract-member "export const answer = 1;\n" "missing")))
+    (let [dir (io/file (System/getProperty "java.io.tmpdir")
+                       (str "uml-ts-miss-" (System/nanoTime)))
+          file (io/file dir "answer.ts")]
+      (io/make-parents file)
+      (spit file "export const answer = 1;\n")
+      (should-be-nil (source/member-source {:lang :typescript
+                                            :file (.getPath file)
+                                            :name "missing"}))))
 
   (it "opens a module at the top when no member is named"
     (let [dir (io/file (System/getProperty "java.io.tmpdir")

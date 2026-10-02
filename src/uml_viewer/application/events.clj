@@ -205,24 +205,36 @@
           hit (hit/at (:scene state) wx wy)]
       (assoc state :selected hit))))
 
-(defn on-scroll [state amount opts]
+(defn- scroll-opts [opts]
   (let [opts (if (map? opts) opts {:window-h opts :window-w 1500})
-        horizontal? (:horizontal? opts)
-        window-w (or (:window-w opts) 1500)
-        window-h (or (:window-h opts) 900)
-        view-w (or (:view-w opts) window-w)
-        z (zoom-of state)
-        amount (cond
-                 (number? amount) amount
-                 (map? amount) (or (:count amount) 0)
-                 :else 0)
-        size (get-in state [:scene :size] {:w 800 :h 600})
+        window-w (or (:window-w opts) 1500)]
+    {:horizontal? (:horizontal? opts)
+     :window-w window-w
+     :window-h (or (:window-h opts) 900)
+     :view-w (or (:view-w opts) window-w)}))
+
+(defn- scroll-amount [amount]
+  (cond
+    (number? amount) amount
+    (map? amount) (or (:count amount) 0)
+    :else 0))
+
+(defn- scroll-limits [state view-w window-h z]
+  (let [size (get-in state [:scene :size] {:w 800 :h 600})
         min-x (or (:min-x size) 0)
         min-y (or (:min-y size) 0)
         vis-w (/ (double view-w) z)
-        vis-h (/ (double window-h) z)
-        max-x (max min-x (- (:w size) vis-w))
-        max-y (max min-y (- (:h size) vis-h))
+        vis-h (/ (double window-h) z)]
+    {:min-x min-x
+     :min-y min-y
+     :max-x (max min-x (- (:w size) vis-w))
+     :max-y (max min-y (- (:h size) vis-h))}))
+
+(defn on-scroll [state amount opts]
+  (let [{:keys [horizontal? window-h view-w]} (scroll-opts opts)
+        z (zoom-of state)
+        amount (scroll-amount amount)
+        {:keys [min-x min-y max-x max-y]} (scroll-limits state view-w window-h z)
         delta (/ (* amount 48.0) z)]
     (if horizontal?
       (update state :cam-x #(max min-x (min max-x (+ % delta))))

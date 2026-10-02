@@ -128,18 +128,14 @@
       (should= "trees" (:root @seen))
       (should= {:prefix "demo"} (:opts @seen))))
 
-  (it "defaults src, prefix, and out when the policy omits them"
+  (it "defaults src and prefix, and requires an output path"
     (let [seen (atom nil)
-          written (atom nil)
           policy-f (edn-file (demo-policy {}))]
-      (with-redefs [spit (fn [path s] (reset! written [path s]))]
-        (let [out (ir-generator/generate (stub-scan seen [demo-a])
-                                         (.getPath policy-f))]
-          (should= "examples/uml-viewer.edn" out)
-          (should= "examples/uml-viewer.edn" (first @written))
-          (should (str/starts-with? (second @written) ";; Generated"))
-          (should= "src" (:root @seen))
-          (should= {:prefix "uml-viewer"} (:opts @seen))))))
+      (should-throw
+        (ir-generator/generate (stub-scan seen [demo-a])
+                               (.getPath policy-f)))
+      (should= "src" (:root @seen))
+      (should= {:prefix "uml-viewer"} (:opts @seen))))
 
   (it "prints unassigned namespaces to stderr"
     (let [out-f (java.io.File/createTempFile "uml-out" ".edn")

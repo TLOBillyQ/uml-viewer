@@ -116,4 +116,58 @@
                     face (curve/face-of (:rect to) tip)
                     along (if (#{:left :right} face) (abs dy) (abs dx))
                     across (if (#{:left :right} face) (abs dx) (abs dy))]]
-        (should (>= (+ across 0.01) along))))))
+        (should (>= (+ across 0.01) along)))))
+
+  (it "clamps a stroke onto the 45° cone of every face"
+    (let [clamp (ns-resolve 'uml-viewer.engine.curve 'clamp-to-face-cone)
+          axis {:left [-1.0 0.0] :right [1.0 0.0] :top [0.0 -1.0] :bottom [0.0 1.0]}
+          half (/ 10.0 (Math/sqrt 2.0))]
+      (doseq [[face [ox oy]] axis
+              arriving? [false true]]
+        (should= (if arriving? [(- ox) (- oy)] [ox oy])
+                 (clamp 0.0 0.0 face arriving?)))
+      (should= [10.0 10.0] (clamp 10.0 10.0 :right false))
+      (should= [half half] (clamp 0.0 10.0 :right false))
+      (should= [(- half) half] (clamp 0.0 10.0 :right true))
+      (let [[x y] (clamp 10.0 0.0 :bottom false)]
+        (should (< (abs (- (Math/hypot x y) 10.0)) 1.0e-9))
+        (should (< (abs (- (abs x) (abs y))) 1.0e-9)))
+      (let [[x y] (clamp -10.0 0.0 :right false)]
+        (should (< (abs (- (Math/hypot x y) 10.0)) 1.0e-9))
+        (should (< (abs (- (abs x) (abs y))) 1.0e-9)))))
+
+  (it "rotates a line leaving a face out to 45 degrees"
+    (let [box (geom/rect 0 0 100 40)
+          path {:start [100.0 20.0]
+                :ops [{:op :line :p [100.0 80.0]}
+                      {:op :line :p [140.0 20.0]}]}
+          out (curve/constrain-ends path box nil)
+          p (:p (first (:ops out)))
+          dx (- (first p) 100.0)
+          dy (- (second p) 20.0)]
+      (should (> dx 0.0))
+      (should (< (abs (- (abs dx) (abs dy))) 1.0e-6))
+      (should= [140.0 20.0] (mapv double (:p (second (:ops out)))))))
+
+  (it "rotates a cubic handle leaving a face out to 45 degrees"
+    (let [box (geom/rect 0 0 100 40)
+          path {:start [100.0 20.0]
+                :ops [{:op :cubic
+                       :c1 [100.0 80.0]
+                       :c2 [120.0 20.0]
+                       :p [140.0 20.0]}
+                      {:op :line :p [160.0 20.0]}]}
+          out (curve/constrain-ends path box nil)
+          c1 (:c1 (first (:ops out)))
+          dx (- (first c1) 100.0)
+          dy (- (second c1) 20.0)]
+      (should (> dx 0.0))
+      (should (< (abs (- (abs dx) (abs dy))) 1.0e-6))
+      (should= [160.0 20.0] (mapv double (:p (second (:ops out)))))))
+
+  (it "insets an elbow back along the incoming leg"
+    (let [rounded (curve/round-corners [[0 0] [0 80] [80 80]] 24)]
+      (should (some (fn [p]
+                      (and (< (abs (first p)) 0.01)
+                           (< (abs (- (second p) 56.0)) 0.01)))
+                    rounded)))))

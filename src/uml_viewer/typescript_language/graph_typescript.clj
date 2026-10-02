@@ -22,27 +22,60 @@
          (remove #(excluded-name? (.getName %)))
          (sort-by #(.getPath %)))))
 
+(def ^:private regex-keywords
+  #{"return" "throw" "case" "void" "typeof" "delete"
+    "await" "yield" "else" "do" "in" "of"})
+
+(defn- skip-ws-left [source j]
+  (loop [j j]
+    (if (and (>= j 0) (Character/isWhitespace (.charAt ^String source j)))
+      (recur (dec j))
+      j)))
+
+(defn- regex-ident? [c]
+  (or (Character/isLetterOrDigit ^char c) (#{\_ \$} c)))
+
+(defn- regex-operand? [c]
+  (or (Character/isLetterOrDigit ^char c) (#{\_ \$ \) \]} c)))
+
+(defn- keyword-start [source j]
+  (loop [k j]
+    (if (and (>= k 0) (regex-ident? (.charAt ^String source k)))
+      (recur (dec k))
+      (inc k))))
+
+(defn- regex-keyword? [source j]
+  (regex-keywords (subs source (keyword-start source j) (inc j))))
+
 (defn- regex-before?
   "True when `/` at `i` can open a regex literal rather than division."
   [source i]
-  (loop [j (dec i)]
-    (if (and (>= j 0) (Character/isWhitespace (.charAt ^String source j)))
-      (recur (dec j))
-      (or (neg? j)
-          (let [c (.charAt ^String source j)]
-            (cond
-              (or (Character/isLetterOrDigit c) (#{\_ \$ \) \]} c))
-              (let [start (loop [k j]
-                            (if (and (>= k 0)
-                                     (let [d (.charAt ^String source k)]
-                                       (or (Character/isLetterOrDigit d)
-                                           (#{\_ \$} d))))
-                              (recur (dec k))
-                              (inc k)))]
-                (#{"return" "throw" "case" "void" "typeof" "delete"
-                   "await" "yield" "else" "do" "in" "of"}
-                 (subs source start (inc j))))
-              :else true))))))
+  (let [j (skip-ws-left source (dec i))]
+    (or (neg? j)
+        (if (regex-operand? (.charAt ^String source j))
+          (regex-keyword? source j)
+          true))))
+
+(defn- class-open? [c class?]
+  (and (= c \[) (not class?)))
+
+(defn- class-close? [c class?]
+  (and (= c \]) class?))
+
+(defn- in-class? [c class?]
+  (cond
+    (class-open? c class?) true
+    (class-close? c class?) false
+    :else class?))
+
+(defn- regex-closed? [c class?]
+  (and (= c \/) (not class?)))
+
+(defn- regex-flag-end [source j n]
+  (loop [k (inc j)]
+    (if (and (< k n) (Character/isLetter (.charAt ^String source k)))
+      (recur (inc k))
+      k)))
 
 (defn- regex-end
   "Index just after the flags of a regex that opens at `i`, or nil."
@@ -55,14 +88,40 @@
             esc (recur (inc j) class? false)
             (= c \\) (recur (inc j) class? true)
             (= c \newline) nil
-            (and (= c \[) (not class?)) (recur (inc j) true false)
-            (and (= c \]) class?) (recur (inc j) false false)
-            (and (= c \/) (not class?))
-            (loop [k (inc j)]
-              (if (and (< k n) (Character/isLetter (.charAt ^String source k)))
-                (recur (inc k))
-                k))
-            :else (recur (inc j) class? false)))))))
+            (regex-closed? c class?) (regex-flag-end source j n)
+            :else (recur (inc j) (in-class? c class?) false)))))))
+
+(defn- slash-regex? [source i c nxt]
+  (and (= c \/) nxt (not= nxt \*) (regex-before? source i)))
+
+(defn- string-quote? [c]
+  (#{\' \" \`} c))
+
+(defn- mask-regex [source sb holes i c]
+  (if-let [end (regex-end source i)]
+    (graph/copy-span sb source holes i end)
+    (do (.append sb c)
+        {:i (inc i) :holes holes})))
+
+(defn- mask-ts-step [source sb holes i n]
+  (let [c (.charAt source i)
+        nxt (graph/next-char source i)]
+    (cond
+      (graph/line-comment? c nxt)
+      {:i (graph/mask-line-comment source sb i n) :holes holes}
+
+      (graph/block-comment? c nxt)
+      {:i (graph/mask-block-comment source sb i n) :holes holes}
+
+      (slash-regex? source i c nxt)
+      (mask-regex source sb holes i c)
+
+      (string-quote? c)
+      (graph/copy-span sb source holes i (graph/scan-quoted source i c n))
+
+      :else
+      (do (.append sb c)
+          {:i (inc i) :holes holes}))))
 
 (defn- mask-comments
   "Comments become spaces. String and template literals are copied and
@@ -74,42 +133,8 @@
     (loop [i 0 holes []]
       (if (>= i n)
         {:text (str sb) :holes holes}
-        (let [c (.charAt source i)
-              nxt (when (< (inc i) n) (.charAt source (inc i)))]
-          (cond
-            (and (= c \/) (= nxt \/))
-            (let [j (or (str/index-of source \newline i) n)]
-              (dotimes [_ (- j i)] (.append sb \space))
-              (recur j holes))
-
-            (and (= c \/) (= nxt \*))
-            (let [j (or (str/index-of source "*/" (+ i 2)) (- n 2))
-                  end (min n (+ j 2))]
-              (doseq [k (range i end)]
-                (.append sb (if (= \newline (.charAt source k)) \newline \space)))
-              (recur end holes))
-
-            (and (= c \/) nxt (not= nxt \*) (regex-before? source i))
-            (if-let [end (regex-end source i)]
-              (do (.append sb (subs source i end))
-                  (recur end (conj holes [i end])))
-              (do (.append sb c)
-                  (recur (inc i) holes)))
-
-            (#{\' \" \`} c)
-            (let [end (loop [j (inc i) esc false]
-                        (cond
-                          (>= j n) n
-                          esc (recur (inc j) false)
-                          (= (.charAt source j) \\) (recur (inc j) true)
-                          (= (.charAt source j) c) (inc j)
-                          :else (recur (inc j) false)))]
-              (.append sb (subs source i end))
-              (recur end (conj holes [i end])))
-
-            :else
-            (do (.append sb c)
-                (recur (inc i) holes))))))))
+        (let [step (mask-ts-step source sb holes i n)]
+          (recur (:i step) (:holes step)))))))
 
 (defn- in-hole? [holes i]
   (boolean (some (fn [[a b]] (and (<= a i) (< i b))) holes)))
@@ -201,47 +226,84 @@
              ident? #(and % (or (Character/isLetterOrDigit ^char %) (#{\_ \$} %)))]
          (and (not (ident? before)) (not (ident? after))))))
 
-(defn- invoke-name [text i]
-  (loop [j i depth-angle 0 depth-paren 0 started false]
-    (when (< j (count text))
-      (let [c (.charAt text j)]
-        (cond
-          (and (not started) (Character/isWhitespace c)) (recur (inc j) 0 0 false)
-          (and (not started) (= c \<)) (recur (inc j) 1 0 true)
-          (pos? depth-angle)
-          (recur (inc j)
-                 (cond (= c \<) (inc depth-angle)
-                       (= c \>) (dec depth-angle)
-                       :else depth-angle)
-                 0
-                 true)
-          (and (not started) (= c \()) (recur (inc j) 0 1 true)
-          (and started (zero? depth-angle) (zero? depth-paren) (= c \())
-          (recur (inc j) 0 1 true)
-          (pos? depth-paren)
-          (cond
-            (#{\' \"} c)
-            (let [end (loop [k (inc j) esc false]
-                        (cond
-                          (>= k (count text)) (count text)
-                          esc (recur (inc k) false)
-                          (= (.charAt text k) \\) (recur (inc k) true)
-                          (= (.charAt text k) c) k
-                          :else (recur (inc k) false)))]
-              (when (> end j)
-                (subs text (inc j) end)))
+(defn- angle-depth [c depth]
+  (cond
+    (= c \<) (inc depth)
+    (= c \>) (dec depth)
+    :else depth))
 
-            (Character/isWhitespace c) (recur (inc j) 0 depth-paren true)
-            :else nil)
-          :else nil)))))
+(defn- open-paren? [c]
+  (= c \())
+
+(defn- arg-quote? [c]
+  (or (= c \') (= c \")))
+
+(defn- quoted-end [text j quote]
+  (let [n (count text)]
+    (loop [k (inc j) esc false]
+      (cond
+        (>= k n) n
+        esc (recur (inc k) false)
+        (= (.charAt text k) \\) (recur (inc k) true)
+        (= (.charAt text k) quote) k
+        :else (recur (inc k) false)))))
+
+(defn- quoted-arg [text j quote]
+  (let [end (quoted-end text j quote)]
+    (when (> end j)
+      (subs text (inc j) end))))
+
+(defn- invoke-before [c]
+  (cond
+    (Character/isWhitespace c) {:state :before}
+    (= c \<) {:state :angle :angle 1}
+    (open-paren? c) {:state :paren :paren 1}
+    :else nil))
+
+(defn- invoke-angle [c depth]
+  (let [depth (angle-depth c depth)]
+    {:state (if (pos? depth) :angle :after)
+     :angle depth}))
+
+(defn- invoke-after [c]
+  (when (open-paren? c)
+    {:state :paren :paren 1}))
+
+(defn- invoke-paren [text j c depth]
+  (cond
+    (arg-quote? c) (quoted-arg text j c)
+    (Character/isWhitespace c) {:state :paren :paren depth}
+    :else nil))
+
+(defn- invoke-state [state text j c angle paren]
+  (case state
+    :before (invoke-before c)
+    :angle (invoke-angle c angle)
+    :after (invoke-after c)
+    :paren (invoke-paren text j c paren)))
+
+(defn- invoke-name [text i]
+  (loop [j i state :before angle 0 paren 0]
+    (when (< j (count text))
+      (let [c (.charAt text j)
+            step (invoke-state state text j c angle paren)]
+        (if (string? step)
+          step
+          (when step
+            (recur (inc j) (:state step) (:angle step 0) (:paren step 0))))))))
+
+(defn- invoke-at [text holes j]
+  (when (and (word-at? text j "invoke")
+             (not (in-hole? holes j)))
+    (invoke-name text (+ j (count "invoke")))))
+
+(defn- conj-name [acc name]
+  (if name (conj acc name) acc))
 
 (defn- invokes-of [text holes]
   (loop [i 0 acc []]
     (if-let [j (str/index-of text "invoke" i)]
-      (if (and (word-at? text j "invoke") (not (in-hole? holes j)))
-        (let [name (invoke-name text (+ j (count "invoke")))]
-          (recur (inc j) (if name (conj acc name) acc)))
-        (recur (inc j) acc))
+      (recur (inc j) (conj-name acc (invoke-at text holes j)))
       acc)))
 
 (defn- line-starts [text holes keyword]
@@ -256,42 +318,61 @@
 (defn- at-keyword [text at keyword]
   (or (str/index-of text keyword at) at))
 
+(defn- export-spec [stmt]
+  {:spec (from-spec stmt)})
+
+(defn- export-brace-ops [stmt]
+  (when-not (re-find #"^export\s+type\b" stmt)
+    (brace-names stmt)))
+
+(defn- export-brace [stmt]
+  {:spec (from-spec stmt)
+   :ops (export-brace-ops stmt)})
+
+(defn- export-function [stmt header]
+  (when-let [name (second (re-find #"function\s+\*?\s*([A-Za-z_$][\w$]*)" stmt))]
+    {:ops [name] :type (return-type header) :value true}))
+
+(defn- export-named [stmt pattern]
+  (when-let [name (second (re-find pattern stmt))]
+    {:ops [name] :value true}))
+
+(defn- export-binding [stmt header]
+  (when-let [name (second (re-find #"(?:const|let|var)\s+([A-Za-z_$][\w$]*)" stmt))]
+    {:ops [name] :type (const-type header) :value true}))
+
+(defn- export-from [stmt]
+  (cond
+    (re-find #"^export\s+type\s*\{" stmt) (export-spec stmt)
+    (re-find #"^export\s+\*" stmt) (export-spec stmt)
+    (re-find #"^export\s+\{" stmt) (export-brace stmt)
+    :else nil))
+
+(defn- export-value [stmt header]
+  (cond
+    (re-find #"^export\s+(?:default\s+)?(?:async\s+)?function\b" stmt)
+    (export-function stmt header)
+
+    (re-find #"^export\s+(?:default\s+)?class\b" stmt)
+    (export-named stmt #"class\s+([A-Za-z_$][\w$]*)")
+
+    (re-find #"^export\s+(?:const|let|var)\b" stmt)
+    (export-binding stmt header)
+
+    (re-find #"^export\s+(?:default\s+)?interface\b" stmt)
+    {:interface true}
+
+    (re-find #"^export\s+(?:default\s+)?enum\b" stmt)
+    (export-named stmt #"enum\s+([A-Za-z_$][\w$]*)")
+
+    :else nil))
+
 (defn- export-fact [text at]
   (let [at (at-keyword text at "export")
         stmt (str/triml (subs text at (statement-end text at)))
         header (header-of (subs text at))]
-    (cond
-      (re-find #"^export\s+type\s*\{" stmt)
-      {:spec (from-spec stmt)}
-
-      (re-find #"^export\s+\*" stmt)
-      {:spec (from-spec stmt)}
-
-      (re-find #"^export\s+\{" stmt)
-      {:spec (from-spec stmt)
-       :ops (when-not (re-find #"^export\s+type\b" stmt)
-              (brace-names stmt))}
-
-      (re-find #"^export\s+(?:default\s+)?(?:async\s+)?function\b" stmt)
-      (when-let [name (second (re-find #"function\s+\*?\s*([A-Za-z_$][\w$]*)" stmt))]
-        {:ops [name] :type (return-type header) :value true})
-
-      (re-find #"^export\s+(?:default\s+)?class\b" stmt)
-      (when-let [name (second (re-find #"class\s+([A-Za-z_$][\w$]*)" stmt))]
-        {:ops [name] :value true})
-
-      (re-find #"^export\s+(?:const|let|var)\b" stmt)
-      (when-let [name (second (re-find #"(?:const|let|var)\s+([A-Za-z_$][\w$]*)" stmt))]
-        {:ops [name] :type (const-type header) :value true})
-
-      (re-find #"^export\s+(?:default\s+)?interface\b" stmt)
-      {:interface true}
-
-      (re-find #"^export\s+(?:default\s+)?enum\b" stmt)
-      (when-let [name (second (re-find #"enum\s+([A-Za-z_$][\w$]*)" stmt))]
-        {:ops [name] :value true})
-
-      :else nil)))
+    (or (export-from stmt)
+        (export-value stmt header))))
 
 (defn- import-fact [text at]
   (let [at (at-keyword text at "import")
@@ -324,12 +405,6 @@
         (str/replace #"/$" "")
         (str/replace "/" "."))))
 
-(defn- ns-join [ns-prefix relative]
-  (cond
-    (str/blank? relative) (str ns-prefix)
-    (str/blank? ns-prefix) relative
-    :else (str ns-prefix "." relative)))
-
 (defn- asset? [spec]
   (boolean (re-find #"\.(?:css|scss|sass|less|svg|png|jpe?g|gif|webp|html|md|json)$" spec)))
 
@@ -357,7 +432,7 @@
 (defn- parse-file [file root path->id prefix ns-prefix]
   (let [surface (read-module (slurp file))
         relative (module-relative file root)
-        ns-str (ns-join ns-prefix relative)
+        ns-str (graph/ns-join ns-prefix relative)
         id (graph/id-of ns-str prefix)
         project-bindings (into {}
                                (for [imp (:imports surface)
@@ -397,18 +472,6 @@
      :impls (vec (remove #(= % id) impls))
      :invokes (:invokes surface)}))
 
-(defn- as-edges [c]
-  (concat
-    (map (fn [to] {:from (:id c) :to to :kind :dependency}) (:requires c))
-    (map (fn [to] {:from (:id c) :to to :kind :dependency}) (:foreigns c))
-    (map (fn [to] {:from (:id c) :to to :kind :implements}) (:impls c))))
-
-(defn- foreign-class [id]
-  {:id id
-   :name (name id)
-   :ns (name id)
-   :foreign true})
-
 (defn- public-class [c]
   (cond-> (dissoc c :requires :foreigns :impls :invokes)
     (empty? (:ops c)) (dissoc :ops)
@@ -422,7 +485,7 @@
           files (source-files root)
           path->id (into {}
                          (map (fn [file]
-                                (let [ns-str (ns-join ns-prefix (module-relative file root))]
+                                (let [ns-str (graph/ns-join ns-prefix (module-relative file root))]
                                   [(.getCanonicalPath file) (graph/id-of ns-str prefix)]))
                               files))
           parsed (mapv #(parse-file % root path->id prefix ns-prefix) files)
@@ -431,9 +494,12 @@
                         (mapcat :foreigns)
                         distinct
                         (remove project-ids)
-                        (mapv foreign-class))
+                        (mapv graph/foreign-class))
           classes (into (mapv public-class parsed) foreigns)
-          edges (->> (mapcat as-edges parsed)
+          edges (->> (mapcat #(graph/member-edges % [[:requires :dependency]
+                                                     [:foreigns :dependency]
+                                                     [:impls :implements]])
+                                parsed)
                      (remove #(= (:from %) (:to %)))
                      distinct
                      vec)

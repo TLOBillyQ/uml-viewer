@@ -35,6 +35,73 @@
     (and (<= (+ j len) n)
          (every? #(= q (.charAt ^String source %)) (range j (+ j len))))))
 
+(defn- escaped-string-char? [source j c n raw? q]
+  (and (= c \\)
+       (< (inc j) n)
+       (or (not raw?) (= q (.charAt ^String source (inc j))))))
+
+(defn- doubled-brace? [source j c n brace]
+  (and (< (inc j) n)
+       (= c brace)
+       (= brace (.charAt ^String source (inc j)))))
+
+(defn- f-escape? [source j c n f? brace]
+  (and f? (doubled-brace? source j c n brace)))
+
+(def ^:private open-brace \{)
+(def ^:private close-brace \})
+
+(defn- f-open? [c f?]
+  (and f? (= c open-brace)))
+
+(defn- f-close? [c f? depth]
+  (and f? (pos? depth) (= c close-brace)))
+
+(defn- f-string-step [source j c n f? depth]
+  (cond
+    (f-escape? source j c n f? open-brace) {:j (+ j 2) :depth depth}
+    (f-escape? source j c n f? close-brace) {:j (+ j 2) :depth depth}
+    (f-open? c f?) {:j (inc j) :depth (inc depth)}
+    (f-close? c f? depth) {:j (inc j) :depth (dec depth)}
+    :else nil))
+
+(defn- py-quote? [c]
+  (or (= c \") (= c \')))
+
+(defn- nested-quote? [c depth]
+  (and (pos? depth) (py-quote? c)))
+
+(defn- at-closer? [source j depth q len]
+  (and (zero? depth) (closer-at? source j q len)))
+
+(defn- skip-nested [source j]
+  (or (skip-string source j) (inc j)))
+
+(defn- escape-advance [source j c n raw? q depth]
+  (when (escaped-string-char? source j c n raw? q)
+    {:j (+ j 2) :depth depth}))
+
+(defn- brace-advance [brace]
+  (when brace
+    {:j (:j brace) :depth (:depth brace)}))
+
+(defn- nested-advance [source j c depth]
+  (when (nested-quote? c depth)
+    {:j (skip-nested source j) :depth depth}))
+
+(defn- closer-advance [source j depth q len]
+  (when (at-closer? source j depth q len)
+    {:end (+ j len)}))
+
+(defn- string-advance [source j depth q len raw? f? n]
+  (let [c (.charAt ^String source j)
+        brace (f-string-step source j c n f? depth)]
+    (or (escape-advance source j c n raw? q depth)
+        (brace-advance brace)
+        (nested-advance source j c depth)
+        (closer-advance source j depth q len)
+        {:j (inc j) :depth depth})))
+
 (defn- scan-string
   "Index just after the string body that starts at `j`."
   [source j q len raw? f?]
@@ -42,31 +109,10 @@
     (loop [j j depth 0]
       (if (>= j n)
         n
-        (let [c (.charAt ^String source j)]
-          (cond
-            (and (= c \\) (< (inc j) n)
-                 (or (not raw?) (= q (.charAt ^String source (inc j)))))
-            (recur (+ j 2) depth)
-
-            (and f? (= c \{) (< (inc j) n) (= \{ (.charAt ^String source (inc j))))
-            (recur (+ j 2) depth)
-
-            (and f? (= c \}) (< (inc j) n) (= \} (.charAt ^String source (inc j))))
-            (recur (+ j 2) depth)
-
-            (and f? (= c \{))
-            (recur (inc j) (inc depth))
-
-            (and f? (pos? depth) (= c \}))
-            (recur (inc j) (dec depth))
-
-            (and (pos? depth) (or (= c \") (= c \')))
-            (recur (or (skip-string source j) (inc j)) depth)
-
-            (and (zero? depth) (closer-at? source j q len))
-            (+ j len)
-
-            :else (recur (inc j) depth)))))))
+        (let [step (string-advance source j depth q len raw? f? n)]
+          (if (:end step)
+            (:end step)
+            (recur (:j step) (:depth step))))))))
 
 (defn- string-open
   "Prefix flags when a string starts at quote `i`, else nil."
@@ -98,6 +144,16 @@
           len (if triple? 3 1)]
       (scan-string source (+ i len) q len (:raw flags) (:f flags)))))
 
+(defn- mask-hash-comment [source sb i n]
+  (let [j (or (str/index-of source \newline i) n)]
+    (dotimes [_ (- j i)] (.append sb \space))
+    j))
+
+(defn- mask-python-string [source sb holes i]
+  (let [end (skip-string source i)]
+    (.append sb (subs source i end))
+    {:i end :holes (conj holes [i end])}))
+
 (defn- mask-comments
   "Comments become spaces. String literals are copied and recorded as
   half-open ranges so a match inside them can be ignored. An f-string
@@ -111,14 +167,11 @@
         (let [c (.charAt ^String source i)]
           (cond
             (= c \#)
-            (let [j (or (str/index-of source \newline i) n)]
-              (dotimes [_ (- j i)] (.append sb \space))
-              (recur j holes))
+            (recur (mask-hash-comment source sb i n) holes)
 
             (string-open source i)
-            (let [end (skip-string source i)]
-              (.append sb (subs source i end))
-              (recur end (conj holes [i end])))
+            (let [step (mask-python-string source sb holes i)]
+              (recur (:i step) (:holes step)))
 
             :else
             (do (.append sb c)
@@ -145,6 +198,23 @@
       (Character/isWhitespace (.charAt ^String text j)) (recur (dec j))
       :else false)))
 
+(defn- continued-line? [text j c n]
+  (and (= c \\) (< (inc j) n) (= \newline (.charAt ^String text (inc j)))))
+
+(defn- bump [c open close depth]
+  (cond
+    (= c open) (inc depth)
+    (= c close) (max 0 (dec depth))
+    :else depth))
+
+(defn- next-depths [c paren brack brace]
+  [(bump c \( \) paren)
+   (bump c \[ \] brack)
+   (bump c \{ \} brace)])
+
+(defn- statement-break? [c paren brack brace]
+  (and (= c \newline) (zero? paren) (zero? brack) (zero? brace)))
+
 (defn- statement-end [text i]
   (let [n (count text)]
     (loop [j i paren 0 brack 0 brace 0]
@@ -152,17 +222,15 @@
         n
         (let [c (.charAt ^String text j)]
           (cond
-            (and (= c \\) (< (inc j) n) (= \newline (.charAt ^String text (inc j))))
+            (continued-line? text j c n)
             (recur (+ j 2) paren brack brace)
 
-            (= c \() (recur (inc j) (inc paren) brack brace)
-            (= c \)) (recur (inc j) (max 0 (dec paren)) brack brace)
-            (= c \[) (recur (inc j) paren (inc brack) brace)
-            (= c \]) (recur (inc j) paren (max 0 (dec brack)) brace)
-            (= c \{) (recur (inc j) paren brack (inc brace))
-            (= c \}) (recur (inc j) paren brack (max 0 (dec brace)))
-            (and (= c \newline) (zero? paren) (zero? brack) (zero? brace)) j
-            :else (recur (inc j) paren brack brace)))))))
+            (statement-break? c paren brack brace)
+            j
+
+            :else
+            (let [[paren brack brace] (next-depths c paren brack brace)]
+              (recur (inc j) paren brack brace))))))))
 
 (defn- flatten-stmt [s]
   (-> s
@@ -198,17 +266,23 @@
         {:kind :import
          :modules (import-parts modules)}))))
 
+(defn- import-at? [text holes i]
+  (and (not (in-hole? holes i))
+       (stmt-start? text i)
+       (or (keyword-at? text i "from")
+           (keyword-at? text i "import"))))
+
+(defn- conj-import [acc parsed]
+  (if parsed (conj acc parsed) acc))
+
 (defn- imports-of [text holes]
   (let [n (count text)]
     (loop [i 0 acc []]
       (if (>= i n)
         acc
-        (if (and (not (in-hole? holes i))
-                 (stmt-start? text i)
-                 (or (keyword-at? text i "from") (keyword-at? text i "import")))
-          (let [end (statement-end text i)
-                parsed (parse-import (subs text i end))]
-            (recur end (if parsed (conj acc parsed) acc)))
+        (if (import-at? text holes i)
+          (let [end (statement-end text i)]
+            (recur end (conj-import acc (parse-import (subs text i end)))))
           (recur (inc i) acc))))))
 
 (defn- bases-of [header]
@@ -302,26 +376,41 @@
       (if (str/blank? module) base (join-mod base module)))
     module))
 
+(defn- relative-only? [imp]
+  (and (pos? (:dots imp)) (str/blank? (:module imp))))
+
+(defn- bind-child [root name bind by-ns by-rel]
+  (when-let [id (exact-id (join-mod root name) by-ns by-rel)]
+    {:id id :bind bind}))
+
+(defn- bind-name [root parent name bind by-ns by-rel]
+  (when-let [id (or (exact-id (join-mod root name) by-ns by-rel)
+                    parent)]
+    {:id id :bind bind}))
+
+(defn- from-fallback [root parent]
+  (cond
+    parent [{:id parent}]
+    (not (str/blank? (str root))) [{:foreign root}]))
+
+(defn- resolve-members [root parent imp by-ns by-rel]
+  (let [hits (keep (fn [{:keys [name bind]}]
+                     (bind-name root parent name bind by-ns by-rel))
+                   (:names imp))]
+    (if (seq hits)
+      hits
+      (from-fallback root parent))))
+
 (defn- resolve-from [package imp by-ns by-rel]
   (let [root (from-root package imp)]
     (cond
       (nil? root) nil
-      (and (pos? (:dots imp)) (str/blank? (:module imp)))
+      (relative-only? imp)
       (keep (fn [{:keys [name bind]}]
-              (when-let [id (exact-id (join-mod root name) by-ns by-rel)]
-                {:id id :bind bind}))
+              (bind-child root name bind by-ns by-rel))
             (:names imp))
       :else
-      (let [parent (exact-id root by-ns by-rel)
-            hits (keep (fn [{:keys [name bind]}]
-                         (when-let [id (or (exact-id (join-mod root name) by-ns by-rel)
-                                           parent)]
-                           {:id id :bind bind}))
-                       (:names imp))]
-        (cond
-          (seq hits) hits
-          parent [{:id parent}]
-          (not (str/blank? (str root))) [{:foreign root}])))))
+      (resolve-members root (exact-id root by-ns by-rel) imp by-ns by-rel))))
 
 (defn- resolve-import [imp by-ns by-rel]
   (keep (fn [{:keys [name bind]}]
@@ -410,9 +499,6 @@
     (map (fn [to] {:from (:id c) :to to :kind :dependency}) (:requires c))
     (map (fn [to] {:from (:id c) :to to :kind :dependency}) (:foreigns c))))
 
-(defn- foreign-class [id]
-  {:id id :name (name id) :ns (name id) :foreign true})
-
 (defn- public-class [c]
   (cond-> (dissoc c :requires :foreigns :inherits :impls :init? :relative)
     (empty? (:ops c)) (dissoc :ops)
@@ -444,7 +530,7 @@
                         (mapcat :foreigns)
                         distinct
                         (remove project-ids)
-                        (mapv foreign-class))]
+                        (mapv graph/foreign-class))]
       {:classes (into (mapv public-class parsed) foreigns)
        :edges (->> (mapcat as-edges parsed)
                    (remove #(= (:from %) (:to %)))

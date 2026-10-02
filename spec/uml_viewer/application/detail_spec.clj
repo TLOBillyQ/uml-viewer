@@ -7,6 +7,10 @@
 (defn- call [sym & args]
   (apply (ns-resolve 'uml-viewer.application.detail sym) args))
 
+(describe "detail height"
+  (it "is two pads when there are no rows"
+    (should= 32 (detail/content-h []))))
+
 (defn scene []
   (compose/compile-diagram
     (ir/normalize
@@ -210,4 +214,57 @@
   (it "does not treat a field row as a relationship hit"
     (let [rows (detail/rows (detail/model (scene) :a))
           name-row (first (filter #(= :name (:kind %)) rows))]
-      (should-be-nil (detail/rel-at rows (:y name-row))))))
+      (should-be-nil (detail/rel-at rows (:y name-row)))))
+
+  (it "lays out level, stereotype, fields, and a labeled relationship"
+    (let [s (compose/compile-diagram
+              (ir/normalize
+                {:title "Card"
+                 :packages [{:id :p :label "Domain"
+                             :classes [{:id :a :name "A" :ns "demo.a"
+                                        :level 2 :stereotype :bean
+                                        :fields ["n"]}
+                                       {:id :b :name "B"}]}]
+                 :edges [{:from :a :to :b :kind :dependency :label "db"}]}))
+          texts (map :text (detail/rows (detail/model s :a)))]
+      (should-contain "Level 2" texts)
+      (should-contain "«bean»" texts)
+      (should-contain "n" texts)
+      (should-contain "Fields" texts)
+      (should-contain "depends on  B  «db»" texts)))
+
+  (it "omits optional sections and falls back to the package id"
+    (let [orphan (detail/rows {:class {:name "Solo" :package :orphan}})
+          bare (detail/rows {:class {:name "Bare"}})
+          kept (detail/rows {:class {:name "A" :package :orphan}
+                             :package {:label "Kept"}
+                             :title "Card"})]
+      (should-be-nil (detail/rows nil))
+      (should= ["Solo" "package  orphan"] (map :text orphan))
+      (should= ["Bare" "package  "] (map :text bare))
+      (should-contain "package  Kept" (map :text kept))
+      (should-contain "Card" (map :text kept))
+      (should-not (some #{:stats :field :rel :crap :heading} (map :kind orphan)))))
+
+  (it "opens the metrics table only when an operator or a metric is present"
+    (should (call 'metrics-row? {:ops [{:name "go"}]}))
+    (should (call 'metrics-row? {:crap 1}))
+    (should (call 'metrics-row? {:coverage 0.2}))
+    (should (call 'metrics-row? {:cc 3}))
+    (should (call 'metrics-row? {:killed 0}))
+    (should (call 'metrics-row? {:survived 0}))
+    (should-not (call 'metrics-row? {}))
+    (should-not (call 'metrics-row? {:uncovered 4 :fields [{:text "n"}]}))))
+
+(describe "member-ident"
+  (it "includes name, lang, and file only when they are present"
+    (should= {:ns "demo.a"} (detail/member-ident {:ns "demo.a"}))
+    (should= {:ns "demo.a"} (detail/member-ident {:ns "demo.a"} nil))
+    (should= {:ns "demo.a"} (detail/member-ident {:ns "demo.a"} ""))
+    (should= {:ns "demo.a" :name "go"} (detail/member-ident {:ns "demo.a"} "go"))
+    (should= {:ns "demo.a" :lang :rust}
+             (detail/member-ident {:ns "demo.a" :lang :rust} nil))
+    (should= {:ns "demo.a" :file "src/lib.rs"}
+             (detail/member-ident {:ns "demo.a" :file "src/lib.rs"} nil))
+    (should= {:ns "demo.a" :name "go" :lang :rust :file "src/lib.rs"}
+             (detail/member-ident {:ns "demo.a" :lang :rust :file "src/lib.rs"} "go"))))

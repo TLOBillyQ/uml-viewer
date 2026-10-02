@@ -26,6 +26,50 @@
           body (or (second (re-find #"(?s)\[lib\](.*?)(?:\n\[|\z)" text)) "")]
       (second (re-find #"(?m)^name\s*=\s*\"([^\"]+)\"" body)))))
 
+(defn- rust-string? [c]
+  (= c \"))
+
+(defn- plain-char? [source i c nxt]
+  (and (= c \')
+       nxt
+       (not= nxt \\)
+       (< (+ i 2) (count source))
+       (= (.charAt source (+ i 2)) \')))
+
+(defn- escaped-char? [c nxt]
+  (and (= c \') (= nxt \\)))
+
+(defn- scan-escaped-char [source i n]
+  (loop [j (+ i 2) esc true]
+    (cond
+      (>= j n) n
+      esc (recur (inc j) false)
+      (= (.charAt source j) \') (inc j)
+      :else (recur (inc j) false))))
+
+(defn- mask-rust-step [source sb holes i n]
+  (let [c (.charAt source i)
+        nxt (graph/next-char source i)]
+    (cond
+      (graph/line-comment? c nxt)
+      {:i (graph/mask-line-comment source sb i n) :holes holes}
+
+      (graph/block-comment? c nxt)
+      {:i (graph/mask-block-comment source sb i n) :holes holes}
+
+      (rust-string? c)
+      (graph/copy-span sb source holes i (graph/scan-quoted source i \" n))
+
+      (plain-char? source i c nxt)
+      (graph/copy-span sb source holes i (+ i 3))
+
+      (escaped-char? c nxt)
+      (graph/copy-span sb source holes i (scan-escaped-char source i n))
+
+      :else
+      (do (.append sb c)
+          {:i (inc i) :holes holes}))))
+
 (defn- mask-comments
   "Comments become spaces. String literals are copied and recorded."
   [source]
@@ -34,49 +78,8 @@
     (loop [i 0 holes []]
       (if (>= i n)
         {:text (str sb) :holes holes}
-        (let [c (.charAt source i)
-              nxt (when (< (inc i) n) (.charAt source (inc i)))]
-          (cond
-            (and (= c \/) (= nxt \/))
-            (let [j (or (str/index-of source \newline i) n)]
-              (dotimes [_ (- j i)] (.append sb \space))
-              (recur j holes))
-
-            (and (= c \/) (= nxt \*))
-            (let [j (or (str/index-of source "*/" (+ i 2)) (- n 2))
-                  end (min n (+ j 2))]
-              (doseq [k (range i end)]
-                (.append sb (if (= \newline (.charAt source k)) \newline \space)))
-              (recur end holes))
-
-            (= c \")
-            (let [end (loop [j (inc i) esc false]
-                        (cond
-                          (>= j n) n
-                          esc (recur (inc j) false)
-                          (= (.charAt source j) \\) (recur (inc j) true)
-                          (= (.charAt source j) \") (inc j)
-                          :else (recur (inc j) false)))]
-              (.append sb (subs source i end))
-              (recur end (conj holes [i end])))
-
-            (and (= c \') nxt (not= nxt \\) (< (+ i 2) n) (= (.charAt source (+ i 2)) \'))
-            (do (.append sb (subs source i (+ i 3)))
-                (recur (+ i 3) (conj holes [i (+ i 3)])))
-
-            (and (= c \') (= nxt \\))
-            (let [end (loop [j (+ i 2) esc true]
-                        (cond
-                          (>= j n) n
-                          esc (recur (inc j) false)
-                          (= (.charAt source j) \') (inc j)
-                          :else (recur (inc j) false)))]
-              (.append sb (subs source i end))
-              (recur end (conj holes [i end])))
-
-            :else
-            (do (.append sb c)
-                (recur (inc i) holes))))))))
+        (let [step (mask-rust-step source sb holes i n)]
+          (recur (:i step) (:holes step)))))))
 
 (defn- in-hole? [holes i]
   (boolean (some (fn [[a b]] (and (<= a i) (< i b))) holes)))
@@ -174,12 +177,6 @@
 
       :else (str/replace rel "/" "."))))
 
-(defn- ns-join [ns-prefix relative]
-  (cond
-    (str/blank? relative) (str ns-prefix)
-    (str/blank? ns-prefix) relative
-    :else (str ns-prefix "." relative)))
-
 (defn- resolve-mod [file mod-name]
   (let [parent (.getParentFile (canonical file))
         dir (if (#{"lib.rs" "main.rs" "mod.rs"} (.getName (canonical file)))
@@ -210,7 +207,7 @@
 
 (defn- class-of [file root prefix ns-prefix]
   (let [relative (rust-relative file root)
-        ns-str (ns-join ns-prefix relative)
+        ns-str (graph/ns-join ns-prefix relative)
         id (graph/id-of ns-str prefix)]
     {:id id :ns ns-str :file file :relative relative}))
 
@@ -310,15 +307,6 @@
       :impls impls
       :commands (:commands surface))))
 
-(defn- as-edges [c]
-  (concat
-    (map (fn [to] {:from (:id c) :to to :kind :dependency}) (:requires c))
-    (map (fn [to] {:from (:id c) :to to :kind :dependency}) (:foreigns c))
-    (map (fn [to] {:from (:id c) :to to :kind :implements}) (:impls c))))
-
-(defn- foreign-class [id]
-  {:id id :name (name id) :ns (name id) :foreign true})
-
 (defn- public-class [c]
   (cond-> (dissoc c :requires :foreigns :impls :commands :relative)
     (empty? (:ops c)) (dissoc :ops)))
@@ -340,13 +328,16 @@
                         (mapcat :foreigns)
                         distinct
                         (remove project-ids)
-                        (mapv foreign-class))
+                        (mapv graph/foreign-class))
           commands (into {} (keep (fn [c]
                                     (when (seq (:commands c))
                                       [(:id c) (:commands c)]))
                                   parsed))]
       {:classes (into (mapv public-class parsed) foreigns)
-       :edges (->> (mapcat as-edges parsed)
+       :edges (->> (mapcat #(graph/member-edges % [[:requires :dependency]
+                                                 [:foreigns :dependency]
+                                                 [:impls :implements]])
+                            parsed)
                    (remove #(= (:from %) (:to %)))
                    distinct
                    vec)

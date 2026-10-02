@@ -98,4 +98,15 @@
           es (hit/connected-edges s :a)]
       (should= 1 (count es))
       (should= :b (:to (first es)))
-      (should= :a (:from (first (hit/connected-edges s :b)))))))
+      (should= :a (:from (first (hit/connected-edges s :b))))))
+
+  (it "uses leaf deps, or the arrow endpoints when there are none"
+    (should= [{:from :a :to :b}]
+             (hit/deps-of {:deps [{:from :a :to :b}] :from :x :to :y}))
+    (should= [{:from :a :to :b :violating true}]
+             (hit/deps-of {:from :a :to :b :violating true}))
+    (should= [{:from :a :to :b :violating false}]
+             (hit/deps-of {:deps [] :from :a :to :b}))
+    (should-be-nil (hit/deps-of {}))
+    (should-be-nil (hit/deps-of {:from :a}))
+    (should-be-nil (hit/deps-of {:to :b}))))

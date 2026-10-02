@@ -58,6 +58,10 @@
   (it "interpolates between the stops"
     (should= 7.75 (config/crap-grade 10)))
 
+  (it "returns the start of the scale when the two stops are the same"
+    (let [lerp (ns-resolve 'uml-viewer.domain.config 'lerp)]
+      (should= 10.0 (lerp 4 2 2 10.0 1.0))))
+
   (it "is red when the score is missing"
     (should= 1.0 (config/crap-grade nil)))
 

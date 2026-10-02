@@ -12,6 +12,35 @@
             [uml-viewer.application.overlay :as overlay]
             [uml-viewer.domain.policy :as policy]))
 
+(defn- compile-opts [extra]
+  (if (map? extra) extra {:proposal (boolean extra)}))
+
+(defn- compile-proposal-id [opts doc]
+  (or (:proposal-id opts)
+      (when (:proposal opts)
+        (:id (first (hierarchy/named-proposals doc))))))
+
+(defn- compile-declutter [opts]
+  (let [mode (or (:declutter opts) :full)]
+    (if (:open-layer opts)
+      (if (= mode :classes) :elements mode)
+      mode)))
+
+(defn- layer-focus? [pid open-layer focus]
+  (and pid open-layer (empty? focus)))
+
+(defn- proposal-root? [doc pid focus]
+  (and pid (empty? focus) (seq (hierarchy/named-proposals doc))))
+
+(defn- compile-source [doc focus pid open-layer]
+  (cond
+    (layer-focus? pid open-layer focus)
+    (hierarchy/layer-view doc pid open-layer)
+    (proposal-root? doc pid focus)
+    (hierarchy/proposal-view doc pid)
+    :else
+    (hierarchy/view-at doc focus)))
+
 (defn compile-view
   "Compile the hierarchical view at `focus`, or the stacked document.
   `extra` is a boolean (legacy proposal?) or
@@ -20,28 +49,16 @@
   ([doc metrics-root] (compile-view doc metrics-root []))
   ([doc metrics-root focus] (compile-view doc metrics-root focus {}))
   ([doc metrics-root focus extra]
-   (let [opts (if (map? extra) extra {:proposal (boolean extra)})
+   (let [opts (compile-opts extra)
          painted (overlay/apply-metrics doc (overlay/load-metrics metrics-root))
          focus (or focus [])
-         pid (or (:proposal-id opts)
-                 (when (:proposal opts)
-                   (:id (first (hierarchy/named-proposals painted)))))
-         open-layer (:open-layer opts)
-         declutter (or (:declutter opts) :full)
-         declutter (if open-layer
-                     (if (= declutter :classes) :elements declutter)
-                     declutter)]
+         pid (compile-proposal-id opts painted)
+         open-layer (:open-layer opts)]
      (if (:hierarchical painted)
        (compose/compile-diagram
          (hierarchy/apply-declutter
-           (cond
-             (and pid open-layer (empty? focus))
-             (hierarchy/layer-view painted pid open-layer)
-             (and pid (empty? focus) (seq (hierarchy/named-proposals painted)))
-             (hierarchy/proposal-view painted pid)
-             :else
-             (hierarchy/view-at painted focus))
-           declutter))
+           (compile-source painted focus pid open-layer)
+           (compile-declutter opts)))
        (compose/compile-document painted)))))
 
 (defn compile-document

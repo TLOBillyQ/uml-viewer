@@ -77,6 +77,18 @@
       (should= 4 (:killed op))
       (should= 1 (:survived op))))
 
+  (it "keeps a fractional complexity"
+    (let [d (ir/normalize
+              {:packages [{:id :p :classes [{:id :a :name "A" :cc 2.5}]}]
+               :edges []})]
+      (should= 2.5 (get-in d [:packages 0 :classes 0 :cc]))))
+
+  (it "rejects a negative complexity"
+    (should-throw
+      (ir/normalize
+        {:packages [{:id :p :classes [{:id :a :name "A" :cc -1}]}]
+         :edges []})))
+
   (it "keeps class :ns so overlay can key any project's snapshots"
     (let [d (ir/normalize
               {:packages

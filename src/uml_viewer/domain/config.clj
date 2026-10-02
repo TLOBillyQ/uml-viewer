@@ -112,6 +112,18 @@
         (> ra rb) a
         :else b))))
 
+(defn- lower-ratio [a b ra rb]
+  (if (< ra rb) a b))
+
+(defn- worse-ratio [a b]
+  (let [ra (mutation-ratio a)
+        rb (mutation-ratio b)]
+    (cond
+      (and (nil? ra) (nil? rb)) a
+      (nil? ra) b
+      (nil? rb) a
+      :else (lower-ratio a b ra rb))))
+
 (defn worse-mutants
   "The killed/survived pair with the lower (worse) mutation ratio.
   Nil is no candidate yet. A pair with no ratio yields to a measured one."
@@ -119,12 +131,4 @@
   (cond
     (nil? a) b
     (nil? b) a
-    :else
-    (let [ra (mutation-ratio a)
-          rb (mutation-ratio b)]
-      (cond
-        (and (nil? ra) (nil? rb)) a
-        (nil? ra) b
-        (nil? rb) a
-        (< ra rb) a
-        :else b))))
+    :else (worse-ratio a b)))

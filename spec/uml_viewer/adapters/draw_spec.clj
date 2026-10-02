@@ -642,3 +642,141 @@
     (should= [95 181 138] (draw/coverage-ink 0.8))
     (should= draw/gold (draw/coverage-ink 0.5))
     (should= [224 122 74] (draw/coverage-ink 0.49))))
+
+(describe "paint decisions"
+  (it "names the selected and hovered box"
+    (should= :klass (call 'selected-box-id {:kind :class :id :klass}))
+    (should= :parent (call 'selected-box-id {:kind :child :parent :parent :id :child}))
+    (should= :parent (call 'selected-box-id {:kind :port :parent :parent :id :port}))
+    (should= :pkg (call 'selected-box-id {:kind :package :id :pkg}))
+    (should-be-nil (call 'selected-box-id {:kind :edge :id :e}))
+    (should-be-nil (call 'selected-box-id nil))
+    (should= :klass (call 'hovered-box-id {:kind :class :id :klass}))
+    (should= :parent (call 'hovered-box-id {:kind :child :parent :parent}))
+    (should= :parent (call 'hovered-box-id {:kind :port :parent :parent}))
+    (should-be-nil (call 'hovered-box-id {:kind :package :id :pkg}))
+    (should-be-nil (call 'hovered-box-id nil)))
+
+  (it "decides which packages, edges, and classes are drawn"
+    (should (call 'package-chosen? {:selected {:kind :package :id :p}} {:id :p}))
+    (should-not (call 'package-chosen? {:selected {:kind :package :id :p}} {:id :q}))
+    (should-not (call 'package-chosen? {:selected {:kind :class :id :p}} {:id :p}))
+    (should-not (call 'package-chosen? {} {:id :p}))
+    (should (call 'edge-visible? {} 0 0 100 100))
+    (should (call 'edge-visible? {:draw-bounds {:x 0 :y 0 :w 5 :h 5}} 0 0 100 100))
+    (should-not (call 'edge-visible? {:draw-bounds {:x 500 :y 500 :w 5 :h 5}} 0 0 100 100))
+    (let [on {:rect {:x 0 :y 0 :w 10 :h 10}}
+          off {:rect {:x 500 :y 500 :w 10 :h 10}}
+          port {:rect {:x 1 :y 1 :w 4 :h 4}}]
+      (should (call 'class-visible? on 0 0 100 100))
+      (should-not (call 'class-visible? off 0 0 100 100))
+      (should (call 'class-visible? (assoc off :out-ports [port]) 0 0 100 100)))
+    (should (call 'edge-hot? {:from :a :to :b} :a nil))
+    (should (call 'edge-hot? {:from :a :to :b} :b nil))
+    (should (call 'edge-hot? {:from :a :to :b :via-ids #{:c}} :c nil))
+    (should (call 'edge-hot? {:from :a :to :b} nil {:kind :edge :from :a :to :b}))
+    (should-not (call 'edge-hot? {:from :a :to :b} nil {:kind :edge :from :a :to :c}))
+    (should-not (call 'edge-hot? {:from :a :to :b} nil {:kind :class :id :a}))
+    (should-not (call 'edge-hot? {:from :a :to :b} :z nil)))
+
+  (it "paints the real diagram row, proposal rows, and declutter label"
+    (record-quil
+      (fn [log]
+        (should= "Declutter none" (call 'declutter-button-label {}))
+        (should= "Declutter arrows" (call 'declutter-button-label {:declutter :arrows}))
+        (should= "Declutter none" (call 'declutter-button-label {:declutter :missing}))
+        (call 'draw-real-diagram-row {:doc {}} 1500 nil)
+        (should-contain "Real diagram" (texts log))
+        (let [r (layout/real-diagram-rect 1500)]
+          (should-contain [:rect (:x r) (:y r) (:w r) (:h r) 3] @log))
+        (reset! log [])
+        (call 'draw-real-diagram-row {:doc {:title "Library"}} 1500 :ccp)
+        (should-contain "Library" (texts log))
+        (let [r (layout/real-diagram-rect 1500)]
+          (should-not-contain [:rect (:x r) (:y r) (:w r) (:h r) 3] @log))
+        (reset! log [])
+        (call 'draw-proposal-row 1500 nil 0 {:id :bare})
+        (should-contain "bare" (texts log))
+        (let [r (layout/proposal-row-rect 1500 0)]
+          (should-not-contain [:rect (:x r) (:y r) (:w r) (:h r) 3] @log))
+        (reset! log [])
+        (call 'draw-proposal-row 1500 :ccp 0 {:id :ccp :name "CCP"})
+        (should-contain "CCP" (texts log))
+        (let [r (layout/proposal-row-rect 1500 0)]
+          (should-contain [:rect (:x r) (:y r) (:w r) (:h r) 3] @log))
+        (reset! log [])
+        (should= (- 1500 layout/sidebar-w)
+                 (call 'draw-sidebar-chrome
+                       {:doc {:title "Library"
+                              :proposals [{:id :ccp :name "CCP"}]}
+                        :proposal-id :ccp
+                        :declutter :arrows}))
+        (should-contain "Library" (texts log))
+        (should-contain "CCP" (texts log))
+        (should-contain "Declutter arrows" (texts log))
+        (should-contain "New Proposal" (texts log))
+        (should-contain "Proposals" (texts log)))))
+
+  (it "draws a mutation note only beside non-header rows that have one"
+    (record-quil
+      (fn [log]
+        (call 'draw-detail-cells {:kind :col-header :mut-note "note"} 8)
+        (should-contain "Crap" (texts log))
+        (should-not-contain "note" (texts log))
+        (reset! log [])
+        (call 'draw-detail-cells {:kind :stats :mut-note "note"
+                                  :crap-s "1.0" :killed-s "9"} 8)
+        (should-contain "1.0" (texts log))
+        (should-contain "note" (texts log))
+        (should-not-contain "9" (texts log))
+        (reset! log [])
+        (with-redefs [detail/group-layout (fn [] [])]
+          (call 'draw-detail-cells {:kind :stats :mut-note "note"
+                                    :crap-s "1.0" :killed-s "9"} 8)
+          (should-contain "1.0" (texts log))
+          (should-not-contain "note" (texts log))
+          (should-not-contain "9" (texts log))))))
+
+  (it "scales, labels focus, and still paints when edges are hidden"
+    (record-quil
+      (fn [log]
+        (call 'draw-state {:scene (scene) :zoom 2})
+        (should-contain [:scale 2.0] @log)
+        (should-contain [:translate 0 0] @log)
+        (reset! log [])
+        (call 'draw-state {:scene (assoc (scene) :dep-indicators
+                                         [{:triangle [[0 0] [4 0] [2 4]]}])
+                           :focus [:engine :layout]
+                           :cam-x 0 :cam-y 0})
+        (should-contain :triangle (kinds log))
+        (should-contain "← engine.layout" (texts log))
+        (reset! log [])
+        (call 'draw-diagram-banner {:waiting true :scene {:diagram {:title "T"}}})
+        (should-not-contain "T" (texts log))
+        (call 'draw-diagram-banner {:scene {:diagram {}}})
+        (should-not-contain "T" (texts log))
+        (call 'draw-diagram-banner {:scene {:diagram {:title "Real"}}})
+        (should-contain "Real" (texts log))
+        (should (painted? log :fill draw/muted))
+        (reset! log [])
+        (call 'draw-diagram-banner {:scene {:diagram {:title "Prop" :proposal true}}})
+        (should-contain "Prop" (texts log))
+        (should (painted? log :fill draw/gold))
+        (reset! log [])
+        (call 'draw-nav-label {})
+        (should-not-contain "←" (texts log))
+        (call 'draw-nav-label {:focus [:engine :layout] :open-layer :inner
+                               :scene {:diagram {:title "Title"}}})
+        (should-contain "← engine.layout" (texts log))
+        (reset! log [])
+        (call 'draw-nav-label {:open-layer :inner :scene {:diagram {:title "Title"}}})
+        (should-contain "← Title" (texts log))
+        (reset! log [])
+        (call 'draw-nav-label {:open-layer :inner :scene {:diagram {}}})
+        (should-contain "← inner" (texts log))
+        (reset! log [])
+        (call 'draw-state {:scene (assoc-in (scene) [:diagram :hide-edges] true)
+                           :open-layer :inner
+                           :cam-x 0 :cam-y 0})
+        (should-contain "← Tiny" (texts log))
+        (should-contain "Inspector" (texts log))))))

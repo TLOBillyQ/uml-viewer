@@ -1,5 +1,6 @@
 (ns uml-viewer.application.document-spec
-  (:require [clojure.java.io :as io]
+  (:require [clojure.edn :as edn]
+            [clojure.java.io :as io]
             [speclj.core :refer :all]
             [uml-viewer.engine.compose :as compose]
             [uml-viewer.application.document :as document]
@@ -320,4 +321,79 @@
           scene (document/compile-document doc)
           titles (map :title (:sections scene))]
       (should= ["One" "Two"] titles)
-      (should (apply < (map :title-y (:sections scene)))))))
+      (should (apply < (map :title-y (:sections scene))))))
+
+  (it "opens one proposal layer and treats a nil focus as the root"
+    (let [doc {:hierarchical true
+               :title "Demo"
+               :proposals [{:id :ccp :name "CCP"
+                            :layers [{:id :kernel :label "Kernel" :nses [:domain]}
+                                     {:id :shell :label "Shell" :nses [:engine]}]}]
+               :classes [{:id :domain :name "Domain" :ns "demo.domain"}
+                         {:id :engine :name "Engine" :ns "demo.engine"}]
+               :edges [{:from :engine :to :domain :kind :dependency}]
+               :order [:domain :engine]}
+          rooted (document/compile-view doc "target" [] false)
+          nil-focus (document/compile-view doc "target" nil false)
+          layer (document/compile-view doc "target" []
+                                       {:proposal-id :ccp
+                                        :open-layer :proposal.kernel
+                                        :declutter :classes})]
+      (should= (map :id (:classes rooted)) (map :id (:classes nil-focus)))
+      (should= "Kernel" (get-in layer [:diagram :title]))
+      (should (some #(= :domain (:id %)) (:classes layer)))))
+
+  (it "finds a sibling policy file only when that file exists"
+    (let [root (io/file "target" (str "policy-path-" (System/nanoTime)))
+          edn (io/file root "diagram.edn")
+          policy (io/file root "diagram.policy.edn")]
+      (.mkdirs root)
+      (spit policy "{:title \"T\"}")
+      (try
+        (should-be-nil (document/policy-path-for nil))
+        (should-be-nil (document/policy-path-for (.getPath (io/file root "notes.txt"))))
+        (should-be-nil (document/policy-path-for (.getPath (io/file root "missing.edn"))))
+        (should= (.getPath policy) (document/policy-path-for (.getPath edn)))
+        (finally
+          (doseq [f (reverse (file-seq root))]
+            (io/delete-file f true))))))
+
+  (it "writes proposals to the IR and the policy file"
+    (let [root (io/file "target" (str "proposals-" (System/nanoTime)))
+          edn (io/file root "diagram.edn")
+          policy (io/file root "diagram.policy.edn")
+          explicit (io/file root "explicit.policy.edn")
+          doc {:title "T"
+               :proposal {:name "old" :layers []}
+               :proposals [{:id :one :name "One" :layers []}
+                           {:id :two :name "Two"
+                            :layers [{:id :kernel :label "Kernel" :nses [:domain]}]}]}]
+      (.mkdirs root)
+      (spit policy (pr-str {:title "Keep" :proposal {:name "old"}}))
+      (spit explicit (pr-str {:title "Keep" :proposal {:name "old"}}))
+      (try
+        (let [out (document/write-proposals! (.getPath edn) doc)
+              written (edn/read-string (slurp edn))
+              pol (edn/read-string (slurp policy))
+              by-file (document/write-proposals!
+                        nil (assoc doc :policy-file (.getPath explicit)))
+              pol2 (edn/read-string (slurp explicit))
+              only (io/file root "only.edn")
+              skipped (document/write-proposals!
+                        (.getPath only)
+                        (assoc doc :policy-file (.getPath (io/file root "nope.policy.edn"))))]
+          (should= [:one :two] (map :id (:proposals out)))
+          (should= ["One" "Two"] (map :name (:proposals out)))
+          (should= (:proposals out) (:proposals written))
+          (should= (:proposals out) (:proposals pol))
+          (should-not (:proposal pol))
+          (should= "Keep" (:title pol))
+          (should (:proposal out))
+          (should= (:proposals by-file) (:proposals pol2))
+          (should-not (:proposal pol2))
+          (should (.isFile only))
+          (should= [:one :two] (map :id (:proposals skipped)))
+          (should-not (.exists (io/file root "nope.policy.edn"))))
+        (finally
+          (doseq [f (reverse (file-seq root))]
+            (io/delete-file f true)))))))

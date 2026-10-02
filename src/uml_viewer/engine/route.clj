@@ -1,8 +1,7 @@
 (ns uml-viewer.engine.route
   (:require [uml-viewer.domain.geom :as geom]
+            [uml-viewer.engine.curve :as curve]
             [uml-viewer.engine.layout :as layout]))
-
-(declare attach-face)
 
 (defn- class-by-id [scene]
   (into {} (map (juxt :id identity) (:classes scene))))
@@ -86,7 +85,7 @@
 (defn- stub-ok? [r p other]
   (if (or (nil? r) (nil? p) (nil? other))
     true
-    (let [face (attach-face r p)
+    (let [face (curve/face-of r p)
           dx (- (first other) (first p))
           dy (- (second other) (second p))
           along (if (#{:left :right} face) (abs dy) (abs dx))
@@ -303,22 +302,10 @@
              (pair-u from to from-t to-t inner i)
              (around-bbox rank-bb fallback-start fallback-end i lr?)])))
 
-(defn- attach-face [r [x y]]
-  (let [dl (abs (- x (:x r)))
-        dr (abs (- x (geom/right r)))
-        dt (abs (- y (:y r)))
-        db (abs (- y (geom/bottom r)))
-        m (min dl dr dt db)]
-    (cond
-      (= m dl) :left
-      (= m dr) :right
-      (= m dt) :top
-      :else :bottom)))
-
 (defn- slide-to-cone
   "Keep `p` on its face and slide it until the segment to `other` is at least 45° to that face."
   [r p other]
-  (let [face (attach-face r p)
+  (let [face (curve/face-of r p)
         [px py] p
         [ox oy] other
         lo-x (+ (:x r) (* 0.12 (:w r)))
@@ -379,8 +366,8 @@
             s (slide-to-cone from-r (nth pts 0) (nth pts 1))
             e (slide-to-cone to-r (nth pts (dec n)) (nth pts (- n 2)))]
         (-> pts
-            (sync-stub :start s (attach-face from-r s))
-            (sync-stub :end e (attach-face to-r e)))))))
+            (sync-stub :start s (curve/face-of from-r s))
+            (sync-stub :end e (curve/face-of to-r e)))))))
 
 (defn- face-along [face p]
   (if (#{:top :bottom} face) (first p) (second p)))
@@ -432,7 +419,7 @@
                        (->> atts
                             (remove nil?)
                             (map (fn [a]
-                                   (assoc a :face (attach-face (:rect (idx (:id a)))
+                                   (assoc a :face (curve/face-of (:rect (idx (:id a)))
                                                                (:p a)))))
                             (group-by (juxt :id :face))))]
     (assoc scene :edges (apply-ports edges placed))))

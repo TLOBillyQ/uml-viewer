@@ -89,21 +89,25 @@
           label (or (:label layer) (name id))]
       {:id id :label label :nses nses})))
 
+(defn- sequential-proposal [p]
+  (let [layers (vec (keep-indexed layer-from p))]
+    (when (seq layers)
+      {:notice proposal-notice :layers layers})))
+
+(defn- map-proposal [p]
+  (let [layers (vec (keep-indexed layer-from (or (:layers p) [])))]
+    (when (seq layers)
+      {:notice (or (:notice p) proposal-notice)
+       :layers layers
+       :omit (mapv as-id (or (:omit p) []))})))
+
 (defn normalize-proposal
   "Named layers that are not namespace segments. Nil when absent."
   [p]
   (cond
     (nil? p) nil
-    (sequential? p)
-    (let [layers (vec (keep-indexed layer-from p))]
-      (when (seq layers)
-        {:notice proposal-notice :layers layers}))
-    (map? p)
-    (let [layers (vec (keep-indexed layer-from (or (:layers p) [])))]
-      (when (seq layers)
-        {:notice (or (:notice p) proposal-notice)
-         :layers layers
-         :omit (mapv as-id (or (:omit p) []))}))
+    (sequential? p) (sequential-proposal p)
+    (map? p) (map-proposal p)
     :else nil))
 
 (defn timestamp-name
@@ -124,6 +128,19 @@
        :omit (mapv as-id (or (:omit p) []))
        :notice (or (:notice p) proposal-notice)})))
 
+(defn- named-map? [one]
+  (and (map? one) (or (:name one) (seq (:layers one)))))
+
+(defn- proposals-from-one [one]
+  (let [p (named-proposal-from 0 (if (:layers one) one {:layers (:layers one)}))]
+    (if p [p] [])))
+
+(defn- proposals-from-layers [one]
+  (let [n (normalize-proposal one)]
+    (if n
+      [{:id :proposal :name "Proposal" :layers (:layers n) :notice (:notice n)}]
+      [])))
+
 (defn named-proposals
   "Named proposal maps `{:id :name :layers}` from a policy or IR doc."
   [x]
@@ -133,15 +150,11 @@
       (sequential? xs)
       (vec (keep-indexed named-proposal-from xs))
 
-      (and (map? one) (or (:name one) (seq (:layers one))))
-      (let [p (named-proposal-from 0 (if (:layers one) one {:layers (:layers one)}))]
-        (if p [p] []))
+      (named-map? one)
+      (proposals-from-one one)
 
       (sequential? one)
-      (let [n (normalize-proposal one)]
-        (if n
-          [{:id :proposal :name "Proposal" :layers (:layers n) :notice (:notice n)}]
-          []))
+      (proposals-from-layers one)
 
       :else [])))
 
@@ -397,33 +410,43 @@
                :edges (edges-among graph ids diagram home)}
         (seq foreign) (assoc :foreign (mapv #(ir-class % false) foreign))))))
 
+(defn- active-proposal [policy proposals]
+  (or (normalize-proposal (first proposals))
+      (normalize-proposal (:proposal policy))))
+
+(defn- hierarchical-document [policy graph proposals proposal levels]
+  (cond-> {:title (or (:title policy) "UML")
+           :hierarchical true
+           :prefix (or (:prefix policy) "uml-viewer")
+           :order (mapv as-id (or (:order policy) []))
+           :levels levels
+           :edge-kinds (or (:edge-kinds policy) {})
+           :omit-edges (or (:omit-edges policy) [])
+           :omit (mapv as-id (or (:omit policy) []))
+           :classes (:classes graph)
+           :edges (:edges graph)}
+    (seq proposals) (assoc :proposals proposals)
+    proposal (assoc :proposal proposal)))
+
+(defn- diagram-for [policy graph diagram]
+  (if (= :overview (:view diagram))
+    (overview-diagram policy graph diagram)
+    (package-diagram policy graph diagram)))
+
+(defn- packaged-document [policy graph]
+  {:title (or (:title policy) "UML")
+   :diagrams (mapv #(diagram-for policy graph %) (:diagrams policy))})
+
 (defn apply-policy
   "Turn a scanned graph and a policy into an IR document."
   [policy graph]
   (let [proposals (named-proposals policy)
-        proposal (or (normalize-proposal (first proposals))
-                     (normalize-proposal (:proposal policy)))
+        proposal (active-proposal policy proposals)
         ranks (level-ranks policy)
         graph (-> (collapse-graph policy graph)
                   (update :edges mark-violations ranks)
                   (update :classes with-levels ranks))
         levels (level-groups policy)]
     (if (hierarchical? policy)
-      (cond-> {:title (or (:title policy) "UML")
-               :hierarchical true
-               :prefix (or (:prefix policy) "uml-viewer")
-               :order (mapv as-id (or (:order policy) []))
-               :levels levels
-               :edge-kinds (or (:edge-kinds policy) {})
-               :omit-edges (or (:omit-edges policy) [])
-               :omit (mapv as-id (or (:omit policy) []))
-               :classes (:classes graph)
-               :edges (:edges graph)}
-        (seq proposals) (assoc :proposals proposals)
-        proposal (assoc :proposal proposal))
-      {:title (or (:title policy) "UML")
-       :diagrams (mapv (fn [d]
-                         (if (= :overview (:view d))
-                           (overview-diagram policy graph d)
-                           (package-diagram policy graph d)))
-                       (:diagrams policy))})))
+      (hierarchical-document policy graph proposals proposal levels)
+      (packaged-document policy graph))))

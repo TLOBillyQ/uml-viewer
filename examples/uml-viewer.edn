@@ -53,13 +53,14 @@
  :omit [],
  :edges
  [{:from :main.uml-viewer, :to :adapters.core, :kind :dependency}
-  {:from :typescript-language.source-typescript, :to :source, :kind :implements}
+  {:from :engine.route, :to :engine.curve, :kind :dependency}
+  {:from :typescript-language.source-typescript, :to :source, :kind :dependency}
   {:from :main.ir-generator,
    :to :typescript-language.graph-typescript,
    :kind :dependency}
   {:from :clojure-language.source-clojure, :to :source, :kind :implements}
   {:from :adapters.draw, :to :application.document, :kind :dependency}
-  {:from :rust-language.source-rust, :to :source, :kind :implements}
+  {:from :rust-language.source-rust, :to :source, :kind :dependency}
   {:from :application.document, :to :domain.hierarchy, :kind :dependency}
   {:from :application.events, :to :domain.policy, :kind :dependency}
   {:from :adapters.sketch, :to :adapters.draw, :kind :dependency}
@@ -109,11 +110,12 @@
   {:from :engine.hit, :to :engine.layout, :kind :dependency}
   {:from :application.document, :to :domain.policy, :kind :dependency}
   {:from :typescript-language.graph-typescript, :to :graph, :kind :implements}
+  {:from :domain.hierarchy, :to :graph, :kind :dependency}
   {:from :engine.hit, :to :domain.geom, :kind :dependency}
   {:from :adapters.draw, :to :domain.config, :kind :dependency}
   {:from :main.uml-viewer, :to :clojure-language.source-clojure, :kind :dependency}
   {:from :engine.curve, :to :domain.geom, :kind :dependency}
-  {:from :python-language.source-python, :to :source, :kind :implements}
+  {:from :python-language.source-python, :to :source, :kind :dependency}
   {:from :engine.layout, :to :domain.config, :kind :dependency}
   {:from :engine.compose, :to :engine.curve, :kind :dependency}
   {:from :adapters.draw, :to :engine.layout, :kind :dependency}
@@ -122,6 +124,7 @@
   {:from :main.ir-generator, :to :application.ir-generator, :kind :dependency}
   {:from :adapters.sketch, :to :domain.policy, :kind :dependency}
   {:from :main.uml-viewer, :to :python-language.source-python, :kind :dependency}
+  {:from :application.detail, :to :graph, :kind :dependency}
   {:from :adapters.sketch, :to :application.detail, :kind :dependency}
   {:from :main.ir-generator, :to :python-language.graph-python, :kind :dependency}
   {:from :adapters.sketch, :to :application.document, :kind :dependency}

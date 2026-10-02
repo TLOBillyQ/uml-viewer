@@ -1,5 +1,6 @@
 (ns uml-viewer.polyglot-spec
   (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [speclj.core :refer :all]
             [uml-viewer.application.ir-generator :as ir-generator]
             [uml-viewer.graph :as graph]
@@ -98,21 +99,30 @@
                               :root (str (io/file bookwriter "src-tauri/src"))
                               :prefix "bookwriter.rust"}]})
             by-id (into {} (map (juxt :id identity) (:classes doc)))
-            edges (set (map (juxt :from :to :kind) (:edges doc)))]
-        (should (contains? (set (keys by-id)) :model))
-        (should (contains? (set (keys by-id)) :book))
-        (should (contains? (set (keys by-id)) :nodeFs))
-        (should (contains? (set (keys by-id)) :tauriFs))
-        (should (contains? (set (keys by-id)) :rust))
-        (should (contains? (set (keys by-id)) :rust.main))
-        (should-not (contains? (set (keys by-id)) :book.test))
-        (should= [] (filter #(and (= :model (:from %))
+            edges (set (map (juxt :from :to :kind) (:edges doc)))
+            ids (set (keys by-id))
+            named (fn [suffix]
+                    (let [s (name suffix)]
+                      (or (ids (keyword s))
+                          (some #(when (str/ends-with? (name %) (str "." s)) %) ids))))
+            model (named :model)
+            book (named :book)
+            node-fs (named :nodeFs)
+            tauri-fs (named :tauriFs)]
+        (should model)
+        (should book)
+        (should node-fs)
+        (should tauri-fs)
+        (should (contains? ids :rust))
+        (should (contains? ids :rust.main))
+        (should-not (some #(str/ends-with? (name %) ".test") ids))
+        (should= [] (filter #(and (= model (:from %))
                                   (not (:foreign (by-id (:to %)))))
                             (:edges doc)))
-        (should (contains? edges [:book :model :dependency]))
-        (should (contains? edges [:nodeFs :book :implements]))
-        (should (contains? edges [:tauriFs :book :implements]))
-        (should (contains? edges [:tauriFs :rust :dependency]))
+        (should (contains? edges [book model :dependency]))
+        (should (contains? edges [node-fs book :implements]))
+        (should (contains? edges [tauri-fs book :implements]))
+        (should (contains? edges [tauri-fs :rust :dependency]))
         (should (contains? edges [:rust.main :rust :dependency]))
         (should (some #{"read_text" "allow_book" "startup_book_path"}
                       (map :name (:ops (by-id :rust)))))))))

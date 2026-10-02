@@ -119,17 +119,41 @@
       (= m dt) :top
       :else :bottom)))
 
+(defn- face-out
+  "Unit normal pointing out of `face`."
+  [face]
+  (case face
+    :left [-1.0 0.0]
+    :right [1.0 0.0]
+    :top [0.0 -1.0]
+    :bottom [0.0 1.0]))
+
+(defn- travel-normal
+  "Outward normal, flipped when the stroke is arriving into the box."
+  [face arriving?]
+  (let [[x y] (face-out face)]
+    (if arriving?
+      [(- x) (- y)]
+      [x y])))
+
+(defn- in-cone? [along plen]
+  (and (pos? along) (<= plen along)))
+
+(defn- cone-unit [px py plen nx ny]
+  (if (< plen 1.0e-9)
+    [(- ny) nx]
+    [(/ px plen) (/ py plen)]))
+
+(defn- on-cone [len nx ny sx sy]
+  (let [s (/ 1.0 (Math/sqrt 2.0))]
+    [(* len (+ (* s nx) (* s sx)))
+     (* len (+ (* s ny) (* s sy)))]))
+
 (defn- clamp-to-face-cone
   "Rotate `(dx,dy)` so its angle with the class edge is at least 45°.
    `arriving?` true: path is heading into the box; false: leaving it."
   [dx dy face arriving?]
-  (let [out (case face
-              :left [-1.0 0.0]
-              :right [1.0 0.0]
-              :top [0.0 -1.0]
-              :bottom [0.0 1.0])
-        nx (if arriving? (- (first out)) (first out))
-        ny (if arriving? (- (second out)) (second out))
+  (let [[nx ny] (travel-normal face arriving?)
         len (Math/hypot dx dy)]
     (if (< len 1.0e-6)
       [(* 1.0 nx) (* 1.0 ny)]
@@ -139,14 +163,10 @@
             px (- ux (* along nx))
             py (- uy (* along ny))
             plen (Math/hypot px py)]
-        (if (and (pos? along) (<= plen along))
+        (if (in-cone? along plen)
           [dx dy]
-          (let [sx (if (< plen 1.0e-9) (- ny) (/ px plen))
-                sy (if (< plen 1.0e-9) nx (/ py plen))
-                s (/ 1.0 (Math/sqrt 2.0))
-                ux' (+ (* s nx) (* s sx))
-                uy' (+ (* s ny) (* s sy))]
-            [(* len ux') (* len uy')]))))))
+          (let [[sx sy] (cone-unit px py plen nx ny)]
+            (on-cone len nx ny sx sy)))))))
 
 (defn- constrain-start [path r]
   (let [ops (vec (:ops path))]

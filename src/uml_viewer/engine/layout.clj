@@ -99,28 +99,41 @@
   (when-let [st (:stereotype c)]
     (str "«" (name st) "»")))
 
+(defn- member-gate [c]
+  (and (not (:hide-members c)) (empty? (:contents c))))
+
+(defn- shown-kids [c]
+  (when-not (:hide-members c)
+    (:contents c)))
+
+(defn- field-texts [c]
+  (when (member-gate c)
+    (mapv :text (or (:fields c) []))))
+
+(defn- op-texts [c]
+  (when (member-gate c)
+    (mapv :text (remove :private (or (:ops c) [])))))
+
+(defn- child-line [ch]
+  {:kind :child
+   :text (:name ch)
+   :id (:id ch)
+   :drill? (boolean (:drill? ch))})
+
+(defn- text-line [kind]
+  (fn [text] {:kind kind :text text}))
+
+(defn- ruled-lines [items line]
+  (when (seq items)
+    (into [{:kind :rule :text nil}] (map line items))))
+
 (defn class-lines [c]
-  (let [contents (:contents c)
-        show-body? (not (:hide-members c))
-        fields (when (and show-body? (empty? contents))
-                 (mapv :text (or (:fields c) [])))
-        ops (when (and show-body? (empty? contents))
-              (mapv :text (remove :private (or (:ops c) []))))
-        kids (when show-body? contents)]
-    (cond-> []
-      (stereotype-line c) (conj {:kind :stereo :text (stereotype-line c)})
-      true (conj {:kind :name :text (:name c)})
-      (seq kids) (conj {:kind :rule :text nil})
-      (seq kids) (into (map (fn [ch]
-                                  {:kind :child
-                                   :text (:name ch)
-                                   :id (:id ch)
-                                   :drill? (boolean (:drill? ch))})
-                                kids))
-      (seq fields) (conj {:kind :rule :text nil})
-      true (into (map (fn [t] {:kind :field :text t}) fields))
-      (seq ops) (conj {:kind :rule :text nil})
-      true (into (map (fn [t] {:kind :op :text t}) ops)))))
+  (let [stereo (stereotype-line c)]
+    (vec (concat (when stereo [{:kind :stereo :text stereo}])
+                 [{:kind :name :text (:name c)}]
+                 (ruled-lines (shown-kids c) child-line)
+                 (ruled-lines (field-texts c) (text-line :field))
+                 (ruled-lines (op-texts c) (text-line :op))))))
 
 (def port-h 18)
 (def port-gap 6)
@@ -360,54 +373,69 @@
 (defn- mutant-pair [c]
   (select-keys c [:killed :survived :uncovered]))
 
+(defn- shift-class [c pkg origin-x origin-y rank-base]
+  (layout-ports
+    (assoc c
+      :package (:id pkg)
+      :rank (+ rank-base (:rank c 0))
+      :rect (geom/rect (+ origin-x pad (get-in c [:rect :x]))
+                       (+ origin-y banner-h pad (get-in c [:rect :y]))
+                       (get-in c [:rect :w])
+                       (get-in c [:rect :h])))))
+
+(defn- rolled-crap [classes]
+  (let [worst (reduce config/worse-crap nil
+                      (map (fn [c] (or (:crap c) {})) classes))]
+    (when (:mu worst)
+      worst)))
+
+(defn- rolled-mutants [classes]
+  (let [worst (reduce config/worse-mutants nil (map mutant-pair classes))]
+    (when (or (:killed worst) (:survived worst))
+      worst)))
+
+(defn- package-body [real origin-x origin-y]
+  (or (geom/union
+        (mapcat (fn [c]
+                  (concat [(:rect c)]
+                          (map :rect (:in-ports c))
+                          (map :rect (:out-ports c))))
+                real))
+      (geom/rect (+ origin-x pad)
+                 (+ origin-y banner-h pad)
+                 160 40)))
+
+(defn- seat-class [c pack-rect pkg-id]
+  (if (:dummy? c)
+    (layout-ports (assoc c :rect pack-rect :package pkg-id))
+    c))
+
+(defn- with-rollup [pkg crap mut]
+  (cond-> pkg
+    crap (assoc :crap crap)
+    mut (assoc :killed (:killed mut) :survived (:survived mut)
+               :uncovered (:uncovered mut))))
+
 (defn- layout-package [pkg origin-x origin-y edges direction rank-base]
-  (let [inner (place-classes (:classes pkg) edges direction)
-        inner (mapv #(layout-ports
-                       (assoc %
-                         :package (:id pkg)
-                         :rank (+ rank-base (:rank % 0))
-                         :rect (geom/rect (+ origin-x pad (get-in % [:rect :x]))
-                                          (+ origin-y banner-h pad (get-in % [:rect :y]))
-                                          (get-in % [:rect :w])
-                                          (get-in % [:rect :h]))))
-                    inner)
+  (let [inner (mapv #(shift-class % pkg origin-x origin-y rank-base)
+                    (place-classes (:classes pkg) edges direction))
         real (vec (remove :dummy? inner))
-        metric-src (if (seq real) real inner)
+        src (if (seq real) real inner)
         title (:label pkg)
-        crap (let [worst (reduce config/worse-crap nil
-                                 (map (fn [c] (or (:crap c) {})) metric-src))]
-               (when (:mu worst)
-                 worst))
-        mut (let [worst (reduce config/worse-mutants nil (map mutant-pair metric-src))]
-              (when (or (:killed worst) (:survived worst))
-                worst))
-        body (or (geom/union
-                   (mapcat (fn [c]
-                             (concat [(:rect c)]
-                                     (map :rect (:in-ports c))
-                                     (map :rect (:out-ports c))))
-                           real))
-                 (geom/rect (+ origin-x pad)
-                            (+ origin-y banner-h pad)
-                            160 40))
+        body (package-body real origin-x origin-y)
         pack-w (max (- (+ (geom/right body) pad) origin-x)
                     (+ (* 2 pad) (text-w title))
                     180)
         pack-h (- (+ (geom/bottom body) pad) origin-y)
         pack-rect (geom/rect origin-x origin-y pack-w pack-h)
-        inner (mapv (fn [c]
-                      (if (:dummy? c)
-                        (layout-ports (assoc c :rect pack-rect :package (:id pkg)))
-                        c))
-                    inner)]
-    (cond-> {:id (:id pkg)
-             :label (:label pkg)
-             :title title
-             :rect pack-rect
-             :classes inner}
-      crap (assoc :crap crap)
-      mut (assoc :killed (:killed mut) :survived (:survived mut)
-                 :uncovered (:uncovered mut)))))
+        inner (mapv #(seat-class % pack-rect (:id pkg)) inner)]
+    (with-rollup {:id (:id pkg)
+                  :label (:label pkg)
+                  :title title
+                  :rect pack-rect
+                  :classes inner}
+                 (rolled-crap src)
+                 (rolled-mutants src))))
 
 (defn- oval-size [c]
   (let [w (max 80 (+ (* 2 pad) (text-w (:name c))))

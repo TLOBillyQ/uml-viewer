@@ -58,7 +58,7 @@
   "1-based line of `member-name` in `source`, or nil."
   [source member-name]
   (when-let [start (member-start source member-name)]
-    (inc (count (re-seq #"\n" (subs source 0 start))))))
+    (source/line-number source start)))
 
 (defrecord ClojureSource []
   source/LanguageSource

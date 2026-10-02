@@ -22,3 +22,27 @@
     (let [doc (source-window/source->html "f.clj" "(ns f)\n(defn go [])\n" 2)]
       (should (str/includes? doc "name='here'"))
       (should (str/includes? doc "class='hl'")))))
+
+(describe "open-member-window!"
+  (it "chooses the ident lang and does not open a frame when source is missing"
+    (let [calls (atom [])
+          shown (atom nil)]
+      (with-redefs [uml-viewer.source/member-source
+                    (fn [impl ident]
+                      (swap! calls conj [impl ident])
+                      (when (= "go" (:name ident))
+                        {:title "T" :body "(defn go [])" :line 4}))
+                    uml-viewer.adapters.source-window/show-member-window!
+                    (fn [title body line]
+                      (reset! shown [title body line]))]
+        (should-be-nil (source-window/open-member-window! :fallback {:ns "demo.a"}))
+        (should= [[:fallback {:ns "demo.a"}]] @calls)
+        (should-be-nil @shown)
+        (should= true (source-window/open-member-window!
+                        :fallback {:ns "demo.a" :name "go"}))
+        (should= ["T" "(defn go [])" 4] @shown)
+        (source-window/open-member-window!
+          :fallback {:ns "demo.a" :name "go" :lang :rust})
+        (should= [:rust {:ns "demo.a" :name "go" :lang :rust}] (last @calls))
+        (source-window/open-member-window! :fallback "demo.a" "go")
+        (should= [:fallback {:ns "demo.a" :name "go"}] (last @calls))))))

@@ -7,11 +7,18 @@
             [uml-viewer.typescript-language.graph-typescript])
   (:gen-class))
 
-(defn -main [& args]
+(defn- generation-plan
+  "Policy path, output path, and language graph chosen from `args`.
+   Does not write a file."
+  [args]
   (let [policy-path (or (first args) "examples/uml-viewer.policy.edn")
-        out (second args)
         policy (ir-generator/read-policy policy-path)
-        lang (or (:lang policy) :clojure)
-        impl (or (graph/lookup lang)
-                 (throw (ex-info (str "no LanguageGraph for " lang) {:lang lang})))]
+        lang (or (:lang policy) :clojure)]
+    {:policy-path policy-path
+     :out (or (second args) (:out policy) "examples/uml-viewer.edn")
+     :impl (or (graph/lookup lang)
+               (throw (ex-info (str "no LanguageGraph for " lang) {:lang lang})))}))
+
+(defn -main [& args]
+  (let [{:keys [policy-path out impl]} (generation-plan args)]
     (println "Wrote" (ir-generator/generate impl policy-path out))))

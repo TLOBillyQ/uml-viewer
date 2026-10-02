@@ -49,7 +49,19 @@
     (let [surface (ts/read-module
                     (str "const q = /\"/g;\n"
                          "export function render(): string { return \"\"; }\n"))]
-      (should= ["render"] (mapcat :ops (:exports surface))))))
+      (should= ["render"] (mapcat :ops (:exports surface)))))
+
+  (it "reads export lists, classes, and enums, and skips export type names"
+    (let [surface (ts/read-module
+                    (str "export type { Secret } from \"./book\";\n"
+                         "export * from \"./book\";\n"
+                         "export { allowBook as allow };\n"
+                         "export class Page {}\n"
+                         "export enum Kind { A }\n"
+                         "export interface Fs { read(): void; }\n"))]
+      (should= ["allow" "Page" "Kind"] (mapcat :ops (:exports surface)))
+      (should (some :value (:exports surface)))
+      (should-not (some #(= ["Secret"] (:ops %)) (:exports surface))))))
 
 (describe "typescript graph"
   (it "scans modules, skips tests, and marks an implemented interface"

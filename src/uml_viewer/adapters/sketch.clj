@@ -631,7 +631,8 @@
   (cond
     (instance? MouseEvent event) event
     :else (try
-            (some-> (applet/current-applet) (.-mouseEvent))
+            (let [ap ^Object (applet/current-applet)]
+              (some-> ap (.-mouseEvent)))
             (catch Exception _ nil))))
 
 (defn- awt-mouse [event]
@@ -641,28 +642,36 @@
         (when (instance? java.awt.event.MouseEvent n) n))
       (catch Exception _ nil))))
 
+(defn- popup-native []
+  (try
+    (some-> (applet/current-applet) native-window)
+    (catch Exception _ nil)))
+
+(defn- popup-invoker [awt native]
+  (or (when awt (.getComponent ^java.awt.event.MouseEvent awt))
+      (when (instance? Component native) native)))
+
+(defn- anchor-at [awt invoker x y]
+  (cond
+    awt
+    {:invoker invoker
+     :x (.getX ^java.awt.event.MouseEvent awt)
+     :y (.getY ^java.awt.event.MouseEvent awt)}
+
+    (instance? Container invoker)
+    (let [in (.getInsets ^Container invoker)]
+      {:invoker invoker
+       :x (+ (int x) (.left in))
+       :y (+ (int y) (.top in))})
+
+    :else
+    {:invoker invoker :x (int x) :y (int y)}))
+
 (defn- popup-anchor
   "Invoker and local x,y for JPopupMenu.show at the mouse-down."
   [event x y]
-  (let [awt (awt-mouse event)
-        native (try (some-> (applet/current-applet) native-window)
-                    (catch Exception _ nil))
-        invoker (or (when awt (.getComponent ^java.awt.event.MouseEvent awt))
-                    (when (instance? Component native) native))]
-    (cond
-      awt
-      {:invoker invoker
-       :x (.getX ^java.awt.event.MouseEvent awt)
-       :y (.getY ^java.awt.event.MouseEvent awt)}
-
-      (instance? Container invoker)
-      (let [in (.getInsets ^Container invoker)]
-        {:invoker invoker
-         :x (+ (int x) (.left in))
-         :y (+ (int y) (.top in))})
-
-      :else
-      {:invoker invoker :x (int x) :y (int y)})))
+  (let [awt (awt-mouse event)]
+    (anchor-at awt (popup-invoker awt (popup-native)) x y)))
 
 (defn- element-target [state sel]
   (let [id (:id sel)
@@ -696,84 +705,121 @@
           (add "Omit" :omit)
           (.show menu (:invoker anchor) (int (:x anchor)) (int (:y anchor))))))))
 
+(defn- rename-op [id raw]
+  (when (and raw (seq (str/trim raw)))
+    {:op :rename :id id :name (str/trim raw)}))
+
+(defn- ask-proposal-name [pname]
+  (JOptionPane/showInputDialog nil "Rename proposal" (str pname)))
+
+(defn- remember-proposal-op! [op]
+  (when op
+    (swap! !bridge assoc :proposal-op op)))
+
+(defn- choose-rename! [id pname]
+  (remember-proposal-op! (rename-op id (ask-proposal-name pname))))
+
+(defn- choose-delete! [id]
+  (remember-proposal-op! {:op :delete :id id}))
+
+(defn- show-popup! [menu invoker x y]
+  (.show ^JPopupMenu menu invoker (int x) (int y)))
+
+(defn- install-proposal-menu! [menu id pname]
+  (let [rename (JMenuItem. "Rename")
+        delete (JMenuItem. "Delete")]
+    (.addActionListener rename
+      (reify ActionListener
+        (actionPerformed [_ _]
+          (choose-rename! id pname))))
+    (.addActionListener delete
+      (reify ActionListener
+        (actionPerformed [_ _]
+          (choose-delete! id))))
+    (.add menu rename)
+    (.add menu delete)
+    menu))
+
 (defn- popup-proposal-menu! [event x y id pname]
   (let [anchor (popup-anchor event x y)]
     (later!
       (fn []
-        (let [menu (JPopupMenu.)
-              rename (JMenuItem. "Rename")
-              delete (JMenuItem. "Delete")]
-          (.addActionListener rename
-            (reify ActionListener
-              (actionPerformed [_ _]
-                (let [n (JOptionPane/showInputDialog nil "Rename proposal" (str pname))]
-                  (when (and n (seq (str/trim n)))
-                    (swap! !bridge assoc :proposal-op
-                           {:op :rename :id id :name (str/trim n)}))))))
-          (.addActionListener delete
-            (reify ActionListener
-              (actionPerformed [_ _]
-                (swap! !bridge assoc :proposal-op {:op :delete :id id}))))
-          (.add menu rename)
-          (.add menu delete)
-          (.show menu (:invoker anchor) (int (:x anchor)) (int (:y anchor))))))))
+        (show-popup! (install-proposal-menu! (JPopupMenu.) id pname)
+                     (:invoker anchor) (:x anchor) (:y anchor))))))
+
+(defn- regen-press [state]
+  (let [root (overlay/metrics-root (:path state))
+        {:keys [woke?]} (request-regen! root)]
+    (assoc state :mail-status (if woke?
+                                "Regen requested."
+                                "Regen queued; Grok session not attached."))))
+
+(defn- proposal-menu-click? [event hit]
+  (and (right-click? event) (= :proposal (:kind hit))))
+
+(defn- sidebar-press [state event x y w]
+  (let [hit (events/inspector-hit state x y w)]
+    (cond
+      (proposal-menu-click? event hit)
+      (do (popup-proposal-menu!
+            event x y (:id hit)
+            (:name (policy/proposal-by-id (:doc state) (:id hit))))
+          state)
+      hit (let [next (events/on-inspector-press state hit)]
+            (when (#{:real-diagram :proposal :new-proposal} (:kind hit))
+              (mail-context! next))
+            next)
+      :else state)))
+
+(defn- element-menu? [event sel]
+  (and (right-click? event)
+       (or (= :class (:kind sel))
+           (= :child (:kind sel))
+           (events/layer-id sel))))
+
+(defn- drill-hit? [sel n]
+  (and (>= n 2) (events/layer-id sel)))
+
+(defn- card-hit? [sel n]
+  (or (= :port (:kind sel))
+      (= :child (:kind sel))
+      (and (>= n 2) (= :class (:kind sel)))))
+
+(defn- canvas-hit [state event x y sel n]
+  (cond
+    (element-menu? event sel)
+    (do (popup-element-menu! event x y state sel)
+        state)
+
+    (drill-hit? sel n)
+    (events/drill state (events/layer-id sel))
+
+    (card-hit? sel n)
+    (open-card! state (:id sel))
+
+    (= :class (:kind sel))
+    state
+
+    :else
+    (do (pin-card! false) state)))
+
+(defn- canvas-press [state event x y]
+  (let [state (events/on-press state x y)]
+    (canvas-hit state event x y (:selected state) (click-count event))))
 
 (defn- on-main-press [state event]
   (let [[w h] (applet-size)
         x (:x event)
-        y (:y event)
-        in-sidebar? (>= x (- w layout/sidebar-w))]
+        y (:y event)]
     (cond
       (events/regen-hit? x y w h)
-      (let [root (overlay/metrics-root (:path state))
-            {:keys [woke?]} (request-regen! root)]
-        (assoc state :mail-status (if woke?
-                                    "Regen requested."
-                                    "Regen queued; Grok session not attached.")))
+      (regen-press state)
 
-      in-sidebar?
-      (let [hit (events/inspector-hit state x y w)]
-        (cond
-          (and (right-click? event) (= :proposal (:kind hit)))
-          (do (popup-proposal-menu!
-                event x y (:id hit)
-                (:name (policy/proposal-by-id (:doc state) (:id hit))))
-              state)
-          hit (let [next (events/on-inspector-press state hit)]
-                (when (#{:real-diagram :proposal :new-proposal} (:kind hit))
-                  (mail-context! next))
-                next)
-          :else state))
+      (>= x (- w layout/sidebar-w))
+      (sidebar-press state event x y w)
 
       :else
-      (let [state (events/on-press state x y)
-            sel (:selected state)
-            n (click-count event)]
-        (cond
-          (and (right-click? event)
-               (or (= :class (:kind sel))
-                   (= :child (:kind sel))
-                   (events/layer-id sel)))
-          (do (popup-element-menu! event x y state sel)
-              state)
-
-          (and (>= n 2) (events/layer-id sel))
-          (events/drill state (events/layer-id sel))
-
-          (and (>= n 2) (= :class (:kind sel)))
-          (open-card! state (:id sel))
-
-          (= :port (:kind sel))
-          (open-card! state (:id sel))
-
-          (= :child (:kind sel))
-          (open-card! state (:id sel))
-
-          (= :class (:kind sel))
-          state
-
-          :else
-          (do (pin-card! false) state))))))
+      (canvas-press state event x y))))
 
 (defn- applet-shift? []
   (try

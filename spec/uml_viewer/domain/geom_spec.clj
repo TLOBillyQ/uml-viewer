@@ -63,4 +63,17 @@
 
   (it "keeps an unobstructed polyline as one path"
     (should= [[[0 0] [10 0] [10 10]]]
-             (geom/gap-polyline [[0 0] [10 0] [10 10]] [] 5))))
+             (geom/gap-polyline [[0 0] [10 0] [10 10]] [] 5)))
+
+  (it "merges overlapping gaps into one opening"
+    (let [a (geom/rect 40 0 20 20)
+          b (geom/rect 50 0 40 20)
+          paths (geom/gap-polyline [[0 10] [200 10]] [a b] 0)
+          left (first paths)
+          right (last paths)]
+      (should= 2 (count paths))
+      (should= 40.0 (first (last left)))
+      (should= 90.0 (first (first right)))))
+
+  (it "measures distance to a zero-length segment as distance to that point"
+    (should= 5.0 (geom/point-seg-dist [4 5] [1 1] [1 1]))))

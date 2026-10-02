@@ -101,6 +101,38 @@
       (should (some #{"show"} texts))
       (should-not (some #{"hide"} texts))))
 
+  (it "lists a stereotype, children, fields, and public ops"
+    (should= [{:kind :stereo :text "«interface»"}
+              {:kind :name :text "Box"}
+              {:kind :rule :text nil}
+              {:kind :child :text "Kid" :id :kid :drill? true}
+              {:kind :child :text "Other" :id :other :drill? false}]
+             (layout/class-lines
+               {:name "Box"
+                :stereotype :interface
+                :fields [{:text "x : int"}]
+                :ops [{:text "go()"}]
+                :contents [{:name "Kid" :id :kid :drill? true}
+                           {:name "Other" :id :other}]}))
+    (should= [{:kind :name :text "Box"}
+              {:kind :rule :text nil}
+              {:kind :field :text "x : int"}
+              {:kind :rule :text nil}
+              {:kind :op :text "go()"}]
+             (layout/class-lines
+               {:name "Box"
+                :fields [{:text "x : int"}]
+                :ops [{:text "go()"} {:text "hide()" :private true}]}))
+    (should= [{:kind :name :text "Box"}]
+             (layout/class-lines
+               {:name "Box"
+                :hide-members true
+                :fields [{:text "x : int"}]
+                :ops [{:text "go()"}]
+                :contents [{:name "Kid" :id :kid}]}))
+    (should= [{:kind :name :text "A"}]
+             (layout/class-lines {:name "A"})))
+
   (it "omits μ/max/σ from the class box"
     (let [d (ir/normalize
               {:packages

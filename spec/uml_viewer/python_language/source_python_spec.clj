@@ -1,7 +1,7 @@
 (ns uml-viewer.python-language.source-python-spec
   (:require [clojure.java.io :as io]
             [speclj.core :refer :all]
-            [uml-viewer.python-language.source-python :as py]
+            [uml-viewer.python-language.source-python]
             [uml-viewer.source :as source]))
 
 (describe "python extractor"
@@ -21,7 +21,14 @@
         (should (re-find #"def walk\(animal\)" (:body found))))))
 
   (it "returns nil when the member is not in the file"
-    (should-be-nil (py/extract-member "def walk():\n    return 1\n" "missing")))
+    (let [dir (io/file (System/getProperty "java.io.tmpdir")
+                       (str "uml-py-miss-" (System/nanoTime)))
+          file (io/file dir "model.py")]
+      (io/make-parents file)
+      (spit file "def walk():\n    return 1\n")
+      (should-be-nil (source/member-source {:lang :python
+                                            :file (.getPath file)
+                                            :name "missing"}))))
 
   (it "opens a module at the top when no member is named"
     (let [dir (io/file (System/getProperty "java.io.tmpdir")
