@@ -133,6 +133,18 @@ This project's `:crap` alias uses `../clojure/crap4clj`. `:mutate` pins
 
 Rename or move of a function is a new form: overlay does not match old names.
 
+### WSL2
+
+On Windows 11, run uml-viewer inside WSL2. WSLg displays the diagram. You
+need `zsh`, `tmux`, `git`, the Clojure CLI, `claude`, and a JDK with GUI
+support (not a `-headless` package). Keep the project on the Linux
+filesystem (`~/…`), not `/mnt/c`. When `WSL_DISTRO_NAME` is set, the
+companion opens in a new Windows Terminal window
+(`wt.exe … wsl.exe -d <distro> -u <user> -- tmux attach -t <session>`). The viewer
+also prints that attach command to `uml-viewer-log.txt`. If `wt.exe` cannot
+be reached, run the command yourself. On any other non-macOS system the
+viewer only prints the command.
+
 ## Navigation
 
 **Layer** and **component** mean the same thing: a namespace grouping

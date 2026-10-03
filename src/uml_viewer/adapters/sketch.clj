@@ -108,6 +108,7 @@
   (let [named (System/getenv "CLAUDE_BIN")
         candidates (filter identity
                            [named
+                            (str (System/getProperty "user.home") "/.local/bin/claude")
                             "/usr/local/bin/claude"
                             "/opt/homebrew/bin/claude"])]
     (or (first (filter (fn [p]
@@ -245,15 +246,20 @@
   ([session]
    (str "tmux attach -t " session "; exit")))
 
+(defn mac?
+  ([] (mac? (System/getProperty "os.name")))
+  ([os-name] (str/starts-with? (str os-name) "Mac")))
+
 (def ghostty-app
   "Ghostty bundle, the default host for the companion window."
   "/Applications/Ghostty.app")
 
 (defn ghostty-path
-  "Installed Ghostty bundle, or nil when this Mac has no Ghostty."
+  "Installed Ghostty bundle, or nil when this Mac has no Ghostty.
+  Nil off macOS: the bundle is opened with macOS `open`."
   []
   (let [p (or (System/getenv "GHOSTTY_APP") ghostty-app)]
-    (when (.exists (io/file p)) p)))
+    (when (and (mac?) (.exists (io/file p))) p)))
 
 (defn hex-color
   "Diagram color as #rrggbb, the form Ghostty's CLI flags take."
@@ -358,20 +364,48 @@
     (tmux! "set-hook" "-t" session "pane-died" "respawn-pane -k")
     (tmux! "set-option" "-t" session "status" "off")))
 
+(defn wsl-distro
+  "WSL distribution this JVM runs in, or nil outside WSL."
+  ([] (wsl-distro (System/getenv "WSL_DISTRO_NAME")))
+  ([env-value] (not-empty env-value)))
+
+(defn wsl-command
+  "argv that opens a Windows Terminal window attached to `session` in `distro`.
+  Pins the user: tmux sockets are per user, and wsl.exe defaults to another."
+  ([distro session] (wsl-command distro (System/getProperty "user.name") session))
+  ([distro user session]
+   ["wt.exe" "-w" "new" "new-tab" "--title" (terminal-title session)
+    "wsl.exe" "-d" distro "-u" user "--" "tmux" "attach" "-t" session]))
+
+(defn- print-attach-hint! [session]
+  (binding [*out* *err*]
+    (println "UML viewer: attach to the companion with: tmux attach -t" session)))
+
 (defn open-window!
-  "Open a window on `session`: Ghostty when installed, else Terminal.app.
-  Returns {:terminal :session :window-id :script}. Ghostty windows carry no id;
-  they close when the tmux session ends, which is what shutdown kills."
+  "Open a window on `session`: Ghostty when installed, Windows Terminal under
+  WSL, else Terminal.app on macOS. Elsewhere, print the attach command.
+  Returns {:terminal :session :window-id}, plus :script for Ghostty and
+  Terminal.app. Only Terminal.app windows carry an id; the others close when
+  the tmux session ends, which is what shutdown kills."
   [session]
   (if-let [app (ghostty-path)]
     (do
       (run-command (ghostty-command app session))
       {:terminal :ghostty :session session :window-id nil
        :script (str "open -na " app)})
-    (let [script (osascript (attach-command session) session)]
-      {:terminal :terminal :session session
-       :window-id (re-find #"\d+" (run-osascript script))
-       :script script})))
+    (if-let [distro (wsl-distro)]
+      (do
+        (print-attach-hint! session)
+        (run-command (wsl-command distro session))
+        {:terminal :wsl :session session :window-id nil})
+      (if (mac?)
+        (let [script (osascript (attach-command session) session)]
+          {:terminal :terminal :session session
+           :window-id (re-find #"\d+" (run-osascript script))
+           :script script})
+        (do
+          (print-attach-hint! session)
+          {:terminal :none :session session :window-id nil})))))
 
 (defn open-in-terminal!
   "Start this project's companion Claude in its own tmux session."

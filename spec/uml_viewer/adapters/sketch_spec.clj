@@ -1,5 +1,6 @@
 (ns uml-viewer.adapters.sketch-spec
-  (:require [quil.applet :as applet]
+  (:require [clojure.string :as str]
+            [quil.applet :as applet]
             [quil.core :as q]
             [speclj.core :refer :all]
             [uml-viewer.application.detail :as detail]
@@ -772,6 +773,8 @@
       (.mkdirs (java.io.File. root))
       (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& _] 0)
                     uml-viewer.adapters.sketch/ghostty-path (fn [] nil)
+                    uml-viewer.adapters.sketch/wsl-distro (fn [] nil)
+                    uml-viewer.adapters.sketch/mac? (fn [] true)
                     uml-viewer.adapters.sketch/run-command
                     (fn [_] (throw (Exception. "open should not run")))
                     uml-viewer.adapters.sketch/run-osascript (fn [s] (swap! opened conj s) "1234")]
@@ -782,6 +785,74 @@
           (should= 1 (count @opened))
           (should (re-find #"tell application \"Terminal\"" (first @opened)))
           (should= "1234" (:window-id (mailbox/read-companion root)))))))
+
+  (it "opens the companion in Windows Terminal under WSL"
+    (let [root (str (System/getProperty "java.io.tmpdir")
+                    "/uv-wsl-" (System/nanoTime))
+          calls (atom [])]
+      (.mkdirs (java.io.File. root))
+      (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& _] 0)
+                    uml-viewer.adapters.sketch/ghostty-path (fn [] nil)
+                    uml-viewer.adapters.sketch/wsl-distro (fn [] "Ubuntu")
+                    uml-viewer.adapters.sketch/run-command (fn [argv] (swap! calls conj (vec argv)) "")
+                    uml-viewer.adapters.sketch/run-osascript
+                    (fn [_] (throw (Exception. "Terminal.app should not be used")))]
+        (let [sid (sketch/session-id root)
+              err (with-out-str (binding [*err* *out*]
+                                  (let [out (sketch/open-in-terminal! root)]
+                                    (should= :wsl (:terminal out))
+                                    (should-be-nil (:window-id out)))))]
+          (should= [(sketch/wsl-command "Ubuntu" sid)] @calls)
+          (should (str/includes? err (str "tmux attach -t " sid)))
+          (should-be-nil (:window-id (mailbox/read-companion root)))))))
+
+  (it "builds the Windows Terminal argv for a WSL attach"
+    (should= ["wt.exe" "-w" "new" "new-tab" "--title" "uml-viewer-p-1"
+              "wsl.exe" "-d" "Debian" "-u" "bob" "--" "tmux" "attach" "-t" "uml-viewer-p-1"]
+             (sketch/wsl-command "Debian" "bob" "uml-viewer-p-1"))
+    (should= ["-u" (System/getProperty "user.name")]
+             (subvec (sketch/wsl-command "Debian" "uml-viewer-p-1") 9 11)))
+
+  (it "prints the attach command when no terminal can be opened"
+    (let [root (str (System/getProperty "java.io.tmpdir")
+                    "/uv-linux-" (System/nanoTime))]
+      (.mkdirs (java.io.File. root))
+      (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& _] 0)
+                    uml-viewer.adapters.sketch/ghostty-path (fn [] nil)
+                    uml-viewer.adapters.sketch/wsl-distro (fn [] nil)
+                    uml-viewer.adapters.sketch/mac? (fn [] false)
+                    uml-viewer.adapters.sketch/run-command
+                    (fn [_] (throw (Exception. "nothing should run")))
+                    uml-viewer.adapters.sketch/run-osascript
+                    (fn [_] (throw (Exception. "Terminal.app should not be used")))]
+        (let [sid (sketch/session-id root)
+              err (with-out-str (binding [*err* *out*]
+                                  (should= :none (:terminal (sketch/open-in-terminal! root)))))]
+          (should (str/includes? err (str "tmux attach -t " sid)))))))
+
+  (it "reads the WSL distro from WSL_DISTRO_NAME"
+    (should= "Ubuntu" (sketch/wsl-distro "Ubuntu"))
+    (should-be-nil (sketch/wsl-distro ""))
+    (should-be-nil (sketch/wsl-distro nil))
+    (should= (sketch/wsl-distro (System/getenv "WSL_DISTRO_NAME")) (sketch/wsl-distro)))
+
+  (it "detects macOS from os.name"
+    (should (sketch/mac? "Mac OS X"))
+    (should-not (sketch/mac? "Linux"))
+    (should-not (sketch/mac? "Windows 11"))
+    (should-not (sketch/mac? nil))
+    (should= (sketch/mac? (System/getProperty "os.name")) (sketch/mac?)))
+
+  (it "finds no Ghostty bundle off macOS"
+    (let [app (str (System/getProperty "java.io.tmpdir") "/uv-Ghostty-" (System/nanoTime) ".app")]
+      (.mkdirs (java.io.File. app))
+      (with-redefs [uml-viewer.adapters.sketch/ghostty-app app
+                    uml-viewer.adapters.sketch/mac? (fn [] false)]
+        (should-be-nil (sketch/ghostty-path)))
+      (with-redefs [uml-viewer.adapters.sketch/ghostty-app app
+                    uml-viewer.adapters.sketch/mac? (fn [] true)]
+        (when-not (System/getenv "GHOSTTY_APP")
+          (should= app (sketch/ghostty-path))))))
 
   (it "closes only this viewer's Terminal window by id"
     (let [script (sketch/close-terminal-script "42")]
@@ -891,6 +962,8 @@
       (mailbox/write-companion! root {:session "uml-viewer-old-ffff" :window-id "1"})
       (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& args] (swap! calls conj (vec args)) 0)
                     uml-viewer.adapters.sketch/ghostty-path (fn [] nil)
+                    uml-viewer.adapters.sketch/wsl-distro (fn [] nil)
+                    uml-viewer.adapters.sketch/mac? (fn [] true)
                     uml-viewer.adapters.sketch/run-osascript (fn [_] "1234")]
         (let [sid (sketch/session-id root)
               out (sketch/open-in-terminal! root)
