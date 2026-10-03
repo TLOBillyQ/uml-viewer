@@ -80,15 +80,18 @@ The diagram is its own JVM. Exceptions and JVM output append to
 **`uml-viewer-log.txt`** in the project directory (gitignored). `clj -M:run`
 still holds the terminal; prefer `./uml`.
 
-A **tmux** session unique to the examined project starts interactive Grok in
-that directory (`--yolo --trust --rules …` plus a launch prompt). The name is
+A **tmux** session unique to the examined project starts interactive Claude
+Code in
+that directory (`--dangerously-skip-permissions --append-system-prompt …`
+plus a launch prompt). The name is
 `uml-viewer-<project>-<hash>`, stored in `.uml-viewer/companion.edn`. On start
 it writes a hierarchical policy from that project's namespaces and regenerates
 the IR. Type there; Esc is the real TUI interrupt. Closing the diagram kills
-**only that** tmux session and its Terminal window — other Grok agents stay
-up. If that Grok process dies, tmux respawns it in the same pane. That
+**only that** tmux session and its Terminal window — other Claude sessions
+stay
+up. If that Claude process dies, tmux respawns it in the same pane. That
 instance also runs `clj -M:crap`, `clj -M:mutate`, and IR generate after later
-changes. Project-wide rules live in `.grok/rules/uml-viewer.md`.
+changes. Project-wide rules live in `CLAUDE.md`.
 
 Prefer `./uml` in the examined project (from `get-uml-viewer`). Aliases
 `:uml-viewer` / `:uml-viewer-restart` still work if present.
@@ -99,13 +102,13 @@ Prefer `./uml` in the examined project (from `get-uml-viewer`). Aliases
 | `./uml --restart` | **associated agent only** | New JVM, same companion. Restores the last view. |
 
 Do **not** pass `--restart` unless you are that companion recycling the
-window after source changes. A stray `--restart` skips spawning Grok and
+window after source changes. A stray `--restart` skips spawning Claude and
 leaves a diagram with no agent. The companion recycles the window by
 writing `:quit-for-restart` to `.uml-viewer/to-viewer.edn`, waiting for
 the JVM to exit, then `./uml --restart`. The new JVM restores depth, pan,
 zoom, and which proposal was showing (`.uml-viewer/session.edn`). Do not
 SIGKILL. Closing the window kills only that project's companion, not other
-Grok agents.
+Claude sessions.
 
 On a fresh start the canvas stays blank until the companion sends `:display`,
 with **Waiting for agent to create diagram.** `R` reloads the current EDN
@@ -296,7 +299,8 @@ tree's namespace root. `src/model.ts` becomes `bookwriter.model`
 | `:sources` | One scan per `{:lang :root :prefix?}`. The entry `:prefix` is that tree's namespace root |
 | `:foreign` | External libs as ovals. A listed prefix collapses `quil.core` to `quil`. Unlisted externals are dropped |
 
-**Viewer Grok loop** (passed with `--rules` to the companion session only)
+**Viewer Claude loop** (passed with `--append-system-prompt` to the
+companion session only)
 
 On launch: from the examined directory, write or update the hierarchical
 policy and regenerate the IR, then wait.
@@ -396,7 +400,7 @@ and C/M dots; double-click still opens a component.
              :omit [cli]}]
 ```
 
-Companion Grok must not invent `:proposals` on launch and must keep them when
+The companion must not invent `:proposals` on launch and must keep them when
 updating `:order`. If instructed, add a named proposal and regenerate the IR.
 
 The viewer draws a violating arrow **red**, and **bold red** when a selected
@@ -404,13 +408,13 @@ element highlights it. Hand-written IR may set `:violating true` directly.
 
 ## Companion mailbox
 
-The viewer and the companion Grok talk through `.uml-viewer/` in the examined
+The viewer and the companion Claude talk through `.uml-viewer/` in the examined
 project (gitignored). The file is the mail; tmux is only a doorbell.
 
 | File | Direction |
 |------|-----------|
-| `.uml-viewer/to-viewer.edn` | Grok → viewer |
-| `.uml-viewer/to-agent.edn` | viewer → Grok |
+| `.uml-viewer/to-viewer.edn` | Claude → viewer |
+| `.uml-viewer/to-agent.edn` | viewer → Claude |
 
 Each mailbox file is a small queue `{:next-id n :queue [cmd …]}` (tmp-then-rename).
 Commands have a rising `:id`. Append; do not overwrite. Handling a command
@@ -426,8 +430,8 @@ touches another project's agent.
 | `:op` | Meaning |
 |-------|---------|
 | `:display` | Viewer loads `:path` (relative to the project root) |
-| `:regen` | Grok rewrites hierarchical policy, regenerates IR, then `:display` |
-| `:quit-for-restart` | Viewer exits the JVM without killing Grok. The associated agent then runs `clj -M:uml-viewer-restart`. |
+| `:regen` | Claude rewrites hierarchical policy, regenerates IR, then `:display` |
+| `:quit-for-restart` | Viewer exits the JVM without killing Claude. The associated agent then runs `clj -M:uml-viewer-restart`. |
 | `:refresh-crap` | Run CRAP on `:target` (class or component), then IR |
 | `:refresh-mutate` | Differential mutate `:target`'s src files, then IR |
 | `:refresh-mutate-all` | `clj -M:mutate --mutate-all` on `:target`'s src files, then IR |
@@ -435,16 +439,18 @@ touches another project's agent.
 | `:context` | Inspector selection is the discussion context: `{:context :real}` or `{:context :proposal :proposal-id id :name "…"}` |
 
 Clicking **Real diagram** or a proposal (including **New Proposal**) writes
-`:context` and wakes Grok. Stay on that architecture until the next
+`:context` and wakes Claude. Stay on that architecture until the next
 `:context`.
 
 Right-click ops include `:target {:id :ns :kind :class|:component :proposal-id?}`.
 `:kind` is `:component` for a layer box (and its nested nses) and `:class`
 for a module.
 
-**Regen** in the inspector queues `:regen` and wakes Grok with literal text, a
+**Regen** in the inspector queues `:regen` and wakes Claude with literal
+text, a
 150ms pause, `C-m`, 50ms, then `C-j` (same timing as SwarmForge). The wake-up
-does not contain the command. If Grok is busy, it finishes first, then reads
+does not contain the command. If Claude is busy, it finishes first, then
+reads
 the mailbox. If tmux is missing, the button still writes the file and the
 inspector says the session is not attached.
 
