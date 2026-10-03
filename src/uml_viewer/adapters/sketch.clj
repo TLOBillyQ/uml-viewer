@@ -245,6 +245,47 @@
   ([session]
    (str "tmux attach -t " session "; exit")))
 
+(def ghostty-app
+  "Ghostty bundle, the default host for the companion window."
+  "/Applications/Ghostty.app")
+
+(defn ghostty-path
+  "Installed Ghostty bundle, or nil when this Mac has no Ghostty."
+  []
+  (let [p (or (System/getenv "GHOSTTY_APP") ghostty-app)]
+    (when (.exists (io/file p)) p)))
+
+(defn hex-color
+  "Diagram color as #rrggbb, the form Ghostty's CLI flags take."
+  [[r g b]]
+  (format "#%02x%02x%02x" (int r) (int g) (int b)))
+
+(defn ghostty-command
+  "argv that opens a Ghostty window attached to `session` via bundle `app`."
+  ([app] (ghostty-command app (current-session)))
+  ([app session]
+   ["open" "-na" app "--args"
+    (str "--title=" (terminal-title session))
+    (str "--background=" (hex-color draw/bg))
+    (str "--foreground=" (hex-color draw/ink))
+    (str "--cursor-color=" (hex-color draw/gold))
+    "--font-family=Menlo"
+    "--font-size=13"
+    "--confirm-close-surface=false"
+    "--window-save-state=never"
+    "-e" "tmux" "attach" "-t" session]))
+
+(defn run-command
+  "Run `argv` to completion. Returns trimmed stdout, or \"\"."
+  [argv]
+  (try
+    (let [p (.start (doto (ProcessBuilder. (into-array String argv))
+                      (.redirectErrorStream true)))
+          out (slurp (.getInputStream p))]
+      (.waitFor p)
+      (str/trim out))
+    (catch Exception _ "")))
+
 (defn osascript
   "AppleScript that opens a Terminal window on `shell-cmd`, painted like the diagram.
   Raises only that window, not every Terminal window. Returns the new window id."
@@ -293,16 +334,11 @@
 (defn run-osascript
   "Run `script` with osascript. Returns trimmed stdout, or \"\"."
   [script]
-  (try
-    (let [p (.start (doto (ProcessBuilder. (into-array String ["osascript" "-e" script]))
-                      (.redirectErrorStream true)))
-          out (slurp (.getInputStream p))]
-      (.waitFor p)
-      (str/trim out))
-    (catch Exception _ "")))
+  (run-command ["osascript" "-e" script]))
 
 (defn close-terminal-window!
-  "Close the Terminal window that attached to the Claude session."
+  "Close the Terminal window that attached to the Claude session.
+  A Ghostty window has no id: it closes when the tmux session ends."
   []
   (run-osascript (close-terminal-script @!terminal-window-id))
   (reset! !terminal-window-id nil))
@@ -322,6 +358,21 @@
     (tmux! "set-hook" "-t" session "pane-died" "respawn-pane -k")
     (tmux! "set-option" "-t" session "status" "off")))
 
+(defn open-window!
+  "Open a window on `session`: Ghostty when installed, else Terminal.app.
+  Returns {:terminal :session :window-id :script}. Ghostty windows carry no id;
+  they close when the tmux session ends, which is what shutdown kills."
+  [session]
+  (if-let [app (ghostty-path)]
+    (do
+      (run-command (ghostty-command app session))
+      {:terminal :ghostty :session session :window-id nil
+       :script (str "open -na " app)})
+    (let [script (osascript (attach-command session) session)]
+      {:terminal :terminal :session session
+       :window-id (re-find #"\d+" (run-osascript script))
+       :script script})))
+
 (defn open-in-terminal!
   "Start this project's companion Claude in its own tmux session."
   ([] (open-in-terminal! (System/getProperty "user.dir")))
@@ -338,15 +389,13 @@
            (println "UML viewer: could not start tmux session" session)))
        (when (zero? code)
          (arm-respawn! session)))
-     (let [script (osascript (attach-command session) session)
-           out (run-osascript script)
-           win-id (re-find #"\d+" out)]
-       (reset! !terminal-window-id win-id)
-       (mailbox/write-companion! cwd {:session session :window-id win-id})
-       {:script script :session session :window-id win-id}))))
+     (let [{:keys [window-id] :as opened} (open-window! session)]
+       (reset! !terminal-window-id window-id)
+       (mailbox/write-companion! cwd {:session session :window-id window-id})
+       opened))))
 
 (defn shutdown-children!
-  "Kill only this viewer's tmux session and its Terminal window."
+  "Kill only this viewer's tmux session and its terminal window."
   ([] (shutdown-children! (System/getProperty "user.dir")))
   ([root]
    (let [info (mailbox/read-companion root)

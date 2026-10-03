@@ -116,7 +116,7 @@
     (when (map? raw) raw)))
 
 (defn write-companion!
-  "Remember this viewer's tmux session and Terminal window."
+  "Remember this viewer's tmux session and terminal window id (nil under Ghostty)."
   [root m]
   (atomic-write! (companion-file root) (or m {}))
   m)

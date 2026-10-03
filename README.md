@@ -87,7 +87,7 @@ plus a launch prompt). The name is
 `uml-viewer-<project>-<hash>`, stored in `.uml-viewer/companion.edn`. On start
 it writes a hierarchical policy from that project's namespaces and regenerates
 the IR. Type there; Esc is the real TUI interrupt. Closing the diagram kills
-**only that** tmux session and its Terminal window — other Claude sessions
+**only that** tmux session and its terminal window — other Claude sessions
 stay
 up. If that Claude process dies, tmux respawns it in the same pane. That
 instance also runs `clj -M:crap`, `clj -M:mutate`, and IR generate after later
@@ -425,7 +425,10 @@ does this itself on `to-viewer.edn`. The companion must pop each
 `.uml-viewer/session.edn` is the last view (depth, pan, zoom, proposal) written
 on `:quit-for-restart` and restored by `--restart`. `.uml-viewer/companion.edn`
 records this viewer's tmux session and Terminal window id so close/kill never
-touches another project's agent.
+touches another project's agent. The companion window opens in Ghostty when
+`/Applications/Ghostty.app` exists (override with `GHOSTTY_APP`); otherwise the
+viewer falls back to Terminal.app. Ghostty windows carry no id — killing the
+tmux session ends the attach and the window closes with it.
 
 | `:op` | Meaning |
 |-------|---------|

@@ -720,6 +720,69 @@
       (should (re-find (re-pattern (str "cursor color of agentTab to \\{" gr ", " gg ", " gb "\\}"))
                        script))))
 
+  (it "opens the companion in Ghostty by default"
+    (let [root (str (System/getProperty "java.io.tmpdir")
+                    "/uv-ghostty-" (System/nanoTime))
+          calls (atom [])]
+      (.mkdirs (java.io.File. root))
+      (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& _] 0)
+                    uml-viewer.adapters.sketch/ghostty-path (fn [] "/Applications/Ghostty.app")
+                    uml-viewer.adapters.sketch/run-command (fn [argv] (swap! calls conj (vec argv)) "")
+                    uml-viewer.adapters.sketch/run-osascript
+                    (fn [_] (throw (Exception. "Terminal.app should not be used")))]
+        (let [sid (sketch/session-id root)
+              out (sketch/open-in-terminal! root)
+              argv (first @calls)]
+          (should= :ghostty (:terminal out))
+          (should-be-nil (:window-id out))
+          (should= sid (:session out))
+          (should= ["open" "-na" "/Applications/Ghostty.app" "--args"] (subvec argv 0 4))
+          (should (some #{(str "--title=" sid)} argv))
+          (should= ["-e" "tmux" "attach" "-t" sid] (subvec argv (- (count argv) 5)))
+          (should (some #{(str "--background=" (sketch/hex-color draw/bg))} argv))
+          (should (some #{(str "--foreground=" (sketch/hex-color draw/ink))} argv))
+          (should (some #{(str "--cursor-color=" (sketch/hex-color draw/gold))} argv))
+          (should (some #{"--confirm-close-surface=false"} argv))
+          (should (some #{"--window-save-state=never"} argv))
+          (should-not (some #(re-find #"(?i)grok|terminal" (str %)) argv))
+          (should= 1 (count @calls))
+          (should= sid (:session (mailbox/read-companion root)))))))
+
+  (it "formats diagram colors as Ghostty hex"
+    (should= "#161c20" (sketch/hex-color [22 28 32]))
+    (should= "#0000ff" (sketch/hex-color [0 0 255]))
+    (should= "#0aff01" (sketch/hex-color [10 255 1])))
+
+  (it "opens the bundle GHOSTTY_APP resolved to, not the default"
+    (let [root (str (System/getProperty "java.io.tmpdir")
+                    "/uv-ghostty-app-" (System/nanoTime))
+          calls (atom [])]
+      (.mkdirs (java.io.File. root))
+      (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& _] 0)
+                    uml-viewer.adapters.sketch/ghostty-path (fn [] "/Applications/Ghostty-Nightly.app")
+                    uml-viewer.adapters.sketch/run-command (fn [argv] (swap! calls conj (vec argv)) "")]
+        (sketch/open-in-terminal! root)
+        (should= ["open" "-na" "/Applications/Ghostty-Nightly.app" "--args"]
+                 (subvec (first @calls) 0 4)))))
+
+  (it "keeps Terminal.app when Ghostty is absent"
+    (let [root (str (System/getProperty "java.io.tmpdir")
+                    "/uv-noterm-" (System/nanoTime))
+          opened (atom [])]
+      (.mkdirs (java.io.File. root))
+      (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& _] 0)
+                    uml-viewer.adapters.sketch/ghostty-path (fn [] nil)
+                    uml-viewer.adapters.sketch/run-command
+                    (fn [_] (throw (Exception. "open should not run")))
+                    uml-viewer.adapters.sketch/run-osascript (fn [s] (swap! opened conj s) "1234")]
+        (let [sid (sketch/session-id root)
+              out (sketch/open-in-terminal! root)]
+          (should= :terminal (:terminal out))
+          (should= "1234" (:window-id out))
+          (should= 1 (count @opened))
+          (should (re-find #"tell application \"Terminal\"" (first @opened)))
+          (should= "1234" (:window-id (mailbox/read-companion root)))))))
+
   (it "closes only this viewer's Terminal window by id"
     (let [script (sketch/close-terminal-script "42")]
       (should (re-find #"exists process \"Terminal\"" script))
@@ -827,6 +890,7 @@
       (.mkdirs (java.io.File. root))
       (mailbox/write-companion! root {:session "uml-viewer-old-ffff" :window-id "1"})
       (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& args] (swap! calls conj (vec args)) 0)
+                    uml-viewer.adapters.sketch/ghostty-path (fn [] nil)
                     uml-viewer.adapters.sketch/run-osascript (fn [_] "1234")]
         (let [sid (sketch/session-id root)
               out (sketch/open-in-terminal! root)
