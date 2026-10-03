@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
-# __DEPS_LINE__ is replaced by get-uml-viewer.
+# get-uml-viewer replaces the placeholder with this checkout's deps.
 DEPS='__DEPS_LINE__'
 
 edn_path() {
@@ -25,6 +25,19 @@ edn_path() {
   fi
 }
 
+policy_path() {
+  local name f
+  name="$(basename "$ROOT")"
+  if [[ -f "examples/${name}.policy.edn" ]]; then
+    echo "examples/${name}.policy.edn"
+    return
+  fi
+  for f in examples/*.policy.edn(N) policy.edn(N); do
+    echo "$f"
+    return
+  done
+}
+
 LOG="uml-viewer-log.txt"
 
 launch_viewer() {
@@ -40,22 +53,60 @@ launch_viewer() {
   echo "UML viewer started (pid $!). Log: $LOG"
 }
 
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-  echo "usage: ./uml [--restart]" >&2
-  echo "  (no args)   fresh window; companion writes the diagram" >&2
-  echo "  --restart   new JVM, same companion; restores last view" >&2
-  echo "  The viewer detaches; exceptions go to $LOG." >&2
-  exit 0
-fi
-
-if [[ "${1:-}" == "--restart" ]]; then
-  edn="$(edn_path)"
-  if [[ -n "$edn" ]]; then
-    launch_viewer --restart "$edn"
-  else
-    launch_viewer --restart
+# A Clojure project uses its own :crap / :mutate aliases. Any other project
+# uses the crapper or mutator checkout get-uml-viewer cloned beside uml-viewer.
+run_metric() {
+  local alias="$1" tool="$2"
+  shift 2
+  if [[ -f deps.edn ]]; then
+    exec clojure "-M:${alias}" "$@"
   fi
-  exit 0
-fi
+  local bin=".uml-viewer/${tool}/${tool}"
+  if [[ ! -x "$bin" ]]; then
+    local var="${(U)tool}_REPO_URL"
+    echo "uml: ${bin} is missing. Re-run get-uml-viewer (set ${var} if the clone failed)." >&2
+    exit 1
+  fi
+  exec "$bin" "$@"
+}
+
+case "${1:-}" in
+  -h|--help)
+    echo "usage: ./uml [--restart | ir | crap | mutate] [args]" >&2
+    echo "  (no args)   fresh window; companion writes the diagram" >&2
+    echo "  --restart   new JVM, same companion; restores last view" >&2
+    echo "  ir          regenerate the IR from this project's policy" >&2
+    echo "  crap        CRAP snapshot (.metrics/crap.edn) for the whole tree" >&2
+    echo "  mutate F…   differential mutation testing of the given files" >&2
+    echo "  The viewer detaches; exceptions go to $LOG." >&2
+    exit 0
+    ;;
+  --restart)
+    edn="$(edn_path)"
+    if [[ -n "$edn" ]]; then
+      launch_viewer --restart "$edn"
+    else
+      launch_viewer --restart
+    fi
+    exit 0
+    ;;
+  ir)
+    shift
+    policy="$(policy_path)"
+    if [[ -z "$policy" ]]; then
+      echo "uml: no policy. Write examples/$(basename "$ROOT").policy.edn." >&2
+      exit 1
+    fi
+    exec clojure -Sdeps "$DEPS" -M -m uml-viewer.main.ir-generator "$policy" "$@"
+    ;;
+  crap)
+    shift
+    run_metric crap crapper "$@"
+    ;;
+  mutate)
+    shift
+    run_metric mutate mutator "$@"
+    ;;
+esac
 
 launch_viewer "$@"

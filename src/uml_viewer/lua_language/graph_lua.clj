@@ -1,5 +1,6 @@
 (ns uml-viewer.lua-language.graph-lua
-  "Lua LanguageGraph: one class per module, require edges, function ops."
+  "Lua LanguageGraph: one class per module, require edges, metatable
+  inheritance, function ops."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [uml-viewer.graph :as graph]))
@@ -216,31 +217,66 @@
       (let [p (.charAt ^String text (dec i))]
         (and (not (ident-char? p)) (not= p \.) (not= p \:)))))
 
+(def ^:private setmetatable-re
+  #"(?s)^setmetatable\s*\(\s*(?:\{\s*\}|[A-Za-z_][\w.]*)\s*,\s*(?:\{\s*__index\s*=\s*([A-Za-z_]\w*)\s*\}|([A-Za-z_]\w*))\s*\)")
+
+(defn- base-at
+  "Base name of a top-level `setmetatable(t, {__index = Base})` or
+  `setmetatable(t, Base)` at `i`, or nil. Inside a function the call makes
+  an instance, not a class."
+  [text i depth]
+  (when (and (zero? depth) (.startsWith ^String text "setmetatable" (int i)))
+    (when-let [[_ indexed direct] (re-find setmetatable-re (subs text i))]
+      (or indexed direct))))
+
 (defn- decl-step
-  "Fold one position of `text` into `[depth decls]`."
+  "Fold one position of `text` into `[depth {:defns :bases}]`."
   [text holes [depth acc] i]
   (if (and (not (in-hole? holes i))
            (ident-char? (.charAt ^String text i))
            (word-start? text i))
     (let [kw (keyword-of text i)
-          decl (decl-at text i kw)]
+          decl (decl-at text i kw)
+          base (base-at text i depth)]
       [(next-depth kw depth)
-       (if decl (conj acc (assoc decl :nested (pos? depth))) acc)])
+       (cond-> acc
+         decl (update :defns conj (assoc decl :nested (pos? depth)))
+         base (update :bases conj base))])
     [depth acc]))
 
 (defn- decls
-  "Function declarations in `text`. A declaration inside another
-  function is nested."
+  "Function declarations in `text`, and the names top-level `setmetatable`
+  calls use as a base. A declaration inside another function is nested."
   [text holes]
-  (second (reduce #(decl-step text holes %1 %2) [0 []] (range (count text)))))
+  (second (reduce #(decl-step text holes %1 %2)
+                  [0 {:defns [] :bases []}]
+                  (range (count text)))))
+
+(def ^:private require-binding-re
+  #"local\s+([A-Za-z_]\w*)\s*=\s*require\s*\(?\s*[\"']([A-Za-z_][\w.]*)")
+
+(defn- require-bindings
+  "Local name to module name for each `local X = require(\"m\")`."
+  [text holes]
+  (let [m (re-matcher require-binding-re text)]
+    (loop [acc {}]
+      (if (.find m)
+        (recur (if (in-hole? holes (.start m))
+                 acc
+                 (assoc acc (.group m 1) (.group m 2))))
+        acc))))
 
 (defn read-module
-  "Module surface of Lua `source`: required module names, and top-level
-  function declarations with their visibility."
+  "Module surface of Lua `source`: required module names, top-level
+  function declarations with their visibility, and the required modules
+  a top-level `setmetatable` inherits from."
   [source]
-  (let [{:keys [text holes]} (mask-comments source)]
+  (let [{:keys [text holes]} (mask-comments source)
+        {:keys [defns bases]} (decls text holes)
+        bound (require-bindings text holes)]
     {:requires (directives text holes)
-     :defns (decls text holes)}))
+     :defns defns
+     :bases (vec (distinct (keep bound bases)))}))
 
 (defn- module-relative
   "Module name of `file` under `root`: strip the longest of
@@ -303,6 +339,8 @@
                                   {:name (graph/module-name (:id m))
                                    :lang :lua
                                    :file (graph/relative-path (:file m))
+                                   :inherits (vec (distinct (keep #(get by-rel %)
+                                                                  (:bases surface))))
                                    :requires (vec (distinct (keep :id hits)))
                                    :foreigns (vec (distinct (keep :foreign hits)))
                                    :ops (mapv (fn [d] {:name (:name d) :text (:name d)})
@@ -314,11 +352,13 @@
                         distinct
                         (remove project-ids)
                         (mapv #(graph/foreign-class (keyword %))))]
-      {:classes (into (mapv #(dissoc % :relative :requires :foreigns) parsed)
+      {:classes (into (mapv #(dissoc % :relative :requires :foreigns :inherits) parsed)
                       foreigns)
        :edges (->> parsed
                    (mapcat (fn [c]
                              (concat
+                               (map (fn [to] {:from (:id c) :to to :kind :inheritance})
+                                    (:inherits c))
                                (map (fn [to] {:from (:id c) :to to :kind :dependency})
                                     (:requires c))
                                (map (fn [to] {:from (:id c) :to (keyword to) :kind :dependency})

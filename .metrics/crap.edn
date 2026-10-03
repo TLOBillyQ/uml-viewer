@@ -974,6 +974,16 @@
    :complexity 5,
    :coverage 100.0,
    :crap 5.0}
+  {:name "base-at",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 5,
+   :coverage 100.0,
+   :crap 5.0}
+  {:name "decl-step",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 5,
+   :coverage 100.0,
+   :crap 5.0}
   {:name "generation-plan",
    :namespace "uml-viewer.main.ir-generator",
    :complexity 5,
@@ -1444,7 +1454,7 @@
    :complexity 4,
    :coverage 100.0,
    :crap 4.0}
-  {:name "decl-step",
+  {:name "require-bindings",
    :namespace "uml-viewer.lua-language.graph-lua",
    :complexity 4,
    :coverage 100.0,

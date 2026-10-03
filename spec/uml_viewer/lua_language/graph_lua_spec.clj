@@ -97,6 +97,23 @@
       (should= ["kept"] (map :name (:defns surface))))
     (should= [] (:requires (lua/read-module "-- require(\"nope\")"))))
 
+  (it "reads a top-level setmetatable base bound by require"
+    (let [surface (lua/read-module
+                    (str "local Base = require(\"app.base\")\n"
+                         "local Mixin = require 'app.mixin'\n"
+                         "local Other = require(\"app.other\")\n"
+                         "local Child = setmetatable({}, {__index = Base})\n"
+                         "setmetatable(Child, Mixin)\n"
+                         "local Plain = setmetatable({}, Unbound)\n"
+                         "-- setmetatable({}, Other)\n"
+                         "local s = \"setmetatable({}, Other)\"\n"
+                         "function Child.new()\n"
+                         "  return setmetatable({}, Other)\n"
+                         "end\n"
+                         "x.setmetatable({}, Other)\n"))]
+      (should= ["app.base" "app.mixin"] (:bases surface))
+      (should= ["app.base" "app.mixin" "app.other"] (:requires surface))))
+
   (it "skips an unclosed string at the end of the file"
     (let [surface (lua/read-module "local s = \"require(\"yes\")\n")]
       (should= [] (:requires surface)))))
@@ -131,6 +148,26 @@
         (should= #{{:from :app :to :model :kind :dependency}
                    {:from :app :to :lfs :kind :dependency}}
                  (set (:edges g))))))
+
+  (it "draws inheritance to a project module a top-level setmetatable uses"
+    (let [dir (temp-root)]
+      (spit-file dir "src/app/base.lua"
+                 (str "local Base = {}\n"
+                      "Base.__index = Base\n"
+                      "return Base\n"))
+      (spit-file dir "src/app/child.lua"
+                 (str "local Base = require(\"app.base\")\n"
+                      "local lfs = require(\"lfs\")\n"
+                      "local Child = setmetatable({}, {__index = Base})\n"
+                      "local Odd = setmetatable({}, lfs)\n"
+                      "return Child\n"))
+      (let [g (graph/scan (graph/lookup :lua) (io/file dir "src")
+                          {:prefix "app"})]
+        (should= #{{:from :child :to :base :kind :inheritance}
+                   {:from :child :to :base :kind :dependency}
+                   {:from :child :to :lfs :kind :dependency}}
+                 (set (:edges g)))
+        (should-not (some :inherits (:classes g))))))
 
   (it "names a module from the longest of src/lua, src, and lua"
     (let [dir (temp-root)]

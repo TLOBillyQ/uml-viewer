@@ -62,18 +62,35 @@ needed):
 
 ```bash
 cd /path/to/the-project
-curl -fsSL https://raw.githubusercontent.com/unclebob/uml-viewer/master/scripts/get-uml-viewer -o get-uml-viewer
+curl -fsSL https://raw.githubusercontent.com/TLOBillyQ/uml-viewer/lua/scripts/get-uml-viewer -o get-uml-viewer
 chmod +x get-uml-viewer
 ./get-uml-viewer               # fetch, write ./uml, start
 ./uml                          # later fresh starts (returns immediately)
 ./uml --restart                # companion only: new JVM, restore last view
+./uml ir                       # policy → IR
+./uml crap                     # .metrics/crap.edn for the whole tree
+./uml mutate src/a/b.lua       # differential mutation of these files
 ```
 
 `scripts/get-uml-viewer` is in this repo. It clones uml-viewer into
 **gitignored** `.uml-viewer/uml-viewer/` (a nested `.git` there is invisible
 to the project's repo), writes `./uml`, and starts the viewer. `--install-only`
 skips the start. `UML_VIEWER_REPO_URL` and `UML_VIEWER_REF` override the clone
-source (default `master`).
+source (default `TLOBillyQ/uml-viewer`, branch `lua`).
+
+A project without `deps.edn` also gets
+[crapper](https://github.com/TLOBillyQ/crapper) and
+[mutator](https://github.com/TLOBillyQ/mutator) cloned side by side into
+`.uml-viewer/` (branch `lua`; override with `CRAPPER_REPO_URL`,
+`CRAPPER_REF`, `MUTATOR_REPO_URL`, `MUTATOR_REF`). They need Python 3.11+.
+A failed clone warns and the diagram still works.
+
+`./uml ir` runs the IR generator on `examples/<dir>.policy.edn` (else the
+first `examples/*.policy.edn`, else `policy.edn`). `./uml crap` and
+`./uml mutate` run the project's `:crap` / `:mutate` aliases when it has
+`deps.edn`, otherwise crapper and mutator. Run `./uml crap` on the whole
+tree: `.metrics/crap.edn` is replaced every run. The companion uses these
+three commands for every language.
 
 `./uml` returns immediately (`clojure` in the background, not `clj`/`rlwrap`).
 The diagram is its own JVM. Exceptions and JVM output append to
@@ -90,7 +107,7 @@ the IR. Type there; Esc is the real TUI interrupt. Closing the diagram kills
 **only that** tmux session and its terminal window — other Claude sessions
 stay
 up. If that Claude process dies, tmux respawns it in the same pane. That
-instance also runs `clj -M:crap`, `clj -M:mutate`, and IR generate after later
+instance also runs `./uml crap`, `./uml mutate`, and `./uml ir` after later
 changes. Project-wide rules live in `CLAUDE.md`.
 
 Prefer `./uml` in the examined project (from `get-uml-viewer`). Aliases
@@ -552,8 +569,12 @@ foreign (`lfs` stays `:lfs`). Comments, strings, and long brackets are
 masked, so a `require` inside them is ignored. Top-level functions that
 are not `local` are `:ops`, named as written in the source (`M.clamp`,
 `Account:deposit`). A function declared inside another is not an op.
-Metatables are not read, so there are no `:inheritance` or `:implements`
-edges and no interface stereotype.
+A top-level `setmetatable(t, {__index = Base})` or
+`setmetatable(t, Base)`, where `local Base = require("app.base")` names a
+project module, is `:inheritance` on that module. This is a pattern match,
+not an evaluation: a `setmetatable` inside a function makes an instance and
+draws nothing, and a base that is not a local bound by `require` is not
+followed. There are no `:implements` edges and no interface stereotype.
 
 `merge-scans` links a TypeScript `invoke("read_text")` to the Rust class
 that owns `#[tauri::command] fn read_text`, as a `:dependency`. Two
