@@ -53,6 +53,7 @@
   :typescript-language
   :rust-language
   :python-language
+  :lua-language
   :domain],
  :omit [],
  :edges
