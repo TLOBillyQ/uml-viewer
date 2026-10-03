@@ -28,6 +28,12 @@
   [:main :lua-language] :association,
   [:main.ir-generator :lua-language.graph-lua] :association},
  :omit-edges [],
+ :proposals
+ [{:id :p-1791033119418,
+   :name "2026-10-03 21:11:59",
+   :layers [],
+   :omit [],
+   :notice "PROPOSAL — not instantiated in code"}],
  :levels
  [[:domain
    :source

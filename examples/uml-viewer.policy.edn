@@ -1,38 +1,59 @@
-{:title "UML viewer"
- :src "src"
- :prefix "uml-viewer"
- :lang :clojure
- :out "examples/uml-viewer.edn"
- :hierarchical true
- :foreign [quil javax.swing]
- :order [main adapters application engine source graph
-         clojure-language typescript-language rust-language python-language lua-language domain]
- :levels [[domain source graph clojure-language typescript-language rust-language python-language lua-language]
-          [engine]
-          [application]
-          [adapters]
-          [main]]
- :edge-kinds {[:engine.compose :engine.layout] :association
-              [:engine.compose :engine.route] :association
-              [:adapters.core :adapters.sketch] :association
-              [:application.document :engine.compose] :association
-              [:application.document :domain.hierarchy] :association
-              [:main :adapters] :association
-              [:main :clojure-language] :association
-              [:main :typescript-language] :association
-              [:main :rust-language] :association
-              [:main :python-language] :association
-              [:main :lua-language] :association
-              [:main :application] :association
-              [:main.uml-viewer :adapters.core] :association
-              [:main.uml-viewer :clojure-language.source-clojure] :association
-              [:main.uml-viewer :typescript-language.source-typescript] :association
-              [:main.uml-viewer :rust-language.source-rust] :association
-              [:main.uml-viewer :python-language.source-python] :association
-              [:main.uml-viewer :lua-language.source-lua] :association
-              [:main.ir-generator :application.ir-generator] :association
-              [:main.ir-generator :clojure-language.graph-clojure] :association
-              [:main.ir-generator :typescript-language.graph-typescript] :association
-              [:main.ir-generator :rust-language.graph-rust] :association
-              [:main.ir-generator :python-language.graph-python] :association
-              [:main.ir-generator :lua-language.graph-lua] :association}}
+{:hierarchical true,
+ :src "src",
+ :title "UML viewer",
+ :prefix "uml-viewer",
+ :edge-kinds
+ {[:main.uml-viewer :adapters.core] :association,
+  [:main.ir-generator :typescript-language.graph-typescript] :association,
+  [:application.document :domain.hierarchy] :association,
+  [:main.ir-generator :clojure-language.graph-clojure] :association,
+  [:main.uml-viewer :rust-language.source-rust] :association,
+  [:application.document :engine.compose] :association,
+  [:main.uml-viewer :typescript-language.source-typescript] :association,
+  [:main.uml-viewer :lua-language.source-lua] :association,
+  [:main :python-language] :association,
+  [:engine.compose :engine.layout] :association,
+  [:engine.compose :engine.route] :association,
+  [:main.ir-generator :rust-language.graph-rust] :association,
+  [:adapters.core :adapters.sketch] :association,
+  [:main :application] :association,
+  [:main.uml-viewer :clojure-language.source-clojure] :association,
+  [:main :clojure-language] :association,
+  [:main.ir-generator :application.ir-generator] :association,
+  [:main.uml-viewer :python-language.source-python] :association,
+  [:main :adapters] :association,
+  [:main :rust-language] :association,
+  [:main.ir-generator :python-language.graph-python] :association,
+  [:main :typescript-language] :association,
+  [:main :lua-language] :association,
+  [:main.ir-generator :lua-language.graph-lua] :association},
+ :lang :clojure,
+ :proposals [{:id :p-1791033119418, :name "2026-10-03 21:11:59", :layers []}],
+ :levels
+ [[domain
+   source
+   graph
+   clojure-language
+   typescript-language
+   rust-language
+   python-language
+   lua-language]
+  [engine]
+  [application]
+  [adapters]
+  [main]],
+ :out "examples/uml-viewer.edn",
+ :order
+ [main
+  adapters
+  application
+  engine
+  source
+  graph
+  clojure-language
+  typescript-language
+  rust-language
+  python-language
+  lua-language
+  domain],
+ :foreign [quil javax.swing]}
