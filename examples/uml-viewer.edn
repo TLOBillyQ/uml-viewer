@@ -10,6 +10,7 @@
   [:main.uml-viewer :rust-language.source-rust] :association,
   [:application.document :engine.compose] :association,
   [:main.uml-viewer :typescript-language.source-typescript] :association,
+  [:main.uml-viewer :lua-language.source-lua] :association,
   [:main :python-language] :association,
   [:engine.compose :engine.layout] :association,
   [:engine.compose :engine.route] :association,
@@ -23,7 +24,9 @@
   [:main :adapters] :association,
   [:main :rust-language] :association,
   [:main.ir-generator :python-language.graph-python] :association,
-  [:main :typescript-language] :association},
+  [:main :typescript-language] :association,
+  [:main :lua-language] :association,
+  [:main.ir-generator :lua-language.graph-lua] :association},
  :omit-edges [],
  :levels
  [[:domain
@@ -32,7 +35,8 @@
    :clojure-language
    :typescript-language
    :rust-language
-   :python-language]
+   :python-language
+   :lua-language]
   [:engine]
   [:application]
   [:adapters]
@@ -63,6 +67,7 @@
   {:from :rust-language.source-rust, :to :source, :kind :dependency}
   {:from :application.document, :to :domain.hierarchy, :kind :dependency}
   {:from :application.events, :to :domain.policy, :kind :dependency}
+  {:from :lua-language.source-lua, :to :source, :kind :dependency}
   {:from :adapters.sketch, :to :adapters.draw, :kind :dependency}
   {:from :application.document, :to :domain.log, :kind :dependency}
   {:from :application.document, :to :engine.hit, :kind :dependency}
@@ -79,6 +84,8 @@
   {:from :application.document, :to :domain.ir, :kind :dependency}
   {:from :adapters.draw, :to :application.detail, :kind :dependency}
   {:from :adapters.draw, :to :quil, :kind :dependency}
+  {:from :lua-language.graph-lua, :to :graph, :kind :implements}
+  {:from :main.uml-viewer, :to :lua-language.source-lua, :kind :dependency}
   {:from :main.uml-viewer, :to :domain.log, :kind :dependency}
   {:from :adapters.draw, :to :engine.curve, :kind :dependency}
   {:from :application.events, :to :application.detail, :kind :dependency}
@@ -131,6 +138,7 @@
   {:from :application.events, :to :application.overlay, :kind :dependency}
   {:from :application.events, :to :engine.hit, :kind :dependency}
   {:from :adapters.sketch, :to :application.overlay, :kind :dependency}
+  {:from :main.ir-generator, :to :lua-language.graph-lua, :kind :dependency}
   {:from :application.document, :to :application.overlay, :kind :dependency}
   {:from :application.document, :to :domain.mailbox, :kind :dependency}
   {:from :engine.route, :to :domain.geom, :kind :dependency}
@@ -305,6 +313,20 @@
    :level 0,
    :lang :clojure,
    :id :graph}
+  {:stereotype nil,
+   :ns "uml-viewer.lua-language.graph-lua",
+   :name "GraphLua",
+   :file "src/uml_viewer/lua_language/graph_lua.clj",
+   :level 0,
+   :lang :clojure,
+   :id :lua-language.graph-lua}
+  {:stereotype nil,
+   :ns "uml-viewer.lua-language.source-lua",
+   :name "SourceLua",
+   :file "src/uml_viewer/lua_language/source_lua.clj",
+   :level 0,
+   :lang :clojure,
+   :id :lua-language.source-lua}
   {:stereotype nil,
    :ns "uml-viewer.main.ir-generator",
    :name "IrGenerator",

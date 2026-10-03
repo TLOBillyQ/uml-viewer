@@ -112,6 +112,10 @@ with **Waiting for agent to create diagram.** `R` reloads the current EDN
 immediately and does not wait. A missing or unreadable file prints
 `UML viewer: file not found: …` in the inspector instead of throwing.
 
+`lua-fixture/` is a Lua project with `.metrics/` snapshots written by
+crapper and mutator. The Lua specs scan it and check the overlay joins
+those snapshots.
+
 ```bash
 clj -M:spec
 clj -M:cov
@@ -191,7 +195,7 @@ namespace is a `:dependency`. `requiring-resolve` of a quoted var is a
 `:stereotype :interface`. `defrecord` or `deftype` of a protocol is
 `:implements`. External `:require`s and `:import`s become **foreign**
 classes. The overlay fills Clojure members from `.metrics/`. TypeScript,
-Rust, and Python are separate scanners (see
+Rust, Python, and Lua are separate scanners (see
 [Language graphs](#language-graphs)): one class per module, with exported
 members as `:ops`. The overlay joins each snapshot by `:ns`, then by
 the class id.
@@ -252,9 +256,9 @@ Right (the ns tree):
  :foreign [quil]
  :order [main adapters application engine source graph
          clojure-language typescript-language rust-language python-language
-         domain]
+         lua-language domain]
  :levels [[domain source graph clojure-language typescript-language
-           rust-language python-language]
+           rust-language python-language lua-language]
           [engine]
           [application]
           [adapters]
@@ -515,12 +519,27 @@ project name. `list[Animal]` is not. Public module-level functions and
 classes are `:ops`. A module whose public classes are only `Protocol` or
 `ABC` bases, with no public functions, is `:stereotype :interface`.
 
+**Lua** (`uml-viewer.lua-language.graph-lua`) emits one class per `.lua`
+module. The module name is the `require` path: strip the longest of
+`src/lua/`, `src/`, `lua/`, drop `.lua`, collapse a trailing `/init`,
+then `/` becomes `.`, so `src/calc/init.lua` and `src/calc/util.lua`
+become `calc` (`:calc`) and `calc.util` (`:calc.util`). It skips
+`*_spec.lua` and paths under `spec`, `lua_modules`, `dist`, `build`,
+`target`, and `.metrics`. `require "a.b"`, `require("a.b")`, and
+`require 'a.b'` are dependencies; a name that is not a project module is
+foreign (`lfs` stays `:lfs`). Comments, strings, and long brackets are
+masked, so a `require` inside them is ignored. Top-level functions that
+are not `local` are `:ops`, named as written in the source (`M.clamp`,
+`Account:deposit`). A function declared inside another is not an op.
+Metatables are not read, so there are no `:inheritance` or `:implements`
+edges and no interface stereotype.
+
 `merge-scans` links a TypeScript `invoke("read_text")` to the Rust class
 that owns `#[tauri::command] fn read_text`, as a `:dependency`. Two
 project classes with the same id are an error. When a dependency and an
 `:implements` edge join the same pair, the IR keeps `:implements`.
 
-CRAP and mutation for TypeScript, Rust, and Python come from separate
+CRAP and mutation for TypeScript, Rust, Python, and Lua come from separate
 tools. The overlay joins a snapshot to the class whose `:ns` equals that
 namespace. Otherwise the class id owns that name (`bookwriter.model`
 owns `model`), a dotted child rolls up (`pdf` owns `pdf.Layout`), and
@@ -648,9 +667,10 @@ extractor must satisfy `LanguageSource`:
 `:file`.
 
 **TypeScript** (`uml-viewer.typescript-language.source-typescript`),
-**Rust** (`uml-viewer.rust-language.source-rust`), and **Python**
-(`uml-viewer.python-language.source-python`) open `:file` and find the
-exported declaration, the `fn`, or the `def`. The class card passes
+**Rust** (`uml-viewer.rust-language.source-rust`), **Python**
+(`uml-viewer.python-language.source-python`), and **Lua**
+(`uml-viewer.lua-language.source-lua`) open `:file` and find the
+exported declaration, the `fn`, the `def`, or the `function`. The class card passes
 `:lang` and `:file` from the class. A class with no `:lang` still uses
 the Clojure extractor that Main passes in. The protocol is the seam; do
 not special-case languages in the class card.
