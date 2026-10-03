@@ -1,20 +1,5 @@
 {:entries
- [{:name "next-depth",
-   :namespace "uml-viewer.lua-language.graph-lua",
-   :complexity 14,
-   :coverage 67.44186046511628,
-   :crap 20.76448614587395}
-  {:name "directives",
-   :namespace "uml-viewer.lua-language.graph-lua",
-   :complexity 9,
-   :coverage 48.717948717948715,
-   :crap 19.923987255348198}
-  {:name "mask-comments",
-   :namespace "uml-viewer.lua-language.graph-lua",
-   :complexity 9,
-   :coverage 50.51903114186851,
-   :crap 18.812950384522985}
-  {:name "keyword-start",
+ [{:name "keyword-start",
    :namespace "uml-viewer.typescript-language.graph-typescript",
    :complexity 4,
    :coverage 5.555555555555555,
@@ -29,16 +14,6 @@
    :complexity 8,
    :coverage 55.294117647058826,
    :crap 13.718392835334825}
-  {:name "decls",
-   :namespace "uml-viewer.lua-language.graph-lua",
-   :complexity 7,
-   :coverage 52.0,
-   :crap 12.419008}
-  {:name "decl-at",
-   :namespace "uml-viewer.lua-language.graph-lua",
-   :complexity 11,
-   :coverage 100.0,
-   :crap 11.0}
   {:name "ghostty-path",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 3,
@@ -589,11 +564,6 @@
    :complexity 2,
    :coverage 4.761904761904762,
    :crap 5.4553503941259045}
-  {:name "statement-end",
-   :namespace "uml-viewer.lua-language.graph-lua",
-   :complexity 2,
-   :coverage 4.761904761904762,
-   :crap 5.4553503941259045}
   {:name "save-session!",
    :namespace "uml-viewer.application.document",
    :complexity 2,
@@ -784,11 +754,6 @@
    :complexity 5,
    :coverage 96.15384615384616,
    :crap 5.001422394173874}
-  {:name "lookahead",
-   :namespace "uml-viewer.lua-language.graph-lua",
-   :complexity 5,
-   :coverage 96.29629629629629,
-   :crap 5.001270131585632}
   {:name "sole-rust-root",
    :namespace "uml-viewer.application.overlay",
    :complexity 5,
@@ -994,6 +959,26 @@
    :complexity 5,
    :coverage 100.0,
    :crap 5.0}
+  {:name "span-at",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 5,
+   :coverage 100.0,
+   :crap 5.0}
+  {:name "lookahead",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 5,
+   :coverage 100.0,
+   :crap 5.0}
+  {:name "require-arg",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 5,
+   :coverage 100.0,
+   :crap 5.0}
+  {:name "decl-at",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 5,
+   :coverage 100.0,
+   :crap 5.0}
   {:name "generation-plan",
    :namespace "uml-viewer.main.ir-generator",
    :complexity 5,
@@ -1155,11 +1140,6 @@
    :coverage 95.23809523809523,
    :crap 4.001727675197063}
   {:name "keyword-at?",
-   :namespace "uml-viewer.lua-language.graph-lua",
-   :complexity 4,
-   :coverage 95.55555555555556,
-   :crap 4.001404663923182}
-  {:name "keyword-at?",
    :namespace "uml-viewer.python-language.graph-python",
    :complexity 4,
    :coverage 95.55555555555556,
@@ -1229,6 +1209,11 @@
    :complexity 4,
    :coverage 97.72727272727273,
    :crap 4.000187828700225}
+  {:name "keyword-at?",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 4,
+   :coverage 97.77777777777777,
+   :crap 4.000175582990398}
   {:name "pick-entries",
    :namespace "uml-viewer.domain.hierarchy",
    :complexity 4,
@@ -1441,6 +1426,21 @@
    :crap 4.0}
   {:name "stacked?",
    :namespace "uml-viewer.engine.route",
+   :complexity 4,
+   :coverage 100.0,
+   :crap 4.0}
+  {:name "mask-step",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 4,
+   :coverage 100.0,
+   :crap 4.0}
+  {:name "require-at",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 4,
+   :coverage 100.0,
+   :crap 4.0}
+  {:name "decl-step",
+   :namespace "uml-viewer.lua-language.graph-lua",
    :complexity 4,
    :coverage 100.0,
    :crap 4.0}
@@ -2034,6 +2034,11 @@
    :complexity 3,
    :coverage 100.0,
    :crap 3.0}
+  {:name "comment-end",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 3,
+   :coverage 100.0,
+   :crap 3.0}
   {:name "statement-start",
    :namespace "uml-viewer.lua-language.graph-lua",
    :complexity 3,
@@ -2339,6 +2344,11 @@
    :complexity 2,
    :coverage 95.23809523809523,
    :crap 2.000431918799266}
+  {:name "long-open?",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 2,
+   :coverage 95.23809523809523,
+   :crap 2.000431918799266}
   {:name "doubled-brace?",
    :namespace "uml-viewer.python-language.graph-python",
    :complexity 2,
@@ -2426,11 +2436,6 @@
    :crap 2.000041094764527}
   {:name "protocol-nses",
    :namespace "uml-viewer.clojure-language.graph-clojure",
-   :complexity 2,
-   :coverage 97.87234042553192,
-   :crap 2.0000385271086367}
-  {:name "long-bracket-end",
-   :namespace "uml-viewer.lua-language.graph-lua",
    :complexity 2,
    :coverage 97.87234042553192,
    :crap 2.0000385271086367}
@@ -3214,12 +3219,27 @@
    :complexity 2,
    :coverage 100.0,
    :crap 2.0}
+  {:name "long-bracket-end",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 2,
+   :coverage 100.0,
+   :crap 2.0}
+  {:name "quote-char?",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 2,
+   :coverage 100.0,
+   :crap 2.0}
   {:name "in-hole?",
    :namespace "uml-viewer.lua-language.graph-lua",
    :complexity 2,
    :coverage 100.0,
    :crap 2.0}
   {:name "ident-char?",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 2,
+   :coverage 100.0,
+   :crap 2.0}
+  {:name "quoted-name",
    :namespace "uml-viewer.lua-language.graph-lua",
    :complexity 2,
    :coverage 100.0,
@@ -3431,11 +3451,6 @@
    :crap 1.7865270823850707}
   {:name "close-terminal-window!",
    :namespace "uml-viewer.adapters.sketch",
-   :complexity 1,
-   :coverage 8.333333333333332,
-   :crap 1.7702546296296298}
-  {:name "statement-prefix",
-   :namespace "uml-viewer.lua-language.graph-lua",
    :complexity 1,
    :coverage 8.333333333333332,
    :crap 1.7702546296296298}
@@ -4465,6 +4480,31 @@
    :coverage 100.0,
    :crap 1.0}
   {:name "excluded-name?",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 1,
+   :coverage 100.0,
+   :crap 1.0}
+  {:name "mask-comments",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 1,
+   :coverage 100.0,
+   :crap 1.0}
+  {:name "directives",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 1,
+   :coverage 100.0,
+   :crap 1.0}
+  {:name "after-local?",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 1,
+   :coverage 100.0,
+   :crap 1.0}
+  {:name "next-depth",
+   :namespace "uml-viewer.lua-language.graph-lua",
+   :complexity 1,
+   :coverage 100.0,
+   :crap 1.0}
+  {:name "decls",
    :namespace "uml-viewer.lua-language.graph-lua",
    :complexity 1,
    :coverage 100.0,

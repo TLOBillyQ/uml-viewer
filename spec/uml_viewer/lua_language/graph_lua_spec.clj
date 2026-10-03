@@ -68,6 +68,35 @@
       (should= ["outer" "inner" "pick" "mid" "top"] (map :name (:defns surface)))
       (should= [false true true true false] (map :nested (:defns surface)))))
 
+  (it "closes a loop or repeat block once"
+    (let [surface (lua/read-module
+                    (str "while x do y() end\n"
+                         "for i = 1, 2 do y() end\n"
+                         "repeat y() until x\n"
+                         "do local function scoped() end end\n"
+                         "function after() end\n"))]
+      (should= ["scoped" "after"] (map :name (:defns surface)))
+      (should= [true false] (map :nested (:defns surface)))))
+
+  (it "reads require with spaces, without parens, and skips non-names"
+    (let [surface (lua/read-module
+                    (str "local a = require ( \"a.b\" )\n"
+                         "local b = require\t'c'\n"
+                         "local c = require(\"1bad\")\n"
+                         "local d = require(name)\n"
+                         "local e = required(\"no\")\n"
+                         "local f = require"))]
+      (should= ["a.b" "c"] (:requires surface))))
+
+  (it "masks an unclosed long comment and a line comment at the end"
+    (let [surface (lua/read-module
+                    (str "function kept() end\n"
+                         "--[[ require(\"nope\")\n"
+                         "function gone() end"))]
+      (should= [] (:requires surface))
+      (should= ["kept"] (map :name (:defns surface))))
+    (should= [] (:requires (lua/read-module "-- require(\"nope\")"))))
+
   (it "skips an unclosed string at the end of the file"
     (let [surface (lua/read-module "local s = \"require(\"yes\")\n")]
       (should= [] (:requires surface)))))

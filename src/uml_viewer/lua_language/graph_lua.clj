@@ -42,44 +42,59 @@
       (+ j (count closer))
       n)))
 
+(def ^:private long-open-re #"(?s)\[=*\[.*")
+
+(defn- long-open?
+  "A long bracket (`[[` or `[==[`) opens at `i`."
+  [source i n]
+  (and (< i n)
+       (boolean (re-matches long-open-re (subs source i (min n (+ i 64)))))))
+
+(defn- comment-end
+  "Index just after the comment that opens at `i`: a long comment ends at
+  its closing bracket, a line comment at the newline."
+  [source i n]
+  (let [j (+ i 2)]
+    (if (long-open? source j n)
+      (long-bracket-end source j n)
+      (or (str/index-of source \newline i) n))))
+
+(defn- quote-char? [c]
+  (or (= c \") (= c \')))
+
+(defn- span-at
+  "What opens at `i`: `[:blank end]` for a comment or long-bracket string,
+  `[:hole end]` for a quoted string, or nil."
+  [source i n]
+  (let [c (.charAt ^String source i)]
+    (cond
+      (and (= c \-) (= \- (graph/next-char source i))) [:blank (comment-end source i n)]
+      (quote-char? c) [:hole (graph/scan-quoted source i c n)]
+      (and (= c \[) (long-open? source i n)) [:blank (long-bracket-end source i n)])))
+
+(defn- mask-step
+  "Copy or blank what opens at `i` into `sb`; return the next `[i holes]`."
+  [^StringBuilder sb source n [i holes]]
+  (let [[kind end] (span-at source i n)]
+    (case kind
+      :blank (do (blank-span sb source i end)
+                 [end holes])
+      :hole (do (.append sb (subs source i end))
+                [end (conj holes [(inc i) (min n (dec end))])])
+      (do (.append sb (.charAt ^String source i))
+          [(inc i) holes]))))
+
 (defn- mask-comments
   "Comments and long-bracket strings become spaces (newlines kept).
   A quoted string is copied and recorded as a half-open hole so a match
   inside it can be ignored."
   [source]
   (let [n (count source)
-        sb (StringBuilder. n)]
-    (loop [i 0 holes []]
-      (if (>= i n)
-        {:text (str sb) :holes holes}
-        (let [c (.charAt ^String source i)
-              nxt (graph/next-char source i)]
-          (cond
-            (and (= c \-) (= nxt \-))
-            (let [j (+ i 2)
-                  long? (and (< j n)
-                             (re-matches #"(?s)\[=*\[.*"
-                                         (subs source j (min n (+ j 64)))))
-                  end (if long?
-                        (long-bracket-end source j n)
-                        (or (str/index-of source \newline i) n))]
-              (blank-span sb source i end)
-              (recur end holes))
-
-            (or (= c \") (= c \'))
-            (let [end (graph/scan-quoted source i c n)]
-              (.append ^StringBuilder sb (subs source i end))
-              (recur end (conj holes [(inc i) (min n (dec end))])))
-
-            (and (= c \[)
-                 (re-matches #"(?s)\[=*\[.*" (subs source i (min n (+ i 64)))))
-            (let [end (long-bracket-end source i n)]
-              (blank-span sb source i end)
-              (recur end holes))
-
-            :else
-            (do (.append ^StringBuilder sb c)
-                (recur (inc i) holes))))))))
+        sb (StringBuilder. n)
+        [_ holes] (->> (iterate #(mask-step sb source n %) [0 []])
+                       (drop-while #(< (first %) n))
+                       first)]
+    {:text (str sb) :holes holes}))
 
 (defn- in-hole? [holes i]
   (boolean (some (fn [[a b]] (and (<= a i) (< i b))) holes)))
@@ -104,41 +119,36 @@
       (recur (inc j))
       j)))
 
+(defn- require-arg
+  "Index of the quote that opens the argument of the `require` at `i`,
+  or nil."
+  [text i]
+  (let [n (count text)
+        j (lookahead text (+ i 7))
+        k (if (and (< j n) (= \( (.charAt ^String text j)))
+            (lookahead text (inc j))
+            j)]
+    (when (and (< k n) (quote-char? (.charAt ^String text k)))
+      k)))
+
+(defn- quoted-name
+  "Module name at the start of the string whose quote is at `k`, or nil."
+  [text k]
+  (let [m (re-matcher #"[A-Za-z_][\w.]*" (subs text (inc k)))]
+    (when (.lookingAt m)
+      (.group m))))
+
+(defn- require-at
+  "Module name required by a `require` at `i`, or nil."
+  [text holes i]
+  (when (and (not (in-hole? holes i)) (keyword-at? text i "require"))
+    (some->> (require-arg text i) (quoted-name text))))
+
 (defn- directives
   "Module names required in `text`: `require \"a\"`, `require(\"a\")`,
   `require 'a'`."
   [text holes]
-  (let [n (count text)]
-    (loop [i 0 acc []]
-      (if (>= i n)
-        acc
-        (if (and (not (in-hole? holes i)) (keyword-at? text i "require"))
-          (let [j (lookahead text (+ i 7))
-                paren? (and (< j n) (= \( (.charAt ^String text j)))
-                k (lookahead text (if paren? (inc j) j))]
-            (if (and (< k n)
-                     (not (in-hole? holes k))
-                     (#{\" \'} (.charAt ^String text k)))
-              (let [m (re-matcher #"[A-Za-z_][\w.]*" (subs text (inc k)))
-                    end (graph/scan-quoted text k (.charAt ^String text k) n)]
-                (if (.lookingAt m)
-                  (recur end (conj acc (.group m)))
-                  (recur end acc)))
-              (recur (inc i) acc)))
-          (recur (inc i) acc))))))
-
-(defn- statement-end
-  "End of the statement that starts at `i`: the next newline or `;`."
-  [text i]
-  (or (str/index-of text \newline i)
-      (str/index-of text \; i)
-      (count text)))
-
-(defn- statement-prefix
-  "Text from `i` to the end of its statement. `i` must be the first
-  non-blank position of that statement."
-  [text i]
-  (subs text (lookahead text i) (statement-end text i)))
+  (vec (keep #(require-at text holes %) (range (count text)))))
 
 (def ^:private fn-decl-re
   #"(?s)^function\s+([A-Za-z_][\w.]*(?::[A-Za-z_]\w*)?)")
@@ -161,46 +171,43 @@
       (#{\newline \;} (.charAt ^String text j)) (inc j)
       :else (recur (dec j)))))
 
+(defn- after-local?
+  "The statement holding `i` reads `local` just before it."
+  [text i]
+  (boolean (re-find #"local\s*$" (subs text (statement-start text i) i))))
+
+(def ^:private decl-res
+  "Declaration patterns tried at each keyword (nil: any other word), with
+  whether they declare a local."
+  {"local" [[local-fn-re true] [local-assign-re true]]
+   "function" [[fn-decl-re false]]
+   nil [[assign-re false]]})
+
 (defn- decl-at
-  "Function declaration whose keyword starts at `i`, or nil."
+  "Function declaration whose keyword starts at `i`, or nil. `local
+  function` and `local name = function` are handled at the `local`."
   [text i kw]
-  (let [rest (subs text i)]
-    (cond
-      (= kw "local")
-      (or (when-let [[_ name] (re-find local-fn-re rest)]
-            {:name name :local true})
-          (when-let [[_ name] (re-find local-assign-re rest)]
-            {:name name :local true}))
-
-      (= kw "function")
-      ;; `local function` is handled at the `local` keyword.
-      (when-not (re-find #"local\s*$" (subs text (statement-start text i) i))
-        (when-let [[_ name] (re-find fn-decl-re rest)]
-          {:name name :local false}))
-
-      (nil? kw)
-      ;; `local name = function` is handled at the `local` keyword.
-      (when-not (re-find #"local\s*$" (subs text (statement-start text i) i))
-        (when-let [[_ name] (re-find assign-re rest)]
-          {:name name :local false})))))
+  (when-let [res (get decl-res kw)]
+    (when-not (and (not= kw "local") (after-local? text i))
+      (let [rest (subs text i)]
+        (some (fn [[re local?]]
+                (when-let [[_ name] (re-find re rest)]
+                  {:name name :local local?}))
+              res)))))
 
 (def ^:private lua-keywords
-  ["function" "local" "if" "for" "while" "do" "end" "repeat" "until"])
+  ["function" "local" "if" "do" "repeat" "end" "until"])
 
 (defn- keyword-of [text i]
   (some #(when (keyword-at? text i %) %) lua-keywords))
 
-(defn- next-depth [kw depth repeat-depth]
-  (case kw
-    "function" [(inc depth) repeat-depth]
-    "if" [(inc depth) repeat-depth]
-    "for" [(inc depth) repeat-depth]
-    "while" [(inc depth) repeat-depth]
-    "do" [(inc depth) repeat-depth]
-    "repeat" [depth (inc repeat-depth)]
-    "end" [(max 0 (dec depth)) repeat-depth]
-    "until" [depth (max 0 (dec repeat-depth))]
-    [depth repeat-depth]))
+(def ^:private depth-steps
+  "Block depth change at each keyword. `for` and `while` open their block
+  at `do`; `repeat` closes at `until`."
+  {"function" 1 "if" 1 "do" 1 "repeat" 1 "end" -1 "until" -1})
+
+(defn- next-depth [kw depth]
+  (max 0 (+ depth (get depth-steps kw 0))))
 
 (defn- word-start?
   "`i` begins a word: the previous char is not part of a longer name."
@@ -209,22 +216,23 @@
       (let [p (.charAt ^String text (dec i))]
         (and (not (ident-char? p)) (not= p \.) (not= p \:)))))
 
+(defn- decl-step
+  "Fold one position of `text` into `[depth decls]`."
+  [text holes [depth acc] i]
+  (if (and (not (in-hole? holes i))
+           (ident-char? (.charAt ^String text i))
+           (word-start? text i))
+    (let [kw (keyword-of text i)
+          decl (decl-at text i kw)]
+      [(next-depth kw depth)
+       (if decl (conj acc (assoc decl :nested (pos? depth))) acc)])
+    [depth acc]))
+
 (defn- decls
   "Function declarations in `text`. A declaration inside another
   function is nested."
   [text holes]
-  (let [n (count text)]
-    (loop [i 0 depth 0 repeat-depth 0 acc []]
-      (if (>= i n)
-        acc
-        (let [c (.charAt ^String text i)]
-          (if (and (not (in-hole? holes i)) (ident-char? c) (word-start? text i))
-            (let [kw (keyword-of text i)
-                  [nd nr] (next-depth kw depth repeat-depth)
-                  decl (decl-at text i kw)
-                  item (when decl (assoc decl :nested (pos? depth)))]
-              (recur (inc i) nd nr (if item (conj acc item) acc)))
-            (recur (inc i) depth repeat-depth acc)))))))
+  (second (reduce #(decl-step text holes %1 %2) [0 []] (range (count text)))))
 
 (defn read-module
   "Module surface of Lua `source`: required module names, and top-level
