@@ -14,11 +14,6 @@
    :complexity 8,
    :coverage 55.294117647058826,
    :crap 13.718392835334825}
-  {:name "ghostty-path",
-   :namespace "uml-viewer.adapters.sketch",
-   :complexity 3,
-   :coverage 5.88235294117647,
-   :crap 10.503358436800326}
   {:name "statement-end",
    :namespace "uml-viewer.python-language.graph-python",
    :complexity 6,
@@ -1144,6 +1139,11 @@
    :complexity 4,
    :coverage 95.55555555555556,
    :crap 4.001404663923182}
+  {:name "ghostty-path",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 4,
+   :coverage 95.65217391304348,
+   :crap 4.001315032464864}
   {:name "same-rank-candidates",
    :namespace "uml-viewer.engine.route",
    :complexity 4,
@@ -1266,6 +1266,11 @@
    :crap 4.0}
   {:name "draw-mut-note",
    :namespace "uml-viewer.adapters.draw",
+   :complexity 4,
+   :coverage 100.0,
+   :crap 4.0}
+  {:name "open-window!",
+   :namespace "uml-viewer.adapters.sketch",
    :complexity 4,
    :coverage 100.0,
    :crap 4.0}
@@ -1679,11 +1684,6 @@
    :complexity 3,
    :coverage 96.7741935483871,
    :crap 3.000302104662482}
-  {:name "claude-executable",
-   :namespace "uml-viewer.adapters.sketch",
-   :complexity 3,
-   :coverage 96.96969696969697,
-   :crap 3.000250438266967}
   {:name "owners-by-ns",
    :namespace "uml-viewer.application.overlay",
    :complexity 3,
@@ -1709,6 +1709,11 @@
    :complexity 3,
    :coverage 97.2972972972973,
    :crap 3.000177679505656}
+  {:name "claude-executable",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 3,
+   :coverage 97.43589743589743,
+   :crap 3.000151722045213}
   {:name "relative-path",
    :namespace "uml-viewer.graph",
    :complexity 3,
@@ -2545,11 +2550,6 @@
    :coverage 100.0,
    :crap 2.0}
   {:name "kill-companion-session!",
-   :namespace "uml-viewer.adapters.sketch",
-   :complexity 2,
-   :coverage 100.0,
-   :crap 2.0}
-  {:name "open-window!",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 2,
    :coverage 100.0,
@@ -3759,12 +3759,32 @@
    :complexity 1,
    :coverage 100.0,
    :crap 1.0}
+  {:name "mac?",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 1,
+   :coverage 100.0,
+   :crap 1.0}
   {:name "hex-color",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 1,
    :coverage 100.0,
    :crap 1.0}
   {:name "arm-respawn!",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 1,
+   :coverage 100.0,
+   :crap 1.0}
+  {:name "wsl-distro",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 1,
+   :coverage 100.0,
+   :crap 1.0}
+  {:name "wsl-command",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 1,
+   :coverage 100.0,
+   :crap 1.0}
+  {:name "print-attach-hint!",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 1,
    :coverage 100.0,
