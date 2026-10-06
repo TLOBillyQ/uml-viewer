@@ -154,6 +154,43 @@ class Entries(unittest.TestCase):
         self.assertFalse((self.project / 'policy.edn').exists())
         self.assertFalse((self.project / 'examples').exists())
 
+    def test_background_launcher_invokes_powershell_cli_as_data(self):
+        import json
+        cli = self.root / 'clojure with spaces.ps1'
+        cli.write_text('[IO.File]::WriteAllLines((Join-Path (Get-Location) "script-argv.txt"), [string[]]$args)\nexit 17\n')
+        manifest = self.root / 'launch.json'
+        manifest.write_text(json.dumps({'executable': str(cli), 'cwd': str(self.project),
+                                        'log': str(self.project / 'launch.log'),
+                                        'argv': ['with spaces', 'literal;$(throw 1)'], 'powershell': True}))
+        result = self.run_entry(['pwsh', '-NoProfile', '-File', str(REPO / 'scripts/uml-launch.ps1'), str(manifest)])
+        self.assertEqual(17, result.returncode, result.stderr)
+        self.assertEqual(['with spaces', 'literal;$(throw 1)'], (self.project / 'script-argv.txt').read_text().splitlines())
+
+    def test_windows_startup_boundary_checks_fixed_psmux_and_launches(self):
+        self.assertEqual(0, self.install().returncode)
+        tools = self.root / 'windows launch tools'
+        tools.mkdir()
+        cli = tools / 'clojure'
+        cli.write_text('#!/bin/sh\npwd > windows-launched.txt\nprintf "%s\\n" "$@" >> windows-launched.txt\n')
+        cli.chmod(0o755)
+        psmux = tools / 'psmux.exe'
+        psmux.write_text('#!/bin/sh\nprintf "tmux 3.3.8\\npsmux 3.3.8 (baseline)\\n"\n')
+        psmux.chmod(0o755)
+        runner = self.root / 'windows startup boundary.ps1'
+        runner.write_text('Set-Variable IsWindows -Value $true -Force\n& $env:TEST_ENTRY @args\nexit $LASTEXITCODE\n')
+        env = dict(self.env, TEST_ENTRY=str(self.project / 'uml.ps1'), PATH=str(tools) + os.pathsep + self.env['PATH'])
+        result = self.run_entry(['pwsh', '-NoProfile', '-File', str(runner), 'diagram with spaces.edn'], env=env)
+        self.assertEqual(0, result.returncode, result.stderr)
+        import time
+        deadline = time.monotonic() + 10
+        while not (self.project / 'windows-launched.txt').exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertTrue((self.project / 'windows-launched.txt').exists())
+        psmux.write_text('#!/bin/sh\nprintf "tmux 3.4\\npsmux 3.4\\n"\n')
+        result = self.run_entry(['pwsh', '-NoProfile', '-File', str(runner)], env=env)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn('3.3.8', result.stderr)
+
     def test_windows_metric_process_boundary_uses_preinstalled_python_module(self):
         # Simulate the OS boundary only; invoke the generated PS1 and real fixture process.
         self.assertEqual(0, self.install().returncode)

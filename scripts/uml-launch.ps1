@@ -3,18 +3,31 @@ $ErrorActionPreference = 'Stop'
 $manifest = $args[0]
 try {
     $launch = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
-    Remove-Item -LiteralPath $manifest
     $log = [IO.File]::Open($launch.log, [IO.FileMode]::Append, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
     $writer = [IO.StreamWriter]::new($log)
     $writer.WriteLine("----- $([DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss')) starting uml-viewer")
     $writer.Flush()
-    $info = [Diagnostics.ProcessStartInfo]::new($launch.executable)
+    if ($launch.powershell) {
+        # Bootstrap contains only a data-file path; executable/argv are read as JSON.
+        $pathData = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($manifest))
+        $bootstrap = "`$m=Get-Content -LiteralPath ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$pathData'))) -Raw|ConvertFrom-Json;"
+        $bootstrap += "Remove-Item -LiteralPath ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$pathData')));"
+        $bootstrap += 'Set-Location -LiteralPath $m.cwd;if($m.module){Import-Module $m.module};$exe=$m.executable;$argv=@($m.argv);& $exe @argv;exit $LASTEXITCODE'
+        $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($bootstrap))
+        $executable = (Get-Process -Id $PID).Path
+        $argv = @('-NoProfile', '-EncodedCommand', $encoded)
+    } else {
+        $executable = $launch.executable
+        $argv = @($launch.argv)
+        Remove-Item -LiteralPath $manifest
+    }
+    $info = [Diagnostics.ProcessStartInfo]::new($executable)
     $info.UseShellExecute = $false
     $info.WorkingDirectory = $launch.cwd
     $info.RedirectStandardInput = $true
     $info.RedirectStandardOutput = $true
     $info.RedirectStandardError = $true
-    foreach ($arg in $launch.argv) { $info.ArgumentList.Add([string]$arg) }
+    foreach ($arg in $argv) { $info.ArgumentList.Add([string]$arg) }
     $process = [Diagnostics.Process]::Start($info)
     $process.StandardInput.Close()
     # 两个流并行排空，写入同一日志时由同步 writer 串行化。

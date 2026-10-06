@@ -61,9 +61,15 @@ try {
         }
         exit $LASTEXITCODE
     }
-    if ($IsWindows) { throw 'Native Windows viewer startup is pending the startup/companion ticket. Use uml ir, crap or mutate; installation is available with --install-only.' }
     $cli = Clojure-Command
-    if (-not (Get-Command tmux -ErrorAction SilentlyContinue)) {
+    if ($IsWindows) {
+        $mux = Get-Command psmux.exe -ErrorAction SilentlyContinue
+        if (-not $mux) { throw 'psmux v3.3.8 is required: https://github.com/psmux/psmux/releases/tag/v3.3.8' }
+        $version = (& $mux -V) -join "`n"
+        if ($LASTEXITCODE -ne 0 -or $version -notmatch '^tmux 3\.3\.8\r?\npsmux 3\.3\.8(?: \([^\r\n]+\))?$') {
+            throw 'Native Windows requires the fixed psmux v3.3.8 baseline; other versions are pending verification.'
+        }
+    } elseif (-not (Get-Command tmux -ErrorAction SilentlyContinue)) {
         throw 'tmux is required for the companion. Install tmux with your system package manager.'
     }
     if ($commandArgs.Count -gt 0 -and $commandArgs[0] -eq '--restart') {
@@ -81,7 +87,12 @@ try {
     $null = New-Item -ItemType Directory -Force -Path $directory
     $manifest = Join-Path $directory ('launch-' + [guid]::NewGuid().ToString('N') + '.json')
     $log = Join-Path $root 'uml-viewer-log.txt'
-    @{ executable = $cli.Source; cwd = $root; log = $log;
+    $psCli = $cli.CommandType -ne 'Application'
+    if ($psCli -and $cli.CommandType -ne 'ExternalScript' -and -not $cli.ModuleName) {
+        throw 'Background Clojure CLI must be an executable, a .ps1 entry, or an exported module command.'
+    }
+    @{ executable = $(if ($cli.CommandType -eq 'ExternalScript' -or -not $psCli) { $cli.Source } else { $cli.Name });
+       powershell = $psCli; module = $cli.ModuleName; cwd = $root; log = $log;
        argv = @('-Sdeps', $deps, '-M', '-m', 'uml-viewer.main.uml-viewer') + $commandArgs } |
         ConvertTo-Json -Depth 4 -Compress | Set-Content -LiteralPath $manifest -Encoding utf8
     $info = [Diagnostics.ProcessStartInfo]::new((Get-Process -Id $PID).Path)
