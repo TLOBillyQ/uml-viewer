@@ -73,7 +73,13 @@ class Entries(unittest.TestCase):
         self.assertEqual(str(self.project), argv[0])
         self.assertEqual(['-M', '-m', 'uml-viewer.main.uml-viewer', 'diagram with spaces.edn', 'literal;$(touch injected)'], argv[3:])
         self.assertFalse((self.project / 'injected').exists())
-        log = (self.project / 'uml-viewer-log.txt').read_text()
+        deadline = time.monotonic() + 10
+        log = ''
+        while time.monotonic() < deadline:
+            log = (self.project / 'uml-viewer-log.txt').read_text()
+            if 'fixture-stdout' in log and 'fixture-stderr' in log:
+                break
+            time.sleep(0.05)
         self.assertIn('fixture-stdout', log)
         self.assertIn('fixture-stderr', log)
 
