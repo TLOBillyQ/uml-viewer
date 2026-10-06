@@ -984,9 +984,10 @@
   "绑定已有 companion；探测失败时禁止继续打开 viewer。"
   [root]
   (let [info (mailbox/read-companion root)
-        session (live-session root)]
-    (when-not session
-      (throw (ex-info "UML viewer: no live companion to bind on restart" {:root root})))
+        session (:session info)]
+    (when-not (and (seq session) (companion/probe! (backend info) session))
+      (throw (ex-info "UML viewer: recorded companion is missing; restart cannot replace it"
+                      {:root root :session session :status :missing})))
     (let [pane (companion/bind! (backend info) session (:pane info))]
       (reset! !session-name session)
       (reset! !terminal-window-id (:window-id info))

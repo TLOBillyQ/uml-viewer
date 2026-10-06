@@ -73,6 +73,25 @@ try {
         throw 'tmux is required for the companion. Install tmux with your system package manager.'
     }
     if ($commandArgs.Count -gt 0 -and $commandArgs[0] -eq '--restart') {
+        # The launcher owns and waits for its CLI/JVM child. Waiting for this
+        # exact process therefore waits for the old JVM without signalling it.
+        $record = Join-Path $root '.uml-viewer/viewer-process.json'
+        if (Test-Path -LiteralPath $record) {
+            $owner = Get-Content -LiteralPath $record -Raw | ConvertFrom-Json
+            if (-not $owner.pid -or -not $owner.started) { throw 'Invalid viewer process record; cannot safely restart.' }
+            $old = Get-Process -Id $owner.pid -ErrorAction SilentlyContinue
+            if ($old) {
+                if ($old.StartTime.ToUniversalTime().Ticks.ToString() -ne $owner.started) {
+                    throw 'Viewer process identity changed; cannot safely restart.'
+                }
+                Write-Output 'Waiting for the old viewer to exit after :quit-for-restart...'
+                if (-not $old.WaitForExit(30000)) {
+                    throw 'Old viewer is still running. Send :quit-for-restart, wait for its exit, then retry ./uml --restart.'
+                }
+            }
+        } else {
+            throw 'No viewer process record; wait for the old JVM to exit and launch through ./uml before restarting.'
+        }
         $name = Split-Path $root -Leaf
         $diagram = if (Test-Path -LiteralPath "examples/$name.edn") { "examples/$name.edn" } else {
             $first = Get-ChildItem 'examples/*.edn' -ErrorAction SilentlyContinue |

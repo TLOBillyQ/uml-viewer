@@ -63,6 +63,36 @@
         (should-not (:waiting s))
         (should (seq (:classes (:scene s)))))))
 
+  (it "roundtrips nonempty namespace focus and an expanded named proposal through disk on restart"
+    (let [root (io/file "target" (str "view-roundtrip-" (System/nanoTime)))
+          path (io/file root "diagram.edn")
+          doc {:hierarchical true :title "Demo"
+               :proposals [{:id :saved :name "Saved"
+                            :layers [{:id :core :label "Core" :nses [:core]}]}]
+               :classes [{:id :core.alpha :name "Alpha" :ns "demo.core.alpha"}
+                         {:id :core.beta :name "Beta" :ns "demo.core.beta"}]
+               :edges [] :order [:core.alpha :core.beta]}]
+      (.mkdirs (io/file root ".metrics"))
+      (spit path (pr-str doc))
+      (try
+        (doseq [[view expected-title expected-ids]
+                [[{:focus [:core] :proposal-id nil :proposal false :open-layer nil}
+                  nil #{:core.alpha :core.beta}]
+                 [{:focus [] :proposal-id :saved :proposal true :open-layer :proposal.core}
+                  "Core" #{:core.alpha :core.beta}]]]
+          (let [saved (merge (document/load-path (.getPath path)) view
+                             {:cam-x 47 :cam-y -23 :zoom 1.35 :declutter :classes
+                              :selected :core.alpha :detail-id :core.alpha})]
+            (document/save-session! saved)
+            (let [restored (document/restart-state (.getPath path))]
+              (should= (select-keys saved document/session-keys)
+                       (select-keys restored document/session-keys))
+              (should= expected-ids (set (map :id (get-in restored [:scene :classes]))))
+              (when expected-title (should= expected-title (get-in restored [:scene :diagram :title])))
+              (should-not (:waiting restored)))))
+        (finally
+          (doseq [f (reverse (file-seq root))] (io/delete-file f true))))))
+
   (it "compiles named proposal packages at the root and the ns tree otherwise"
     (let [doc {:hierarchical true
                :title "Demo"

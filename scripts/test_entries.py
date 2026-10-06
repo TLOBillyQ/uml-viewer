@@ -77,6 +77,35 @@ class Entries(unittest.TestCase):
         self.assertIn('fixture-stdout', log)
         self.assertIn('fixture-stderr', log)
 
+    def test_restart_waits_for_recorded_process_exit_before_launching(self):
+        import json
+        import time
+        self.assertEqual(0, self.install().returncode)
+        tools = self.root / 'restart tools'
+        tools.mkdir()
+        cli = tools / 'clojure'
+        cli.write_text('#!/bin/sh\ntouch restarted.txt\n')
+        cli.chmod(0o755)
+        env = dict(self.env, PATH=str(tools) + os.pathsep + self.env['PATH'])
+        fixture = self.root / 'old viewer.ps1'
+        fixture.write_text('$p=Get-Process -Id $PID; @{pid=$PID;started=$p.StartTime.ToUniversalTime().Ticks.ToString()}|ConvertTo-Json|Set-Content -LiteralPath $args[0];Start-Sleep -Seconds 4')
+        old = subprocess.Popen(['pwsh', '-NoProfile', '-File', str(fixture),
+                                str(self.project / '.uml-viewer/viewer-process.json')],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        record = self.project / '.uml-viewer/viewer-process.json'
+        deadline = time.monotonic() + 10
+        while not record.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertTrue(record.exists())
+        # Reap our child as a real detached launcher's parent would.
+        import threading
+        reaper = threading.Thread(target=old.wait)
+        reaper.start()
+        result = self.run_entry([str(self.project / 'uml'), '--restart'], env=env)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIsNotNone(old.poll(), 'wrapper returned while the old viewer process was alive')
+        old.communicate(timeout=10)
+
     def test_metric_alias_preserves_arguments_working_directory_and_exit(self):
         self.assertEqual(0, self.install().returncode)
         bin_dir = self.root / 'fake tools'

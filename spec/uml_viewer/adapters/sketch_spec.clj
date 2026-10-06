@@ -649,12 +649,21 @@
       (should-be-nil (:exit missing))
       (should (seq (:err missing)))))
 
-  (it "stops before opening the viewer on restart probe timeout"
-    (let [opened (atom false)]
-      (with-redefs [sketch/tmux! (fn [& _] {:exit nil :out "" :err "deadline" :timeout? true})
-                    q/sketch (fn [& _] (reset! opened true))]
-        (should-throw clojure.lang.ExceptionInfo (sketch/start! "doc.edn" :src true))
-        (should-not @opened))))
+  (it "stops before opening the viewer on restart probe timeout or bind failure"
+    (let [root (java.io.File. "target" (str "restart-failure-" (System/nanoTime)))
+          path (java.io.File. root "doc.edn")
+          opened (atom false)]
+      (.mkdirs (java.io.File. root ".metrics"))
+      (mailbox/write-companion! root {:session "original" :pane "%42"})
+      (doseq [failed-command ["has-session" "display-message"]]
+        (with-redefs [sketch/tmux! (fn [& args]
+                                    (if (= failed-command (first args))
+                                      {:exit nil :out "" :err "deadline" :timeout? true}
+                                      0))
+                      q/sketch (fn [& _] (reset! opened true))]
+          (should-throw clojure.lang.ExceptionInfo (sketch/start! (.getPath path) :src true))
+          (should-not @opened)
+          (should= "original" (:session (mailbox/read-companion root)))))))
 
   (it "keeps diagnostic output when every terminal opener fails"
     (with-redefs [sketch/ghostty-path (fn [] "/Applications/Ghostty.app")
@@ -972,10 +981,27 @@
                                 (some #{"uml-viewer-other-zzz"} %))
                           @calls)))))
 
+  (it "refuses restart when the recorded companion is gone even if a fallback session exists"
+    (let [root (java.io.File. "target" (str "strict-restart-" (System/nanoTime)))
+          path (java.io.File. root "doc.edn")
+          opened (atom false)
+          calls (atom [])]
+      (.mkdirs (java.io.File. root ".metrics"))
+      (mailbox/write-companion! root {:session "original-companion" :pane "%42"})
+      (with-redefs [sketch/tmux! (fn [& args]
+                                 (swap! calls conj (vec args))
+                                 (if (= "original-companion" (last args)) 1 0))
+                    q/sketch (fn [& _] (reset! opened true))]
+        (should-throw clojure.lang.ExceptionInfo (sketch/start! (.getPath path) :src true))
+        (should-not @opened)
+        (should= "original-companion" (:session (mailbox/read-companion root)))
+        (should-not (some #(= "new-session" (first %)) @calls)))))
+
   (it "on restart binds the live tmux session so later mail can wake it"
     (let [root (str (System/getProperty "java.io.tmpdir")
                     "/uv-remember-" (System/nanoTime))]
       (.mkdirs (java.io.File. root))
+      (mailbox/write-companion! root {:session (sketch/session-id root) :pane "%42"})
       (reset! sketch/!session-name nil)
       (reset! sketch/!terminal-window-id nil)
       (with-redefs [uml-viewer.adapters.sketch/tmux!

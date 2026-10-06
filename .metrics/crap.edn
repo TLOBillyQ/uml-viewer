@@ -14,16 +14,16 @@
    :complexity 8,
    :coverage 55.294117647058826,
    :crap 13.718392835334825}
-  {:name "windows-owner!",
-   :namespace "uml-viewer.adapters.companion",
-   :complexity 10,
-   :coverage 77.57009345794393,
-   :crap 11.128450185013914}
   {:name "open-window!",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 11,
    :coverage 90.0523560209424,
    :crap 11.119109409459504}
+  {:name "windows-owner!",
+   :namespace "uml-viewer.adapters.companion",
+   :complexity 10,
+   :coverage 78.0701754385965,
+   :crap 11.05464299406565}
   {:name "notify-agent!",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 10,
@@ -579,16 +579,6 @@
    :complexity 2,
    :coverage 4.545454545454546,
    :crap 5.478963185574756}
-  {:name "known-proposal-id",
-   :namespace "uml-viewer.application.document",
-   :complexity 3,
-   :coverage 35.0,
-   :crap 5.471625}
-  {:name "save-session!",
-   :namespace "uml-viewer.application.document",
-   :complexity 2,
-   :coverage 5.0,
-   :crap 5.429499999999999}
   {:name "imports-of",
    :namespace "uml-viewer.python-language.graph-python",
    :complexity 4,
@@ -1769,6 +1759,11 @@
    :complexity 3,
    :coverage 98.27586206896551,
    :crap 3.000046127352495}
+  {:name "remember-companion!",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 3,
+   :coverage 98.50746268656717,
+   :crap 3.000029923893564}
   {:name "edges-among",
    :namespace "uml-viewer.domain.policy",
    :complexity 3,
@@ -1895,6 +1890,11 @@
    :coverage 100.0,
    :crap 3.0}
   {:name "compile-proposal-id",
+   :namespace "uml-viewer.application.document",
+   :complexity 3,
+   :coverage 100.0,
+   :crap 3.0}
+  {:name "known-proposal-id",
    :namespace "uml-viewer.application.document",
    :complexity 3,
    :coverage 100.0,
@@ -2219,11 +2219,6 @@
    :complexity 2,
    :coverage 81.81818181818183,
    :crap 2.0240420736288502}
-  {:name "remember-companion!",
-   :namespace "uml-viewer.adapters.sketch",
-   :complexity 2,
-   :coverage 84.31372549019608,
-   :crap 2.015439009129219}
   {:name "lower-ratio",
    :namespace "uml-viewer.domain.config",
    :complexity 2,
@@ -2730,6 +2725,11 @@
    :coverage 100.0,
    :crap 2.0}
   {:name "proposal-root?",
+   :namespace "uml-viewer.application.document",
+   :complexity 2,
+   :coverage 100.0,
+   :crap 2.0}
+  {:name "save-session!",
    :namespace "uml-viewer.application.document",
    :complexity 2,
    :coverage 100.0,
