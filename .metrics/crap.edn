@@ -14,6 +14,11 @@
    :complexity 8,
    :coverage 55.294117647058826,
    :crap 13.718392835334825}
+  {:name "windows-owner!",
+   :namespace "uml-viewer.adapters.companion",
+   :complexity 10,
+   :coverage 77.57009345794393,
+   :crap 11.128450185013914}
   {:name "open-window!",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 11,
@@ -39,11 +44,6 @@
    :complexity 9,
    :coverage 88.67924528301887,
    :crap 9.117519831807465}
-  {:name "shutdown-children!",
-   :namespace "uml-viewer.adapters.sketch",
-   :complexity 6,
-   :coverage 56.16438356164384,
-   :crap 9.032381618284033}
   {:name "detail-row-color",
    :namespace "uml-viewer.adapters.draw",
    :complexity 9,
@@ -314,6 +314,11 @@
    :complexity 7,
    :coverage 100.0,
    :crap 7.0}
+  {:name "shutdown-children!",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 6,
+   :coverage 71.42857142857143,
+   :crap 6.839650145772595}
   {:name "normalize",
    :namespace "uml-viewer.domain.ir",
    :complexity 6,
@@ -709,6 +714,11 @@
    :complexity 5,
    :coverage 92.3076923076923,
    :crap 5.011379153390988}
+  {:name "open-windows-companion!",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 5,
+   :coverage 92.39766081871345,
+   :crap 5.010984536452562}
   {:name "gap-segment",
    :namespace "uml-viewer.domain.geom",
    :complexity 5,
@@ -2589,11 +2599,6 @@
    :complexity 2,
    :coverage 100.0,
    :crap 2.0}
-  {:name "open-windows-companion!",
-   :namespace "uml-viewer.adapters.sketch",
-   :complexity 2,
-   :coverage 100.0,
-   :crap 2.0}
   {:name "native-window",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 2,
@@ -3524,11 +3529,6 @@
    :complexity 1,
    :coverage 12.5,
    :crap 1.669921875}
-  {:name "run-osascript",
-   :namespace "uml-viewer.adapters.sketch",
-   :complexity 1,
-   :coverage 14.285714285714285,
-   :crap 1.6297376093294462}
   {:name "show-popup!",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 1,
@@ -3840,6 +3840,11 @@
    :coverage 100.0,
    :crap 1.0}
   {:name "run-command",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 1,
+   :coverage 100.0,
+   :crap 1.0}
+  {:name "run-osascript",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 1,
    :coverage 100.0,

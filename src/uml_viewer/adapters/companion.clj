@@ -106,6 +106,24 @@
       (throw (ex-info "psmux identity probe failed; session absence is not proven" (assoc r :status :failure :expected expected :observed observed))))
     observed))
 
+(defn windows-owner!
+  "OS evidence for the recorded server only; PID reuse is never live-owner evidence."
+  [identity]
+  (let [pid (:server-pid identity)]
+    (when-not (and (string? pid) (re-matches #"[1-9][0-9]*" pid))
+      (throw (ex-info "No verified Windows server PID" {:status :failure})))
+    (let [script (str "$ErrorActionPreference='Stop';try{$p=[Diagnostics.Process]::GetProcessById(" pid
+                      ")}catch [ArgumentException]{[Console]::Write('MISSING');exit 0};"
+                      "[Console]::Write(('OWNER|{0}|{1}|{2}' -f $p.Id,$p.StartTime.ToUniversalTime().Ticks,$p.ProcessName))")
+          r (checked! process! ["pwsh.exe" "-NoProfile" "-EncodedCommand" (encoded script)])
+          [_ seen start name] (re-matches #"OWNER\|([1-9][0-9]*)\|([0-9]+)\|([^|\r\n]+)" (:out r))]
+      (cond
+        (= "MISSING" (:out r)) {:status :missing}
+        (and (= pid seen) (:owner-start identity) (not= start (:owner-start identity))) {:status :missing}
+        (and (= pid seen) (re-matches #"(?i)(psmux|pmux|tmux)" (or name "")))
+        {:status :exists :owner-start start}
+        :else (throw (ex-info "Windows owner process probe is ambiguous" (assoc r :status :failure)))))))
+
 (defrecord Psmux [run identity]
   SessionBackend
   (create! [_ session cwd command] (checked! run (into ["new-session" "-d" "-s" session "--"] command)))
@@ -146,9 +164,18 @@
           (throw (ex-info "psmux recovery effect could not be verified" {:status :failure :out out}))))
       (windows-identity! run session (or pane (:pane identity)) identity)))
   (cleanup! [this session]
-    (recovery! this session (:pane identity) nil nil false)
-    (checked! run ["kill-session" "-t" (str "=" session)])
-    (throw (ex-info "psmux kill requested after verified hook removal; server death cannot be proven by v3.3.8 CLI" {:status :failure :session session}))))
+    (when-not (:owner-start identity)
+      (throw (ex-info "Windows cleanup requires recorded process creation identity" {:status :failure})))
+    (when (= :exists (:status (windows-owner! identity)))
+      (recovery! this session (:pane identity) nil nil false)
+      (checked! run ["kill-session" "-t" (str "=" session)]))
+    (let [deadline (+ (System/nanoTime) 2000000000)]
+      (loop []
+        (if (= :missing (:status (windows-owner! identity)))
+          true
+          (if (< (System/nanoTime) deadline)
+            (do (Thread/sleep 50) (recur))
+            (throw (ex-info "Windows companion owner did not exit after cleanup" {:status :timeout :session session}))))))))
 
 (defn psmux [run identity]
   (let [r (checked! run ["-V"])]

@@ -438,8 +438,11 @@
       (do (print-attach-hint! session) {:terminal :none :session session :window-id nil})))))
 
 (defn- open-windows-companion! [cwd]
-  (when (seq (mailbox/read-companion cwd))
-    (throw (ex-info "Windows companion owner already recorded; use --restart or resolve its identity before fresh start" {:status :failure :root cwd})))
+  (let [info (mailbox/read-companion cwd)]
+    (when (seq info)
+      (when-not (and (:owner-start info) (= :missing (:status (companion/windows-owner! info))))
+        (throw (ex-info "Windows companion owner already recorded; use --restart or resolve its identity before fresh start" {:status :failure :root cwd})))
+      (mailbox/write-companion! cwd {})))
   (let [session (str (session-id cwd) "-" (str/replace (str (java.util.UUID/randomUUID)) "-" ""))
         run #(companion/process! (into ["psmux.exe"] %))
         backend (companion/psmux run nil)
@@ -448,7 +451,11 @@
     ;; Provisional ownership survives errors/timeouts; never create a replacement automatically.
     (mailbox/write-companion! cwd {:backend :psmux :session session :cwd cwd :command command :provisional true})
     (companion/create! backend session cwd command)
-    (let [identity (companion/windows-identity! run session nil nil)
+    (let [observed (companion/windows-identity! run session nil nil)
+          owner (companion/windows-owner! observed)
+          _ (when-not (= :exists (:status owner)) (throw (ex-info "Windows server owner exited during creation" {:status :failure})))
+          identity (assoc observed :owner-start (:owner-start owner))
+          _ (companion/windows-identity! run session (:pane identity) identity)
           backend (companion/psmux run identity)]
       (mailbox/write-companion! cwd (merge identity {:backend :psmux :cwd cwd :command command}))
       (companion/recovery! backend session (:pane identity) cwd command true)
@@ -485,6 +492,7 @@
          win (or (:window-id info) @!terminal-window-id)]
      (if (windows?)
        (try (companion/cleanup! (backend info) session)
+            (mailbox/write-companion! root {})
             (catch Exception e (binding [*out* *err*] (println "UML viewer: companion cleanup:" (.getMessage e)))))
        (kill-companion-session! session))
      (when win

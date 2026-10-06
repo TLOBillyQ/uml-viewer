@@ -48,9 +48,8 @@
                                      "")}) nil)]
       (companion/recovery! backend "mine" "=mine:%3" "C:/project" ["pwsh.exe" "-NoProfile" "-EncodedCommand" "AAA="] true)
       (should= "respawn-pane -k -t =mine:%3 -- pwsh.exe -NoProfile -EncodedCommand AAA=" @hook)
-      (should-throw clojure.lang.ExceptionInfo (companion/cleanup! backend "mine"))
-      (should (< (.indexOf @calls ["set-hook" "-t" "=mine" "-u" "pane-died"])
-                 (.indexOf @calls ["kill-session" "-t" "=mine"])))))
+      (companion/recovery! backend "mine" "=mine:%3" nil nil false)
+      (should-be-nil @hook)))
   (it "passes arbitrary executable, cwd and prompt as runner data instead of respawn syntax"
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-windows-" (System/nanoTime))
           command (companion/windows-command! root ["C:/With Spaces/claude.ps1" "a'$(throw 1);\"b"])
@@ -85,6 +84,7 @@
                                        "new-session" (do (reset! session (nth args 3)) "")
                                        "display-message" (str "UML|" @session "|$1|442|%3")
                                        "show-options" "on"
+                                       "-NoProfile" "OWNER|442|123|psmux"
                                        "set-hook" (do (reset! hook (last args)) "")
                                        "show-hooks" (str "pane-died -> " @hook)
                                        "")}))
@@ -119,4 +119,30 @@
                                                                  "UML|mine|$1|443|%3")})]
         (should-throw clojure.lang.ExceptionInfo
           ((ns-resolve 'uml-viewer.adapters.sketch 'remember-companion!) root)))))
+  (it "releases a normally closed Windows owner so the next fresh launch is possible"
+    (let [root (str (System/getProperty "java.io.tmpdir") "/uv-win-close-" (System/nanoTime))
+          dead (atom false) calls (atom [])]
+      (mailbox/write-companion! root {:backend :psmux :session "mine" :pane "=mine:%3" :session-id "$1" :server-pid "442" :owner-start "123"})
+      (with-redefs [sketch/windows? (fn [] true)
+                    companion/process! (fn [args]
+                      (swap! calls conj args)
+                      {:exit 0 :out (case (first args)
+                                     "pwsh.exe" (if @dead "MISSING" "OWNER|442|123|psmux")
+                                     "psmux.exe" (case (second args)
+                                                   "-V" "tmux 3.3.8\npsmux 3.3.8"
+                                                   "display-message" "UML|mine|$1|442|%3"
+                                                   "show-hooks" "(no hooks)"
+                                                   "kill-session" (do (reset! dead true) "")
+                                                   "") "")})]
+        (sketch/shutdown-children! root)
+        (should= {} (mailbox/read-companion root))
+        (should (< (.indexOf @calls ["psmux.exe" "set-hook" "-t" "=mine" "-u" "pane-died"])
+                   (.indexOf @calls ["psmux.exe" "kill-session" "-t" "=mine"]))))))
+  (it "rejects fresh replacement while a verified Windows owner remains alive"
+    (let [root (str (System/getProperty "java.io.tmpdir") "/uv-win-live-" (System/nanoTime)) calls (atom [])]
+      (mailbox/write-companion! root {:backend :psmux :session "mine" :server-pid "442" :owner-start "123"})
+      (with-redefs [sketch/windows? (fn [] true)
+                    companion/process! (fn [args] (swap! calls conj args) {:exit 0 :out "OWNER|442|123|psmux"})]
+        (should-throw clojure.lang.ExceptionInfo (sketch/open-in-terminal! root))
+        (should-not (some #(some #{"new-session" "kill-session"} %) @calls)))))
 )
