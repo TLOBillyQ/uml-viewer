@@ -14,6 +14,11 @@
    :complexity 8,
    :coverage 55.294117647058826,
    :crap 13.718392835334825}
+  {:name "notify-agent!",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 9,
+   :coverage 78.70370370370371,
+   :crap 9.782343106995885}
   {:name "statement-end",
    :namespace "uml-viewer.python-language.graph-python",
    :complexity 6,
@@ -79,6 +84,11 @@
    :complexity 6,
    :coverage 60.67415730337079,
    :crap 8.189457976166327}
+  {:name "open-window!",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 8,
+   :coverage 87.02290076335878,
+   :crap 8.139866224276508}
   {:name "at",
    :namespace "uml-viewer.engine.hit",
    :complexity 8,
@@ -379,6 +389,11 @@
    :complexity 6,
    :coverage 93.97590361445783,
    :crap 6.007870063502668}
+  {:name "process!",
+   :namespace "uml-viewer.adapters.companion",
+   :complexity 6,
+   :coverage 94.36619718309859,
+   :crap 6.0064373545378595}
   {:name "import-packages",
    :namespace "uml-viewer.clojure-language.graph-clojure",
    :complexity 6,
@@ -554,11 +569,6 @@
    :complexity 3,
    :coverage 35.0,
    :crap 5.471625}
-  {:name "run-command",
-   :namespace "uml-viewer.adapters.sketch",
-   :complexity 2,
-   :coverage 4.761904761904762,
-   :crap 5.4553503941259045}
   {:name "save-session!",
    :namespace "uml-viewer.application.document",
    :complexity 2,
@@ -574,11 +584,6 @@
    :complexity 5,
    :coverage 76.92307692307693,
    :crap 5.3072371415566675}
-  {:name "open-in-terminal!",
-   :namespace "uml-viewer.adapters.sketch",
-   :complexity 5,
-   :coverage 77.01149425287356,
-   :crap 5.303719193382566}
   {:name "-main",
    :namespace "uml-viewer.main.uml-viewer",
    :complexity 2,
@@ -599,11 +604,6 @@
    :complexity 5,
    :coverage 79.3103448275862,
    :crap 5.22141129197589}
-  {:name "tmux!",
-   :namespace "uml-viewer.adapters.sketch",
-   :complexity 2,
-   :coverage 7.142857142857142,
-   :crap 5.20262390670554}
   {:name "quit-for-restart!",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 2,
@@ -1029,11 +1029,6 @@
    :complexity 4,
    :coverage 80.0,
    :crap 4.128}
-  {:name "remember-companion!",
-   :namespace "uml-viewer.adapters.sketch",
-   :complexity 4,
-   :coverage 81.3953488372093,
-   :crap 4.103034952897229}
   {:name "live-edge",
    :namespace "uml-viewer.adapters.draw",
    :complexity 2,
@@ -1279,11 +1274,6 @@
    :complexity 4,
    :coverage 100.0,
    :crap 4.0}
-  {:name "open-window!",
-   :namespace "uml-viewer.adapters.sketch",
-   :complexity 4,
-   :coverage 100.0,
-   :crap 4.0}
   {:name "apply-proposal-op",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 4,
@@ -1494,11 +1484,6 @@
    :complexity 3,
    :coverage 56.86274509803921,
    :crap 3.722437071714499}
-  {:name "notify-agent!",
-   :namespace "uml-viewer.adapters.sketch",
-   :complexity 3,
-   :coverage 68.6046511627907,
-   :crap 3.278508496107261}
   {:name "proposals-from-one",
    :namespace "uml-viewer.domain.policy",
    :complexity 3,
@@ -1739,6 +1724,11 @@
    :complexity 3,
    :coverage 97.5609756097561,
    :crap 3.0001305842921604}
+  {:name "checked!",
+   :namespace "uml-viewer.adapters.companion",
+   :complexity 3,
+   :coverage 97.72727272727273,
+   :crap 3.000105653643877}
   {:name "remap-proposal-edges",
    :namespace "uml-viewer.domain.hierarchy",
    :complexity 3,
@@ -1780,6 +1770,16 @@
    :coverage 100.0,
    :crap 3.0}
   {:name "mail-context!",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 3,
+   :coverage 100.0,
+   :crap 3.0}
+  {:name "kill-companion-session!",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 3,
+   :coverage 100.0,
+   :crap 3.0}
+  {:name "command-ok?",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 3,
    :coverage 100.0,
@@ -2194,6 +2194,11 @@
    :complexity 2,
    :coverage 81.81818181818183,
    :crap 2.0240420736288502}
+  {:name "remember-companion!",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 2,
+   :coverage 84.0,
+   :crap 2.016384}
   {:name "lower-ratio",
    :namespace "uml-viewer.domain.config",
    :complexity 2,
@@ -2204,6 +2209,11 @@
    :complexity 2,
    :coverage 85.71428571428571,
    :crap 2.011661807580175}
+  {:name "open-in-terminal!",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 2,
+   :coverage 86.66666666666667,
+   :crap 2.0094814814814814}
   {:name "persist-doc",
    :namespace "uml-viewer.application.events",
    :complexity 2,
@@ -2555,11 +2565,6 @@
    :coverage 100.0,
    :crap 2.0}
   {:name "close-terminal-script",
-   :namespace "uml-viewer.adapters.sketch",
-   :complexity 2,
-   :coverage 100.0,
-   :crap 2.0}
-  {:name "kill-companion-session!",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 2,
    :coverage 100.0,
@@ -3479,6 +3484,11 @@
    :complexity 1,
    :coverage 11.11111111111111,
    :crap 1.702331961591221}
+  {:name "tmux!",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 1,
+   :coverage 12.5,
+   :crap 1.669921875}
   {:name "ask-proposal-name",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 1,
@@ -3609,6 +3619,16 @@
    :complexity 1,
    :coverage 99.17355371900827,
    :crap 1.00000056447393}
+  {:name "shell-word",
+   :namespace "uml-viewer.adapters.companion",
+   :complexity 1,
+   :coverage 100.0,
+   :crap 1.0}
+  {:name "tmux",
+   :namespace "uml-viewer.adapters.companion",
+   :complexity 1,
+   :coverage 100.0,
+   :crap 1.0}
   {:name "mix",
    :namespace "uml-viewer.adapters.draw",
    :complexity 1,
@@ -3744,6 +3764,11 @@
    :complexity 1,
    :coverage 100.0,
    :crap 1.0}
+  {:name "backend",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 1,
+   :coverage 100.0,
+   :crap 1.0}
   {:name "live-session",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 1,
@@ -3775,6 +3800,11 @@
    :coverage 100.0,
    :crap 1.0}
   {:name "hex-color",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 1,
+   :coverage 100.0,
+   :crap 1.0}
+  {:name "run-command",
    :namespace "uml-viewer.adapters.sketch",
    :complexity 1,
    :coverage 100.0,

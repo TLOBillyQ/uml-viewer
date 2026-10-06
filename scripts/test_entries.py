@@ -53,6 +53,30 @@ class Entries(unittest.TestCase):
         self.assertIn('sample', diagram)
         self.assertIn('Saved', diagram)
 
+    def test_startup_runs_in_ps7_without_legacy_delegate_and_preserves_argv(self):
+        self.assertEqual(0, self.install().returncode)
+        legacy = self.project / '.uml-viewer/uml-viewer/scripts/uml-launch-unix'
+        legacy.unlink(missing_ok=True)
+        bin_dir = self.root / 'startup tools'
+        bin_dir.mkdir()
+        cli = bin_dir / 'clojure'
+        cli.write_text('#!/bin/sh\npwd > launched.txt\nprintf "%s\\n" "$@" >> launched.txt\necho fixture-stdout\necho fixture-stderr >&2\n')
+        cli.chmod(0o755)
+        env = dict(self.env, PATH=str(bin_dir) + os.pathsep + self.env['PATH'])
+        result = self.run_entry([str(self.project / 'uml'), 'diagram with spaces.edn', 'literal;$(touch injected)'], cwd=self.root, env=env)
+        self.assertEqual(0, result.returncode, result.stderr)
+        import time
+        deadline = time.monotonic() + 10
+        while not (self.project / 'launched.txt').exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        argv = (self.project / 'launched.txt').read_text().splitlines()
+        self.assertEqual(str(self.project), argv[0])
+        self.assertEqual(['-M', '-m', 'uml-viewer.main.uml-viewer', 'diagram with spaces.edn', 'literal;$(touch injected)'], argv[3:])
+        self.assertFalse((self.project / 'injected').exists())
+        log = (self.project / 'uml-viewer-log.txt').read_text()
+        self.assertIn('fixture-stdout', log)
+        self.assertIn('fixture-stderr', log)
+
     def test_metric_alias_preserves_arguments_working_directory_and_exit(self):
         self.assertEqual(0, self.install().returncode)
         bin_dir = self.root / 'fake tools'

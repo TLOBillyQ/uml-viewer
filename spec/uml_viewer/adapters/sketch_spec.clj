@@ -640,6 +640,71 @@
               (should= :s ((:key-released @opts) :s {:key :esc}))))))))
 
 (describe "claude session"
+  (it "exposes process failures and deadlines through the existing process boundary"
+    (let [failure (sketch/run-command ["/bin/sh" "-c" "printf stdout; printf stderr >&2; exit 7"])]
+      (should= 7 (:exit failure))
+      (should= "stdout" (:out failure))
+      (should= "stderr" (:err failure)))
+    (let [missing (sketch/run-command ["/no/such/uml-viewer-command"])]
+      (should-be-nil (:exit missing))
+      (should (seq (:err missing)))))
+
+  (it "stops before opening the viewer on restart probe timeout"
+    (let [opened (atom false)]
+      (with-redefs [sketch/tmux! (fn [& _] {:exit nil :out "" :err "deadline" :timeout? true})
+                    q/sketch (fn [& _] (reset! opened true))]
+        (should-throw clojure.lang.ExceptionInfo (sketch/start! "doc.edn" :src true))
+        (should-not @opened))))
+
+  (it "keeps diagnostic output when every terminal opener fails"
+    (with-redefs [sketch/ghostty-path (fn [] "/Applications/Ghostty.app")
+                  sketch/run-command (fn [_] {:exit 5 :out "" :err "permission denied"})
+                  sketch/run-osascript (fn [_] {:exit 6 :out "" :err "automation denied"})]
+      (let [err (with-out-str (binding [*err* *out*]
+                               (should= :none (:terminal (sketch/open-window! "uml-viewer-test")))))]
+        (should (str/includes? err "permission denied"))
+        (should (str/includes? err "automation denied"))
+        (should (str/includes? err "tmux attach -t uml-viewer-test")))))
+
+  (it "does not use another project's in-memory session as a wake candidate"
+    (let [root (str (System/getProperty "java.io.tmpdir") "/uv-isolation-" (System/nanoTime))
+          calls (atom [])]
+      (reset! sketch/!session-name "uml-viewer-another-project")
+      (with-redefs [sketch/tmux! (fn [& args] (swap! calls conj args) 1)]
+        (should-not (sketch/notify-agent! root))
+        (should-not (some #(some #{"uml-viewer-another-project"} %) @calls)))))
+
+  (it "falls back to Terminal when Ghostty fails without discarding the session"
+    (let [root (str (System/getProperty "java.io.tmpdir") "/uv-fallback-" (System/nanoTime))]
+      (with-redefs [sketch/tmux! (fn [& _] 0)
+                    sketch/ghostty-path (fn [] "/Applications/Ghostty.app")
+                    sketch/mac? (fn [] true)
+                    sketch/run-command (fn [_] {:exit 3 :out "" :err "open failed"})
+                    sketch/run-osascript (fn [_] "52")]
+        (should= :terminal (:terminal (sketch/open-in-terminal! root)))
+        (should= "52" (:window-id (mailbox/read-companion root))))))
+
+  (it "retains queued mail and diagnoses a failed pane wake"
+    (let [root (str (System/getProperty "java.io.tmpdir") "/uv-wake-fail-" (System/nanoTime))
+          calls (atom [])]
+      (mailbox/write-companion! root {:session (sketch/session-id root) :pane "%42"})
+      (with-redefs [sketch/tmux! (fn [& args]
+                                 (swap! calls conj (vec args))
+                                 (if (= "send-keys" (first args)) 9 0))]
+        (should-not (:woke? (sketch/request-agent! root :regen {})))
+        (should= :regen (:op (first (:queue (clojure.edn/read-string (slurp (mailbox/to-agent root)))))))
+        (should= ["send-keys" "-t" "%42" "-l" sketch/wake-message] (last @calls)))))
+
+  (it "refuses to open the viewer when companion creation fails"
+    (let [root (str (System/getProperty "java.io.tmpdir") "/uv-failed-" (System/nanoTime))
+          opened (atom false)]
+      (with-redefs [sketch/tmux! (fn [& args] (if (= "new-session" (first args)) 7 0))
+                    sketch/open-window! (fn [_] (reset! opened true))
+                    q/sketch (fn [& _] (reset! opened true))]
+        (should-throw clojure.lang.ExceptionInfo (sketch/open-in-terminal! root))
+        (should-not @opened)
+        (should-be-nil (mailbox/read-companion root)))))
+
   (it "mails discussion context for the real diagram and a proposal"
     (let [got (atom nil)]
       (with-redefs [sketch/request-agent! (fn [_ op extra]
@@ -791,25 +856,12 @@
           (should (re-find #"tell application \"Terminal\"" (first @opened)))
           (should= "1234" (:window-id (mailbox/read-companion root)))))))
 
-  (it "opens the companion in Windows Terminal under WSL"
-    (let [root (str (System/getProperty "java.io.tmpdir")
-                    "/uv-wsl-" (System/nanoTime))
-          calls (atom [])]
-      (.mkdirs (java.io.File. root))
-      (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& _] 0)
-                    uml-viewer.adapters.sketch/ghostty-path (fn [] nil)
-                    uml-viewer.adapters.sketch/wsl-distro (fn [] "Ubuntu")
-                    uml-viewer.adapters.sketch/run-command (fn [argv] (swap! calls conj (vec argv)) "")
-                    uml-viewer.adapters.sketch/run-osascript
-                    (fn [_] (throw (Exception. "Terminal.app should not be used")))]
-        (let [sid (sketch/session-id root)
-              err (with-out-str (binding [*err* *out*]
-                                  (let [out (sketch/open-in-terminal! root)]
-                                    (should= :wsl (:terminal out))
-                                    (should-be-nil (:window-id out)))))]
-          (should= [(sketch/wsl-command "Ubuntu" sid)] @calls)
-          (should (str/includes? err (str "tmux attach -t " sid)))
-          (should-be-nil (:window-id (mailbox/read-companion root)))))))
+  (it "uses the Linux attach strategy under WSL"
+    (with-redefs [sketch/ghostty-path (fn [] nil)
+                  sketch/mac? (fn [] false)
+                  sketch/wsl-distro (fn [] "Ubuntu")
+                  sketch/run-command (fn [_] (throw (Exception. "no terminal launcher")))]
+      (should= :none (:terminal (sketch/open-window! "uml-viewer-wsl")))))
 
   (it "builds the Windows Terminal argv for a WSL attach"
     (should= ["wt.exe" "-w" "new" "new-tab" "--title" "uml-viewer-p-1"
@@ -914,7 +966,7 @@
                         (= "uml-viewer-mine-abc" (last args)) 0
                         :else 1))]
         (should (sketch/notify-agent! root))
-        (should (some #(= ["send-keys" "-t" "uml-viewer-mine-abc" "-l" sketch/wake-message] %)
+        (should (some #(= ["send-keys" "-t" "uml-viewer-mine-abc:0.0" "-l" sketch/wake-message] %)
                       @calls))
         (should-not (some #(and (= "send-keys" (first %))
                                 (some #{"uml-viewer-other-zzz"} %))
@@ -928,10 +980,9 @@
       (reset! sketch/!terminal-window-id nil)
       (with-redefs [uml-viewer.adapters.sketch/tmux!
                     (fn [& args]
-                      (if (and (= "has-session" (first args))
-                               (= (sketch/session-id root) (last args)))
+                      (if (= "display-message" (first args))
                         0
-                        1))]
+                        (if (= (sketch/session-id root) (last args)) 0 1)))]
         (should= (sketch/session-id root) (call 'remember-companion! root))
         (should= (sketch/session-id root) @sketch/!session-name)
         (should= (sketch/session-id root)
@@ -949,7 +1000,8 @@
                     uml-viewer.adapters.sketch/run-osascript (fn [s] (swap! scripts conj s) "")]
         (sketch/shutdown-children! root)
         (should (some #(= ["kill-session" "-t" "uml-viewer-mine-abc"] %) @tmux-calls))
-        (should (some #(= ["set-hook" "-t" "uml-viewer-mine-abc" "-u" "pane-died"] %) @tmux-calls))
+        (should (< (.indexOf @tmux-calls ["set-hook" "-t" "uml-viewer-mine-abc" "-u" "pane-died"])
+                   (.indexOf @tmux-calls ["kill-session" "-t" "uml-viewer-mine-abc"])))
         (should-not (some #(some #{"uml-viewer-grok"} %) @tmux-calls))
         (should-not (some #(and (string? %) (re-find #"(?i)grok" %)) (mapcat identity @tmux-calls)))
         (should-not (some #(some #{"other-session"} %) @tmux-calls))
@@ -977,11 +1029,16 @@
           (should= "1234" (:window-id out))
           (should= sid (:session (mailbox/read-companion root)))
           (should= "1234" (:window-id (mailbox/read-companion root)))
-          (should (some #(= ["kill-session" "-t" "uml-viewer-old-ffff"] %) @calls))
+          (should-not (some #(= ["kill-session" "-t" "uml-viewer-old-ffff"] %) @calls))
           (should (some #(= ["kill-session" "-t" sid] %) @calls))
           (should (some #(= "new-session" (first %)) @calls))
           (should (some #(= ["set-option" "-p" "-t" (str sid ":0.0") "remain-on-exit" "on"] %) @calls))
-          (should (some #(= ["set-hook" "-t" sid "pane-died" "respawn-pane -k"] %) @calls))
+          (let [hook (last (first (filter #(= "set-hook" (first %))
+                                           (filter #(= "pane-died" (nth % 3 nil)) @calls))))]
+            (should (str/includes? hook "respawn-pane -k -t"))
+            (should (str/includes? hook (str sid ":0.0")))
+            (should (str/includes? hook "--append-system-prompt"))
+            (should (str/includes? hook "--dangerously-skip-permissions")))
           (should-not (some #(and (string? %) (re-find #"(?i)grok" %)) flat))))))))
 
 (describe "detail card pointer"

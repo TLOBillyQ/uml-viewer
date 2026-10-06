@@ -62,8 +62,35 @@ try {
         exit $LASTEXITCODE
     }
     if ($IsWindows) { throw 'Native Windows viewer startup is pending the startup/companion ticket. Use uml ir, crap or mutate; installation is available with --install-only.' }
-    $null = Clojure-Command
-    if (-not (Get-Command zsh -ErrorAction SilentlyContinue)) { throw 'Existing Unix viewer startup requires zsh. Install zsh with your system package manager.' }
-    & zsh "$PSScriptRoot/uml-launch-unix" $root $deps @commandArgs
-    exit $LASTEXITCODE
+    $cli = Clojure-Command
+    if (-not (Get-Command tmux -ErrorAction SilentlyContinue)) {
+        throw 'tmux is required for the companion. Install tmux with your system package manager.'
+    }
+    if ($commandArgs.Count -gt 0 -and $commandArgs[0] -eq '--restart') {
+        $name = Split-Path $root -Leaf
+        $diagram = if (Test-Path -LiteralPath "examples/$name.edn") { "examples/$name.edn" } else {
+            $first = Get-ChildItem 'examples/*.edn' -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -notlike '*.policy.edn' } | Sort-Object Name | Select-Object -First 1
+            if ($first) { $first.FullName }
+        }
+        $commandArgs = @('--restart')
+        if ($diagram) { $commandArgs += $diagram }
+    }
+    # 参数写入数据文件；后台 PS7 进程直接用 ArgumentList 启动 JVM，不经 shell 再解析。
+    $directory = Join-Path $root '.uml-viewer'
+    $null = New-Item -ItemType Directory -Force -Path $directory
+    $manifest = Join-Path $directory ('launch-' + [guid]::NewGuid().ToString('N') + '.json')
+    $log = Join-Path $root 'uml-viewer-log.txt'
+    @{ executable = $cli.Source; cwd = $root; log = $log;
+       argv = @('-Sdeps', $deps, '-M', '-m', 'uml-viewer.main.uml-viewer') + $commandArgs } |
+        ConvertTo-Json -Depth 4 -Compress | Set-Content -LiteralPath $manifest -Encoding utf8
+    $info = [Diagnostics.ProcessStartInfo]::new((Get-Process -Id $PID).Path)
+    $info.UseShellExecute = $false
+    $info.WorkingDirectory = $root
+    foreach ($arg in @('-NoProfile', '-File', "$PSScriptRoot/uml-launch.ps1", $manifest)) {
+        $info.ArgumentList.Add($arg)
+    }
+    $process = [Diagnostics.Process]::Start($info)
+    Write-Output "UML viewer starting (launcher pid $($process.Id)). Log: $log"
+    exit 0
 } catch { [Console]::Error.WriteLine("uml: $_"); exit 1 }

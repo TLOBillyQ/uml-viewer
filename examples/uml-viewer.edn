@@ -71,6 +71,7 @@
    :kind :dependency}
   {:from :clojure-language.source-clojure, :to :source, :kind :implements}
   {:from :adapters.draw, :to :application.document, :kind :dependency}
+  {:from :adapters.sketch, :to :adapters.companion, :kind :dependency}
   {:from :rust-language.source-rust, :to :source, :kind :dependency}
   {:from :application.document, :to :domain.hierarchy, :kind :dependency}
   {:from :application.events, :to :domain.policy, :kind :dependency}
@@ -152,7 +153,14 @@
   {:from :adapters.source-window, :to :javax.swing, :kind :dependency}
   {:from :adapters.sketch, :to :javax.swing, :kind :dependency}],
  :classes
- [{:stereotype nil,
+ [{:stereotype :interface,
+   :ns "uml-viewer.adapters.companion",
+   :name "Companion",
+   :file "src/uml_viewer/adapters/companion.clj",
+   :level 3,
+   :lang :clojure,
+   :id :adapters.companion}
+  {:stereotype nil,
    :ns "uml-viewer.adapters.core",
    :name "Core",
    :file "src/uml_viewer/adapters/core.clj",

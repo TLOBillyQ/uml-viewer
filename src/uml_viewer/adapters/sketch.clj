@@ -1,6 +1,7 @@
 (ns uml-viewer.adapters.sketch
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
+            [uml-viewer.adapters.companion :as companion]
             [quil.applet :as applet]
             [quil.core :as q]
             [quil.middleware :as m]
@@ -142,19 +143,16 @@
        @!session-name
        (session-id root))))
 
-(defn tmux!
-  "Run tmux with `args`. Returns the process exit code (1 if tmux is missing)."
-  [& args]
-  (try
-    (let [p (.start (ProcessBuilder. (into-array String (cons "tmux" args))))]
-      (.waitFor p))
-    (catch Exception _ 1)))
+(defn tmux! [& args]
+  (companion/process! (into ["tmux"] args)))
+
+(defn- backend []
+  (companion/tmux #(apply tmux! %)))
 
 (defn session-candidates
   "Names to try, unique first, then the pre-isolation session."
   [root]
   (->> [(:session (mailbox/read-companion root))
-        @!session-name
         (when root (session-id root))]
        (filter seq)
        distinct
@@ -163,7 +161,7 @@
 (defn live-session
   "First candidate that tmux currently has, or nil."
   [root]
-  (first (filter #(zero? (tmux! "has-session" "-t" %))
+  (first (filter #(companion/probe! (backend) %)
                  (session-candidates root))))
 
 (defn rgb-16
@@ -206,15 +204,26 @@
   "Wake the companion Claude session. Returns false if tmux/session is missing."
   ([] (notify-agent! (System/getProperty "user.dir")))
   ([root]
-   (if-let [session (live-session root)]
-     (do
-       (reset! !session-name session)
-       (doseq [step (notify-steps session)]
-         (if (= :sleep (first step))
-           (Thread/sleep (long (second step)))
-           (apply tmux! step)))
-       true)
-     false)))
+   (try
+     (if-let [session (live-session root)]
+       (let [pane (or (:pane (mailbox/read-companion root)) (str session ":0.0"))]
+         (reset! !session-name session)
+         (loop [[step & more] (notify-steps pane)]
+           (if-not step
+             true
+             (if (= :sleep (first step))
+               (do (Thread/sleep (long (second step))) (recur more))
+               (let [result (apply tmux! step)
+                     code (if (map? result) (:exit result) result)]
+                 (if (= 0 code)
+                   (recur more)
+                   (do (binding [*out* *err*]
+                         (println "UML viewer: companion wake failed" pane "exit" code))
+                       false)))))))
+       false)
+     (catch Exception e
+       (binding [*out* *err*] (println "UML viewer: companion wake failed:" (.getMessage e)))
+       false))))
 
 (defn request-agent!
   "Queue `op` for the companion and wake Claude. Returns {:cmd :woke?}."
@@ -287,16 +296,8 @@
     "--window-save-state=never"
     "-e" "tmux" "attach" "-t" session]))
 
-(defn run-command
-  "Run `argv` to completion. Returns trimmed stdout, or \"\"."
-  [argv]
-  (try
-    (let [p (.start (doto (ProcessBuilder. (into-array String argv))
-                      (.redirectErrorStream true)))
-          out (slurp (.getInputStream p))]
-      (.waitFor p)
-      (str/trim out))
-    (catch Exception _ "")))
+(defn run-command [argv]
+  (companion/process! argv))
 
 (defn osascript
   "AppleScript that opens a Terminal window on `shell-cmd`, painted like the diagram.
@@ -359,16 +360,11 @@
   "Drop this project's tmux session only. Unhook respawn so the pane stays dead."
   [session]
   (when (seq session)
-    (tmux! "set-hook" "-t" session "-u" "pane-died")
-    (apply tmux! (kill-session-args session))))
+    (when (companion/probe! (backend) session)
+      (companion/cleanup! (backend) session))))
 
-(defn- arm-respawn!
-  "If Claude dies, tmux restarts that pane only — not other agents."
-  [session]
-  (let [pane (str session ":0.0")]
-    (tmux! "set-option" "-p" "-t" pane "remain-on-exit" "on")
-    (tmux! "set-hook" "-t" session "pane-died" "respawn-pane -k")
-    (tmux! "set-option" "-t" session "status" "off")))
+(defn- arm-respawn! [session pane cwd command]
+  (companion/recovery! (backend) session pane cwd command true))
 
 (defn wsl-distro
   "WSL distribution this JVM runs in, or nil outside WSL."
@@ -387,59 +383,58 @@
   (binding [*out* *err*]
     (println "UML viewer: attach to the companion with: tmux attach -t" session)))
 
+(defn- command-ok? [result]
+  (let [ok? (if (map? result) (= 0 (:exit result)) (string? result))]
+    (when-not ok?
+      (binding [*out* *err*]
+        (println "UML viewer: terminal open failed:" (:err result) "exit" (:exit result))))
+    ok?))
+
 (defn open-window!
-  "Open a window on `session`: Ghostty when installed, Windows Terminal under
-  WSL, else Terminal.app on macOS. Elsewhere, print the attach command.
-  Returns {:terminal :session :window-id}, plus :script for Ghostty and
-  Terminal.app. Only Terminal.app windows carry an id; the others close when
-  the tmux session ends, which is what shutdown kills."
+  "会话已经创建；终端失败只提供 attach，不销毁会话。WSL 与 Linux 相同。"
   [session]
   (if-let [app (ghostty-path)]
-    (do
-      (run-command (ghostty-command app session))
-      {:terminal :ghostty :session session :window-id nil
-       :script (str "open -na " app)})
-    (if-let [distro (wsl-distro)]
-      (do
-        (print-attach-hint! session)
-        (run-command (wsl-command distro session))
-        {:terminal :wsl :session session :window-id nil})
-      (if (mac?)
-        (let [script (osascript (attach-command session) session)]
-          {:terminal :terminal :session session
-           :window-id (re-find #"\d+" (run-osascript script))
-           :script script})
-        (do
-          (print-attach-hint! session)
-          {:terminal :none :session session :window-id nil})))))
+    (if (command-ok? (run-command (ghostty-command app session)))
+      {:terminal :ghostty :session session :window-id nil :script (str "open -na " app)}
+      (let [script (osascript (attach-command session) session)
+            result (run-osascript script)]
+        (if (command-ok? result)
+          {:terminal :terminal :session session :window-id (re-find #"\d+" (if (map? result) (:out result) result)) :script script}
+          (do (print-attach-hint! session) {:terminal :none :session session :window-id nil}))))
+    (if (mac?)
+      (let [script (osascript (attach-command session) session)
+            result (run-osascript script)]
+        (if (command-ok? result)
+          {:terminal :terminal :session session :window-id (re-find #"\d+" (if (map? result) (:out result) result)) :script script}
+          (do (print-attach-hint! session) {:terminal :none :session session :window-id nil})))
+      (do (print-attach-hint! session) {:terminal :none :session session :window-id nil}))))
 
 (defn open-in-terminal!
   "Start this project's companion Claude in its own tmux session."
   ([] (open-in-terminal! (System/getProperty "user.dir")))
   ([cwd]
-   (let [session (session-id cwd)
-         previous (:session (mailbox/read-companion cwd))]
+   (let [session (session-id cwd)]
      (reset! !session-name session)
-     (when (and previous (not= previous session))
-       (kill-companion-session! previous))
      (kill-companion-session! session)
-     (let [code (apply tmux! (new-session-args cwd session))]
-       (when-not (zero? code)
-         (binding [*out* *err*]
-           (println "UML viewer: could not start tmux session" session)))
-       (when (zero? code)
-         (arm-respawn! session)))
-     (let [{:keys [window-id] :as opened} (open-window! session)]
-       (reset! !terminal-window-id window-id)
-       (mailbox/write-companion! cwd {:session session :window-id window-id})
-       opened))))
+     (let [command (vec (drop 8 (new-session-args cwd session)))
+           _ (companion/create! (backend) session cwd command)
+           pane (companion/bind! (backend) session nil)]
+       (try
+         (arm-respawn! session pane cwd command)
+         (catch Exception e
+           (kill-companion-session! session)
+           (throw e)))
+       (let [{:keys [window-id] :as opened} (open-window! session)]
+         (reset! !terminal-window-id window-id)
+         (mailbox/write-companion! cwd {:session session :pane pane :cwd cwd :command command :window-id window-id})
+         opened)))))
 
 (defn shutdown-children!
   "Kill only this viewer's tmux session and its terminal window."
   ([] (shutdown-children! (System/getProperty "user.dir")))
   ([root]
    (let [info (mailbox/read-companion root)
-         session (or (:session info) @!session-name)
+         session (or (:session info) (session-id root))
          win (or (:window-id info) @!terminal-window-id)]
      (kill-companion-session! session)
      (when win
@@ -928,15 +923,16 @@
   state)
 
 (defn- remember-companion!
-  "On --restart, bind this JVM to the existing tmux session so mail can wake it."
+  "绑定已有 companion；探测失败时禁止继续打开 viewer。"
   [root]
   (let [info (mailbox/read-companion root)
         session (live-session root)]
-    (when session
+    (when-not session
+      (throw (ex-info "UML viewer: no live companion to bind on restart" {:root root})))
+    (let [pane (companion/bind! (backend) session (:pane info))]
       (reset! !session-name session)
-      (when-let [win (:window-id info)]
-        (reset! !terminal-window-id win))
-      (mailbox/write-companion! root (merge (or info {}) {:session session}))
+      (reset! !terminal-window-id (:window-id info))
+      (mailbox/write-companion! root (merge info {:session session :pane pane}))
       session)))
 
 (defn start!
