@@ -14,7 +14,7 @@
                       {:exit 0 :out (if (= ["-V"] args)
                                      "tmux 3.3.8\npsmux 3.3.8 (baseline)"
                                      "UML|mine|$1|442|%3")}) nil)]
-      (should= "=mine:%3" (companion/bind! backend "mine" nil))
+      (should= "%3" (companion/bind! backend "mine" nil))
       (should (companion/probe! backend "mine"))))
   (it "rejects ambiguous empty, wrong identity and timed out probes instead of replacing the companion"
     (doseq [response [{:exit 0 :out ""} {:exit 1 :out ""}
@@ -33,7 +33,7 @@
                                               "display-message" "UML|mine|$1|442|%3"
                                               "")}) nil)]
       (should-throw clojure.lang.ExceptionInfo
-        (companion/recovery! backend "mine" "=mine:%3" "C:/project" ["pwsh.exe" "-NoProfile" "-EncodedCommand" "AAA="] true))))
+        (companion/recovery! backend "mine" "%3" "C:/project" ["pwsh.exe" "-NoProfile" "-EncodedCommand" "AAA="] true))))
   (it "arms the original controlled command in its explicit pane and disables recovery before owned cleanup"
     (let [hook (atom nil) calls (atom [])
           backend (companion/psmux
@@ -46,10 +46,19 @@
                                      "show-hooks" (if @hook (str "pane-died -> " @hook) "(no hooks)")
                                      "set-hook" (do (reset! hook (when-not (some #{"-u"} args) (last args))) "")
                                      "")}) nil)]
-      (companion/recovery! backend "mine" "=mine:%3" "C:/project" ["pwsh.exe" "-NoProfile" "-EncodedCommand" "AAA="] true)
-      (should= "respawn-pane -k -t =mine:%3 -- pwsh.exe -NoProfile -EncodedCommand AAA=" @hook)
-      (companion/recovery! backend "mine" "=mine:%3" nil nil false)
+      (companion/recovery! backend "mine" "%3" "C:/project" ["pwsh.exe" "-NoProfile" "-EncodedCommand" "AAA="] true)
+      (should= "respawn-pane -k -t %3 -- pwsh.exe -NoProfile -EncodedCommand AAA=" @hook)
+      (companion/recovery! backend "mine" "%3" nil nil false)
       (should-be-nil @hook)))
+  (it "probes recovery with the verified native pane id rather than the unsupported session-pane syntax"
+    (let [calls (atom [])]
+      (companion/windows-identity!
+        (fn [args]
+          (swap! calls conj args)
+          {:exit 0 :out (case (last args)
+                          "UML|#{session_name}|#{session_id}|#{pid}|#{pane_id}" "UML|mine|$1|442|%3"
+                          "")}) "mine" "%3" nil)
+      (should (some #(= ["display-message" "-p" "-t" "%3" companion/identity-format] %) @calls))))
   (it "passes arbitrary executable, cwd and prompt as runner data instead of respawn syntax"
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-windows-" (System/nanoTime))
           command (companion/windows-command! root ["C:/With Spaces/claude.ps1" "a'$(throw 1);\"b"])
@@ -104,7 +113,7 @@
   (it "does not create a replacement when a Windows project already has an ambiguous owner record"
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-win-existing-" (System/nanoTime))
           calls (atom [])]
-      (mailbox/write-companion! root {:session "mine" :pane "=mine:%3" :backend :psmux})
+      (mailbox/write-companion! root {:session "mine" :pane "%3" :backend :psmux})
       (with-redefs [sketch/windows? (fn [] true)
                     companion/process! (fn [args] (swap! calls conj args) {:exit 0 :out ""})]
         (should-throw clojure.lang.ExceptionInfo (sketch/open-in-terminal! root))
@@ -140,7 +149,7 @@
       (should= "C:\\With Spaces\\claude.ps1" (sketch/claude-executable))))
   (it "keeps queued Windows mail when the literal wake has no visible pane effect"
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-win-mail-" (System/nanoTime))]
-      (mailbox/write-companion! root {:backend :psmux :session "mine" :pane "=mine:%3" :session-id "$1" :server-pid "442"})
+      (mailbox/write-companion! root {:backend :psmux :session "mine" :pane "%3" :session-id "$1" :server-pid "442"})
       (with-redefs [sketch/windows? (fn [] true)
                     companion/process! (fn [args] {:exit 0 :out (case (second args)
                                                                  "-V" "tmux 3.3.8\npsmux 3.3.8"
@@ -148,9 +157,21 @@
                                                                  "")})]
         (should-not (:woke? (sketch/request-agent! root :context {:context :real})))
         (should= :context (:op (first (:queue (clojure.edn/read-string (slurp (mailbox/to-agent root))))))))))
+  (it "reports legacy session-prefixed Windows pane records instead of silently converting them"
+    (let [root (str (System/getProperty "java.io.tmpdir") "/uv-win-legacy-pane-" (System/nanoTime))
+          calls (atom [])]
+      (mailbox/write-companion! root {:backend :psmux :session "mine" :pane "=mine:%3" :session-id "$1" :server-pid "442"})
+      (with-redefs [sketch/windows? (fn [] true)
+                    companion/process! (fn [args] (swap! calls conj args) {:exit 0 :out "tmux 3.3.8\npsmux 3.3.8"})]
+        (let [e (try ((ns-resolve 'uml-viewer.adapters.sketch 'live-session) root) nil
+                     (catch clojure.lang.ExceptionInfo e e))]
+          (should e)
+          (should= :failure (:status (ex-data e)))
+          (should= "=mine:%3" (:pane (ex-data e)))
+          (should-not (some #(some #{"display-message"} %) @calls))))))
   (it "rejects Windows restart when the recorded server identity changed"
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-win-restart-" (System/nanoTime))]
-      (mailbox/write-companion! root {:backend :psmux :session "mine" :pane "=mine:%3" :session-id "$1" :server-pid "442"})
+      (mailbox/write-companion! root {:backend :psmux :session "mine" :pane "%3" :session-id "$1" :server-pid "442"})
       (with-redefs [sketch/windows? (fn [] true)
                     companion/process! (fn [args] {:exit 0 :out (if (= "-V" (second args))
                                                                  "tmux 3.3.8\npsmux 3.3.8"
@@ -160,7 +181,7 @@
   (it "releases a normally closed Windows owner so the next fresh launch is possible"
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-win-close-" (System/nanoTime))
           dead (atom false) calls (atom [])]
-      (mailbox/write-companion! root {:backend :psmux :session "mine" :pane "=mine:%3" :session-id "$1" :server-pid "442" :owner-start "123"})
+      (mailbox/write-companion! root {:backend :psmux :session "mine" :pane "%3" :session-id "$1" :server-pid "442" :owner-start "123"})
       (with-redefs [sketch/windows? (fn [] true)
                     companion/process! (fn [args]
                       (swap! calls conj args)

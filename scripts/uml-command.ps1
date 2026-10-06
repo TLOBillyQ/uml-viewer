@@ -7,7 +7,10 @@ $root = $args[0]
 $commandArgs = @($args | Select-Object -Skip 1)
 function Clojure-Command {
     $command = Get-Command clojure -ErrorAction SilentlyContinue
-    if (-not $command -and $IsWindows) {
+    if ($IsWindows -and (-not $command -or $command.CommandType -ne 'Application')) {
+        # Importing the official module makes its clojure alias shadow any
+        # PATH .ps1 shim (alias precedence), so split-form detection below
+        # sees the real Invoke-Clojure entry, not the forwarding script.
         Import-Module ClojureTools -ErrorAction SilentlyContinue
         $command = Get-Command clojure -ErrorAction SilentlyContinue
     }
@@ -45,7 +48,13 @@ try {
         $forward = @($commandArgs | Select-Object -Skip 1)
         if (Test-Path 'deps.edn') {
             $cli = Clojure-Command
-            & $cli "-M:$alias" @forward
+            # Official ClojureTools treats '-M:<alias>' as a source file; its
+            # protocol requires the literal '-M:' plus the alias.
+            if ($cli.ModuleName -eq 'ClojureTools' -or $cli.Definition -eq 'Invoke-Clojure') {
+                & $cli '-M:' $alias @forward
+            } else {
+                & $cli "-M:$alias" @forward
+            }
             exit $LASTEXITCODE
         }
         $tool = if ($alias -eq 'crap') { 'crapper' } else { 'mutator' }

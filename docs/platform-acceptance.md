@@ -1,6 +1,6 @@
 # Platform acceptance — issue #5 / spec #1
 
-All-platform support is **pending**. Automated backend simulations do not replace native process, terminal, and GUI acceptance. Native Windows, Linux, and WSL were unavailable on 2026-10-06.
+All-platform support is **pending**. Automated backend simulations do not replace native process, terminal, and GUI acceptance. The subsequent native Windows run below covers installation, real analysis entry points, Claude display/mail and public cleanup; recovery and complete two-project acceptance remain unverified.
 
 ## Recorded results
 
@@ -11,8 +11,8 @@ Evidence root for this run: `/Users/billyq/.claude/jobs/c31d870c/tmp/a5/evidence
 | Criterion | macOS | Native Windows / psmux 3.3.8 | Linux / tmux | WSL / tmux |
 | --- | --- | --- | --- | --- |
 | First installation, repeated installation, preserved policy/proposal, path with spaces | Passed, local fixed-ref install and A reinstall; repeat-preservation also covered by entry tests | Pending | Pending | Pending |
-| Real `ir`, `crap`, differential `mutate` | Passed both projects, two source files individually; no forced mutation reruns | Pending | Pending | Pending |
-| Real Claude launch and `:display` consumed by viewer | Passed A and B; Claude generated IR and sent persistent mail | Pending | Pending | Pending |
+| Real `ir`, `crap`, differential `mutate` | Passed both projects, two source files individually; no forced mutation reruns | Partial: A/B crap and ir passed; original mutate blocked by symlink privilege | Pending | Pending |
+| Real Claude launch and `:display` consumed by viewer | Passed A and B; Claude generated IR and sent persistent mail | Partial: B passed, full A/B run pending | Pending | Pending |
 | FIFO context and regeneration mail, isolated from other project | Passed A `Saved` proposal context then regen; real Claude reported FIFO consumption; both queues empty; B identity unchanged | Pending | Pending | Pending |
 | Claude unexpected exit restores same pane and command | Passed: verified A Claude PID 64705 received SIGTERM; restored Claude PID 66469 in session `$1`, pane `%1`; B `$0/%0`, PID 63937 unchanged | Pending | Pending | Pending |
 | `:quit-for-restart` saves view, old JVM exits, wrapper starts new JVM, original companion remains | Passed process/mail flow: launcher 64680 exited; wrapper started 67033, Java child 67041; A `$1/%1`, Claude 66469 retained; B unchanged | Pending | Pending | Pending |
@@ -60,6 +60,34 @@ crap4clj root; per-file differential mutation killed 2/2 companion mutants and
 exposed a fixture read-before-write-completion race; the harness now waits for
 the complete recorded argv before asserting.
 Local regression evidence is under `/Users/billyq/.claude/jobs/c31d870c/tmp/reviewfix`.
+
+## 原生 Windows 入口验收 — 2026-10-06
+
+本次环境为 Windows 11 build 26300 / ARM64、PowerShell 7.6.6、Git 2.52.0.windows.1、Claude Code 2.1.291；Windows Terminal 1.24.12741.0 已安装。验收使用固定本地 checkout `b5a4fa1480031c0159143ac9dbe065e10ded2e3c`，在独立临时项目 `Project A With Spaces` 中调用真实 PowerShell 和 `.cmd` 入口，没有使用已有 viewer 或 companion。
+
+13 项检查通过：PS1 安装成功、三个项目入口生成、已有 policy/proposal 的哈希保持不变、重复安装保留用户 `.gitignore` 且仅有一个生成区块、安装器 CMD help、含空格项目路径的 CMD help、非法安装参数返回非零，以及 `ir`、`crap`、`mutate`、fresh start、`--restart` 在缺少 Clojure 时及时返回非零并输出安装指引。依赖失败后无 viewer 进程记录或 launch manifest。首次本地 clone 被共享文件系统的 Git ownership 检查拒绝；验收脚本仅为子进程设置两个精确 `safe.directory` 值后，在新临时项目重跑成功，没有修改全局 Git 配置。
+
+证据目录：`C:\Users\billyq\AppData\Local\Temp\uml-win-acceptance-1ae4d63dda7b47c082edb295a635663c`，包含 `results.json`、首次及重复安装日志、CMD help/非法参数日志、五个依赖失败日志和保留的临时项目。执行脚本位于 `C:\Users\billyq\AppData\Local\Temp\uml-windows-acceptance-20261006.ps1`。这些路径是本机证据，以上结果是持久记录。
+
+首次入口验收时 Java、Clojure CLI 和 psmux 缺失，完整验收被阻塞。用户随后明确授权安装依赖，后续结果见下节；13 项入口检查本身不代表完整平台验收通过。
+
+## 原生 Windows 后续验收 — 2026-10-06 至 2026-10-07
+
+经用户授权，在用户目录安装并核对官方发布校验值：Temurin JDK 21.0.12.1+1 ARM64、Clojure CLI 1.12.6.1673（ClojureTools PowerShell 模块）、psmux 3.3.8 ARM64。环境仅通过验收脚本注入，没有永久修改 PATH 或 profile。基线为 `b5a4fa1`，A/B 安装目录同步了本次工作区修复，因此结果对应带修复的 checkout。
+
+- 修复官方 ClojureTools alias 协议：`-M:crap` 被模块当作源文件；改用 `-M:` 与 alias 两个参数。`-NoProfile` 子进程会先找到 PATH 的 PS1 shim，现显式导入官方模块并重新解析命令。真实 CMD → PS7 → JVM 回归六项通过，覆盖模块、PATH shim、无模块外部 PS1、含空格 cwd/argv、字面 shell 字符、stdout/stderr 和退出码 23。
+- 修复 psmux pane target：`=session:%1` 返回 `can't find window: %1`；使用经 session/server 身份核对的原生 `%1`。旧格式记录拒绝使用并给出重建指引。独立真实 session 的创建、身份探测、绑定、recovery hook 设置/撤销及清理通过。
+- 修复 mailbox spec 的 Windows 路径断言，使用 canonical path；该组 37 examples / 141 assertions、零失败。
+- A/B 的真实 `uml.cmd crap` 与 `uml.cmd ir` 返回 0，两个 namespace 的覆盖率均为 100%。原版 clj-mutate 配置默认调用 `clj`，验收 fixture 改用显式 coverage/test command 与 `--test-roots spec` 后 baseline 通过，但 worker 的 `Files/createSymbolicLink` 因 Windows 缺少权限失败，退出 1。曾临时在外部依赖加入复制 fallback，A/B 各得到 3/3 和 1/1 killed；这些是实验结果，**不算固定版本 mutation 验收通过**。外部依赖已恢复原版，实验补丁单独保存在 evidence。不是 uncovered-mutant 退出 3。
+- B 的真实 Claude 启动并发送 `:display`；viewer 消费后 mailbox 为 `{:next-id 2 :queue []}`。首次 context/regen wake 的即时 capture 校验偶发报告 `psmux wake effect was not observed`，但真实 Claude 随后按 FIFO 消费了两条命令；在队列清空后再验一次，两次 wake 均成功、队列清空且新的 display 被消费。该误报仍待修复。
+- B 的受控 Claude 退出触发了 respawn，但恢复后 psmux 的 `#{pane_pid}` 为空，harness 以 `For input string: ""` 失败。后来手动诊断 respawn 已改变测试状态，故不能据此证明原始 hook 完整恢复成功；恢复项保持 Pending。
+- B 通过 `:quit-for-restart` mailbox 正常退出 viewer；再次核对 session/server/pane 和 owner-start 后，公开 `shutdown-children!` 清理成功，companion 记录为 `{}`。这是公开接口清理，不能代替 GUI close 验收。
+
+本次仓库质量检查亦未全绿：CRAP 退出 1，配置的本地 `crap4clj` 路径 `\\Mac\Home\Desktop\dev\clojure\crap4clj` 不存在；companion/sketch 分别执行差分 mutation，均因 coverage 无法生成退出 1，未执行 mutants，既有快照保留。相关 Windows/sketch/mailbox spec 为 96 examples / 15 failures / 367 assertions；单独 Windows companion + mailbox 为 30 examples / 1 failure / 76 assertions，唯一失败是缺少 Node。全 coverage suite 为 494 examples / 19 failures / 1939 assertions，退出 19；其他失败包括 Unix/macOS fixture、Windows 路径分隔符和换行假设。失败运行的 LCOV 不能算质量检查通过。IR 检查退出 0，输出 `target/companion-sketch-check.edn`；没有改动受保护的 `examples/uml-viewer.edn`。
+
+完整 A/B 并行隔离、wrapper 重启和原 Claude 身份保持、GUI pan/zoom/focus/proposal 恢复、GUI close，以及 Windows Terminal 有无两种情况仍为 Pending。不能声称原生 Windows 或全平台完整验收通过。
+
+本机证据目录：`C:\Users\billyq\AppData\Local\Temp\uml-win-full-20261006-222855\evidence`。包含 B observe、mail-sent/mail-observed/mail-pane、before-recovery、quit-sent，以及 `mutation-experimental-copy.patch`；fixture 的 policy、metrics、mailbox、session EDN 和 viewer log 保留在相邻 A/B 项目。实验 mutation 快照不应被当作原版工具的验收证据。
 
 ## Repeatable native acceptance procedure
 

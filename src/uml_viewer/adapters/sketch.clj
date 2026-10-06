@@ -178,6 +178,9 @@
     (let [info (mailbox/read-companion root)]
       (when-not (and (= :psmux (:backend info)) (:pane info) (:session-id info) (:server-pid info))
         (throw (ex-info "Windows companion has no verified ownership record" {:status :failure :root root})))
+      (when (re-matches #"=[^:]+:%\d+" (:pane info))
+        (throw (ex-info "Windows companion uses legacy session-prefixed pane target; recreate or explicitly clear companion.edn before continuing"
+                        {:status :failure :root root :pane (:pane info)})))
       (when (companion/probe! (backend info) (:session info)) (:session info)))
     (first (filter #(companion/probe! (backend) %)
                    (session-candidates root)))))

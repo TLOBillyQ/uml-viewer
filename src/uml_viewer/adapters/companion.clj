@@ -103,7 +103,7 @@
 (defn windows-identity! [run session pane expected]
   (let [r (checked! run ["display-message" "-p" "-t" (or pane (str "=" session ":0.0")) identity-format])
         [_ name sid pid pane-id] (re-matches #"UML\|([^|\r\n]+)\|(\$\d+)\|(\d+)\|(%\d+)" (:out r))
-        observed {:session name :session-id sid :server-pid pid :pane (str "=" name ":" pane-id)}]
+        observed {:session name :session-id sid :server-pid pid :pane pane-id}]
     (when-not (and (= session name) (or (nil? pane) (= pane (:pane observed)))
                    (or (nil? expected) (= (select-keys expected [:session :session-id :server-pid :pane]) observed)))
       (throw (ex-info "psmux identity probe failed; session absence is not proven" (assoc r :status :failure :expected expected :observed observed))))
@@ -150,7 +150,7 @@
           hook (when enabled? (str "respawn-pane -k -t " pane " -- " (str/join " " command)))]
       (if enabled?
         (do
-          (when-not (and (re-matches #"=[A-Za-z0-9_-]+:%\d+" pane)
+          (when-not (and (re-matches #"%\d+" pane)
                          (= 4 (count command))
                          (= "pwsh.exe" (first command))
                          (= ["-NoProfile" "-EncodedCommand"] (subvec (vec command) 1 3))
