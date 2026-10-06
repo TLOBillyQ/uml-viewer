@@ -96,12 +96,37 @@ pwsh -NoProfile -File .\get-uml-viewer.ps1 --install-only
 
 The installer writes `uml`, `uml.ps1` and `uml.cmd`; they all forward to the
 installed PowerShell runtime. `pwsh -File .\uml.ps1 ...` also works.
-Native Windows viewer startup and companion support are pending the separate
-startup tickets. Unix startup retains its existing zsh launcher in this stage.
-The installation and analysis entries have been exercised on macOS; native
-Windows and Linux process validation remains pending. A standalone downloaded
+Viewer startup also uses PowerShell 7: a detached launcher starts the Clojure
+process with individual arguments and writes its output to the project log.
+Companion backends are tmux on macOS/Linux/WSL and psmux **v3.3.8** on native
+Windows. Windows Terminal is optional; opening a terminal can fail while the
+owned companion remains available through the reported attach command.
+All-platform support remains **pending**; see [platform acceptance](docs/platform-acceptance.md)
+for recorded macOS results and the remaining native Windows, Linux, WSL and GUI checks. A standalone downloaded
 Unix installer fetches its PS1 sibling from `UML_VIEWER_REF`; for custom hosts,
 put both files together or set `UML_VIEWER_INSTALLER_URL` explicitly.
+
+Native Windows requires `clojure.exe`, a `.ps1` Clojure entry, or the exported
+`clojure` command from `ClojureTools`. A `.cmd`/`.bat` Clojure wrapper is rejected
+before launching; install the [Windows Clojure CLI](https://clojure.org/guides/install_clojure)
+and remove a batch wrapper that shadows the native or PowerShell entry.
+
+`CLAUDE_BIN` continues to select the companion program. On Windows use the
+[native Claude installation](https://code.claude.com/docs/en/setup) (`claude.exe`)
+or a `.ps1` adapter. Claude `.cmd`/`.bat` wrappers are rejected because they cannot
+preserve arbitrary prompts and argv. If retaining the npm package, point
+`CLAUDE_BIN` to a PS1 adapter like the following, replacing the two paths with
+your actual `node.exe` and the official installed package's `cli.js` paths:
+
+```powershell
+$PSNativeCommandArgumentPassing = 'Standard'
+& 'C:\Program Files\nodejs\node.exe' 'C:\Users\you\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\cli.js' @args
+exit $LASTEXITCODE
+```
+
+This invokes Node with individual arguments; it does not forward through the npm
+batch wrapper. Set `$env:CLAUDE_BIN = 'C:\path\Claude adapter.ps1'` before launching.
+The adapter must preserve argv and the child exit status.
 
 A project without `deps.edn` also gets
 [crapper](https://github.com/TLOBillyQ/crapper) and
@@ -142,14 +167,14 @@ The diagram is its own JVM. Exceptions and JVM output append to
 **`uml-viewer-log.txt`** in the project directory (gitignored). `clj -M:run`
 still holds the terminal; prefer `./uml`.
 
-A **tmux** session unique to the examined project starts interactive Claude
+A **tmux** (or native Windows **psmux**) session unique to the examined project starts interactive Claude
 Code in
 that directory (`--dangerously-skip-permissions --append-system-prompt …`
 plus a launch prompt). The name is
 `uml-viewer-<project>-<hash>`, stored in `.uml-viewer/companion.edn`. On start
 it writes a hierarchical policy from that project's namespaces and regenerates
 the IR. Type there; Esc is the real TUI interrupt. Closing the diagram kills
-**only that** tmux session and its terminal window — other Claude sessions
+**only that** companion session and its terminal window — other Claude sessions
 stay
 up. If that Claude process dies, tmux respawns it in the same pane. That
 instance also runs `./uml crap`, `./uml mutate`, and `./uml ir` after later

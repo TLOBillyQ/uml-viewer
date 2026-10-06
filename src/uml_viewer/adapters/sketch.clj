@@ -117,7 +117,7 @@
   (if (windows?)
     (let [script (str "$ErrorActionPreference='Stop';$name=if($env:CLAUDE_BIN){$env:CLAUDE_BIN}else{'claude'};"
                       "$c=Get-Command -Name $name -CommandType Application,ExternalScript -ErrorAction Stop|Select-Object -First 1;"
-                      "if([IO.Path]::GetExtension($c.Source) -notin @('.exe','.cmd','.ps1')){throw 'Claude must be .exe, .cmd or .ps1'};[Console]::Write($c.Source)")
+                      "if([IO.Path]::GetExtension($c.Source).ToLowerInvariant() -notin @('.exe','.ps1')){throw 'Unsafe Claude wrapper. Set CLAUDE_BIN to native claude.exe (https://code.claude.com/docs/en/setup), or a .ps1 adapter invoking node.exe and the official @anthropic-ai/claude-code/cli.js; .cmd/.bat cannot preserve arbitrary argv.'};[Console]::Write($c.Source)")
           result (companion/checked! companion/process! ["pwsh.exe" "-NoProfile" "-EncodedCommand" (companion/encoded script)])]
       (when-not (seq (:out result)) (throw (ex-info "CLAUDE_BIN or Claude on PATH is required" result)))
       (:out result))
@@ -410,6 +410,14 @@
         (println "UML viewer: terminal open failed:" (:err result) "exit" (:exit result))))
     ok?))
 
+(defn- open-terminal-window! [session]
+  (let [script (osascript (attach-command session) session)
+        result (run-osascript script)]
+    (if (command-ok? result)
+      {:terminal :terminal :session session
+       :window-id (re-find #"\d+" (if (map? result) (:out result) result)) :script script}
+      (do (print-attach-hint! session) {:terminal :none :session session :window-id nil}))))
+
 (defn open-window!
   "会话已经创建；终端失败只提供 attach，不销毁会话。WSL 与 Linux 相同。"
   [session]
@@ -424,17 +432,9 @@
     (if-let [app (ghostty-path)]
     (if (command-ok? (run-command (ghostty-command app session)))
       {:terminal :ghostty :session session :window-id nil :script (str "open -na " app)}
-      (let [script (osascript (attach-command session) session)
-            result (run-osascript script)]
-        (if (command-ok? result)
-          {:terminal :terminal :session session :window-id (re-find #"\d+" (if (map? result) (:out result) result)) :script script}
-          (do (print-attach-hint! session) {:terminal :none :session session :window-id nil}))))
+      (open-terminal-window! session))
     (if (mac?)
-      (let [script (osascript (attach-command session) session)
-            result (run-osascript script)]
-        (if (command-ok? result)
-          {:terminal :terminal :session session :window-id (re-find #"\d+" (if (map? result) (:out result) result)) :script script}
-          (do (print-attach-hint! session) {:terminal :none :session session :window-id nil})))
+      (open-terminal-window! session)
       (do (print-attach-hint! session) {:terminal :none :session session :window-id nil})))))
 
 (defn- open-windows-companion! [cwd]

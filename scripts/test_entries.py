@@ -67,9 +67,13 @@ class Entries(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         import time
         deadline = time.monotonic() + 10
-        while not (self.project / 'launched.txt').exists() and time.monotonic() < deadline:
+        argv = []
+        while time.monotonic() < deadline:
+            if (self.project / 'launched.txt').exists():
+                argv = (self.project / 'launched.txt').read_text().splitlines()
+                if len(argv) == 8:
+                    break
             time.sleep(0.05)
-        argv = (self.project / 'launched.txt').read_text().splitlines()
         self.assertEqual(str(self.project), argv[0])
         self.assertEqual(['-M', '-m', 'uml-viewer.main.uml-viewer', 'diagram with spaces.edn', 'literal;$(touch injected)'], argv[3:])
         self.assertFalse((self.project / 'injected').exists())
@@ -206,14 +210,14 @@ class Entries(unittest.TestCase):
     def test_background_launcher_invokes_powershell_cli_as_data(self):
         import json
         cli = self.root / 'clojure with spaces.ps1'
-        cli.write_text('[IO.File]::WriteAllLines((Join-Path (Get-Location) "script-argv.txt"), [string[]]$args)\nexit 17\n')
+        cli.write_text('[IO.File]::WriteAllText((Join-Path (Get-Location) "script-argv.txt"), (ConvertTo-Json -InputObject @($args) -Compress))\nexit 17\n')
         manifest = self.root / 'launch.json'
         manifest.write_text(json.dumps({'executable': str(cli), 'cwd': str(self.project),
                                         'log': str(self.project / 'launch.log'),
-                                        'argv': ['with spaces', 'literal;$(throw 1)'], 'powershell': True}))
+                                        'argv': ['with spaces', 'literal;$(throw 1)', 'quoted "value"', '', 'first\nsecond'], 'powershell': True}))
         result = self.run_entry(['pwsh', '-NoProfile', '-File', str(REPO / 'scripts/uml-launch.ps1'), str(manifest)])
         self.assertEqual(17, result.returncode, result.stderr)
-        self.assertEqual(['with spaces', 'literal;$(throw 1)'], (self.project / 'script-argv.txt').read_text().splitlines())
+        self.assertEqual(['with spaces', 'literal;$(throw 1)', 'quoted "value"', '', 'first\nsecond'], json.loads((self.project / 'script-argv.txt').read_text()))
 
     def test_windows_startup_boundary_checks_fixed_psmux_and_launches(self):
         self.assertEqual(0, self.install().returncode)
@@ -239,6 +243,26 @@ class Entries(unittest.TestCase):
         result = self.run_entry(['pwsh', '-NoProfile', '-File', str(runner)], env=env)
         self.assertNotEqual(0, result.returncode)
         self.assertIn('3.3.8', result.stderr)
+
+    def test_windows_clojure_batch_fails_before_background_launch_with_guidance(self):
+        self.assertEqual(0, self.install().returncode)
+        tools = self.root / 'batch tools'
+        tools.mkdir()
+        mux = tools / 'psmux.exe'
+        mux.write_text('#!/bin/sh\nprintf "tmux 3.3.8\\npsmux 3.3.8\\n"\n')
+        mux.chmod(0o755)
+        runner = self.root / 'batch boundary.ps1'
+        runner.write_text("Set-Variable IsWindows -Value $true -Force\n"
+                          "function Get-Command { param($Name) if($Name -eq 'clojure') { "
+                          "[pscustomobject]@{CommandType='Application';Source='C:/tools/clojure.cmd';ModuleName='';Name='clojure.cmd'} "
+                          "} else { Microsoft.PowerShell.Core\\Get-Command $Name } }\n"
+                          "& $env:TEST_ENTRY @args;exit $LASTEXITCODE\n")
+        env = dict(self.env, TEST_ENTRY=str(self.project / 'uml.ps1'), PATH=str(tools) + os.pathsep + self.env['PATH'])
+        result = self.run_entry(['pwsh', '-NoProfile', '-File', str(runner)], env=env)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn('ClojureTools', result.stderr)
+        self.assertIn('.cmd/.bat', result.stderr)
+        self.assertFalse((self.project / '.uml-viewer/viewer-process.json').exists())
 
     def test_windows_metric_process_boundary_uses_preinstalled_python_module(self):
         # Simulate the OS boundary only; invoke the generated PS1 and real fixture process.

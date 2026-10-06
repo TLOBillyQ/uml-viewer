@@ -57,6 +57,44 @@
       (should= ["pwsh.exe" "-NoProfile" "-EncodedCommand"] (subvec command 0 3))
       (should-not (.contains script "$(throw 1)"))
       (should (.contains script "FromBase64String"))))
+  (it "rejects unsafe Claude batch wrappers with a usable native-entry diagnostic"
+    (let [root (str (or (System/getenv "UML_ENTRY_TEST_TMP") (System/getProperty "java.io.tmpdir")) "/batch-" (System/nanoTime))
+          fixture (clojure.java.io/file root "Claude.cmd")]
+      (clojure.java.io/make-parents fixture)
+      (spit fixture "#!/bin/sh\nexit 0\n")
+      (.setExecutable fixture true)
+      (let [command (companion/windows-command! root [(.getAbsolutePath fixture) "quoted \"prompt\""])
+            result (companion/process! (assoc command 0 "pwsh"))]
+        (should-not= 0 (:exit result))
+        (should-contain "CLAUDE_BIN" (:err result))
+        (should-contain ".ps1" (:err result)))))
+  (it "delivers quoted multiline and empty argv to a real PowerShell Claude adapter"
+    (let [root (str (or (System/getenv "UML_ENTRY_TEST_TMP") (System/getProperty "java.io.tmpdir")) "/argv-" (System/nanoTime))
+          fixture (clojure.java.io/file root "Claude adapter.ps1")
+          output (clojure.java.io/file root "observed.json")
+          expected ["quoted \"value\"" "first\nsecond" "" "literal;$(throw 1)&%PATH%!" "末尾\\"]]
+      (clojure.java.io/make-parents fixture)
+      (spit fixture "[IO.File]::WriteAllText((Join-Path (Get-Location) 'observed.json'), (ConvertTo-Json -InputObject @($args) -Compress));exit 17")
+      (let [command (companion/windows-command! root (into [(.getAbsolutePath fixture)] expected))
+            result (companion/process! (assoc command 0 "pwsh"))]
+        (should= 17 (:exit result))
+        (should= "[\"quoted \\\"value\\\"\",\"first\\nsecond\",\"\",\"literal;$(throw 1)&%PATH%!\",\"末尾\\\\\"]" (slurp output)))))
+  (it "delivers quoted multiline and empty argv to a real native process without Legacy parsing"
+    (let [root (str (or (System/getenv "UML_ENTRY_TEST_TMP") (System/getProperty "java.io.tmpdir")) "/native-" (System/nanoTime))
+          fixture (clojure.java.io/file root "argv.js")
+          node (companion/process! ["pwsh" "-NoProfile" "-Command" "(Get-Command node).Source"])
+          executable (if (sketch/windows?) (clojure.java.io/file (:out node))
+                         (clojure.java.io/file root "node.exe"))]
+      (clojure.java.io/make-parents fixture)
+      (when-not (sketch/windows?)
+        (java.nio.file.Files/createSymbolicLink (.toPath executable)
+          (.toPath (clojure.java.io/file (:out node))) (make-array java.nio.file.attribute.FileAttribute 0)))
+      (spit fixture "process.stdout.write(JSON.stringify(process.argv.slice(2)));process.exitCode=19")
+      (let [command (companion/windows-command! root [(.getAbsolutePath executable) (.getAbsolutePath fixture)
+                                                     "quoted \"value\"" "first\nsecond" "" "literal;$(throw 1)&%PATH%!" "末尾\\"])
+            result (companion/process! (assoc command 0 "pwsh"))]
+        (should= 19 (:exit result))
+        (should= "[\"quoted \\\"value\\\"\",\"first\\nsecond\",\"\",\"literal;$(throw 1)&%PATH%!\",\"末尾\\\\\"]" (:out result)))))
   (it "preserves an owned Windows companion when Windows Terminal is unavailable"
     (with-redefs [sketch/windows? (fn [] true)
                   sketch/run-command (fn [_] {:exit nil :err "wt missing"})]

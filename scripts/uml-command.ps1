@@ -12,6 +12,10 @@ function Clojure-Command {
         $command = Get-Command clojure -ErrorAction SilentlyContinue
     }
     if (-not $command) { throw 'Clojure CLI is required. Install: https://clojure.org/guides/install_clojure' }
+    if ($IsWindows -and $command.CommandType -eq 'Application' -and
+        [IO.Path]::GetExtension($command.Source).ToLowerInvariant() -in @('.cmd', '.bat')) {
+        throw 'Clojure .cmd/.bat wrappers cannot safely launch the background viewer. Put clojure.exe from the Windows Clojure CLI installer on PATH (https://clojure.org/guides/install_clojure), or use the ClojureTools exported clojure command / a .ps1 entry. Remove the batch wrapper shadowing that entry.'
+    }
     return $command
 }
 try {

@@ -14,11 +14,6 @@
    :complexity 8,
    :coverage 55.294117647058826,
    :crap 13.718392835334825}
-  {:name "open-window!",
-   :namespace "uml-viewer.adapters.sketch",
-   :complexity 11,
-   :coverage 90.0523560209424,
-   :crap 11.119109409459504}
   {:name "windows-owner!",
    :namespace "uml-viewer.adapters.companion",
    :complexity 10,
@@ -259,6 +254,11 @@
    :complexity 7,
    :coverage 97.36842105263158,
    :crap 7.000892987315935}
+  {:name "open-window!",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 7,
+   :coverage 98.1651376146789,
+   :crap 7.000302695924184}
   {:name "line-at",
    :namespace "uml-viewer.engine.layout",
    :complexity 7,
@@ -1619,6 +1619,11 @@
    :complexity 3,
    :coverage 93.18181818181817,
    :crap 3.0028526483846734}
+  {:name "open-terminal-window!",
+   :namespace "uml-viewer.adapters.sketch",
+   :complexity 3,
+   :coverage 93.33333333333333,
+   :crap 3.002666666666667}
   {:name "read-edn",
    :namespace "uml-viewer.application.overlay",
    :complexity 3,

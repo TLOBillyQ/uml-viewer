@@ -35,6 +35,32 @@ Relevant local evidence files: `spec.log`, `entries-final.log`, `crap.log`, `mut
 - Document save/restart traverses real disk with nonempty namespace focus in one round and valid named proposal/open layer in the other; pan, zoom, declutter, selection, and detail are retained.
 - CRAP completed using a command-line `-Sdeps` absolute `crap4clj` override. Only changed `src/uml_viewer/adapters/sketch.clj` received differential mutation: 2/2 killed, exit 0. IR regenerated last. The non-Clojure scanners and mail queue contract were unchanged.
 
+## Review fixes and automated evidence
+
+The final review found unsafe Claude batch argument forwarding, direct background
+execution of Clojure batch wrappers, stale README startup guidance, and duplicate
+macOS Terminal fallback code. Claude now accepts native `.exe` and `.ps1` entries
+only on Windows; `CLAUDE_BIN` remains supported. Unsafe batch entries receive a
+native Claude / Node PS1 adapter diagnostic before a companion is created.
+Clojure batch entries are rejected synchronously with `clojure.exe` / ClojureTools
+/ PS1 guidance, before a detached launcher is spawned. The README includes a
+concrete Node adapter for the official npm package. Terminal fallback shares one
+implementation with the existing behavioral tests retained.
+
+Real PowerShell argv fixtures on macOS verify quotes, multiline arguments, empty
+arguments, Unicode, trailing backslashes and literal shell characters through the
+controlled companion runner (PS1 and Node native process), including child exit
+status. A simulated Windows command-discovery boundary verifies Clojure batch
+rejection before a process record appears. These checks do not establish native
+Windows process behavior: the full native Windows procedure below remains pending.
+Final review checks: 492 Clojure examples / 1992 assertions, zero failures;
+15 installed-entry tests passed. CRAP completed with the temporary absolute
+crap4clj root; per-file differential mutation killed 2/2 companion mutants and
+17/17 sketch mutants (both exit 0). IR regenerated last. The final entry run also
+exposed a fixture read-before-write-completion race; the harness now waits for
+the complete recorded argv before asserting.
+Local regression evidence is under `/Users/billyq/.claude/jobs/c31d870c/tmp/reviewfix`.
+
 ## Repeatable native acceptance procedure
 
 Use two new projects under a short unique temporary root, for example `a5-20261006/Project A With Spaces` and `Project B With Spaces`. Never use an existing project's viewer or companion as a test resource. Record versions and fixed checkout SHA, timestamps, exit codes, project log, policy hashes, mail EDN, saved-view EDN, JVM PID/parent, and exact session/pane/Claude identities. Do not dump credentials, the environment, or unrelated sessions.

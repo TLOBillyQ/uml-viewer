@@ -90,6 +90,9 @@
         runner (str "$ErrorActionPreference='Stop';function D($s){[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([string]$s))};"
                     "[xml]$m=[IO.File]::ReadAllText(" (data-string (.getAbsolutePath file)) ");"
                     "Set-Location -LiteralPath (D $m.launch.cwd);$exe=D $m.launch.executable;"
+                    "$ext=[IO.Path]::GetExtension($exe).ToLowerInvariant();"
+                    "if($ext -notin @('.exe','.ps1')){throw 'Unsafe Claude wrapper. Set CLAUDE_BIN to the native claude.exe or a .ps1 adapter invoking node.exe with the official @anthropic-ai/claude-code/cli.js; .cmd/.bat cannot preserve arbitrary argv.'};"
+                    "$PSNativeCommandArgumentPassing='Standard';"
                     "$argv=@($m.launch.argv.arg|ForEach-Object{D $_});& $exe @argv;exit $LASTEXITCODE")]
     (io/make-parents file)
     (spit file manifest)

@@ -19,7 +19,7 @@ try {
         $pathData = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($manifest))
         $bootstrap = "`$m=Get-Content -LiteralPath ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$pathData'))) -Raw|ConvertFrom-Json;"
         $bootstrap += "Remove-Item -LiteralPath ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$pathData')));"
-        $bootstrap += 'Set-Location -LiteralPath $m.cwd;if($m.module){Import-Module $m.module};$exe=$m.executable;$argv=@($m.argv);& $exe @argv;exit $LASTEXITCODE'
+        $bootstrap += '$PSNativeCommandArgumentPassing="Standard";Set-Location -LiteralPath $m.cwd;if($m.module){Import-Module $m.module};$exe=$m.executable;$argv=@($m.argv);& $exe @argv;exit $LASTEXITCODE'
         $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($bootstrap))
         $executable = (Get-Process -Id $PID).Path
         $argv = @('-NoProfile', '-EncodedCommand', $encoded)
