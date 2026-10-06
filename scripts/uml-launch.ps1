@@ -59,6 +59,11 @@ public static class UmlLog {
     $writer.Dispose()
     exit $process.ExitCode
 } catch {
-    [Console]::Error.WriteLine("uml launcher: $_")
+    # The parent exits immediately and does not retain these pipes. Persist
+    # launcher errors in the same project log before any optional stderr write.
+    if ($launch -and $launch.log) {
+        [IO.File]::AppendAllText($launch.log, "uml launcher: $_`n")
+    }
+    try { [Console]::Error.WriteLine("uml launcher: $_") } catch {}
     exit 1
 }

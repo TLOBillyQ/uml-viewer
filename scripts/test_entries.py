@@ -77,6 +77,20 @@ class Entries(unittest.TestCase):
         self.assertIn('fixture-stdout', log)
         self.assertIn('fixture-stderr', log)
 
+    def test_background_start_returns_without_inheriting_captured_pipes(self):
+        import time
+        self.assertEqual(0, self.install().returncode)
+        tools = self.root / 'detach tools'
+        tools.mkdir()
+        cli = tools / 'clojure'
+        cli.write_text('#!/bin/sh\nsleep 6\n')
+        cli.chmod(0o755)
+        env = dict(self.env, PATH=str(tools) + os.pathsep + self.env['PATH'])
+        started = time.monotonic()
+        result = self.run_entry([str(self.project / 'uml')], env=env)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertLess(time.monotonic() - started, 4, 'background launcher retained captured pipes')
+
     def test_restart_waits_for_recorded_process_exit_before_launching(self):
         import json
         import time

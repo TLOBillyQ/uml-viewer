@@ -117,10 +117,16 @@ try {
     $info = [Diagnostics.ProcessStartInfo]::new((Get-Process -Id $PID).Path)
     $info.UseShellExecute = $false
     $info.WorkingDirectory = $root
+    # Give the detached launcher its own pipes, so callers can capture the
+    # wrapper's output without waiting for the viewer's entire lifetime.
+    $info.RedirectStandardInput = $true
+    $info.RedirectStandardOutput = $true
+    $info.RedirectStandardError = $true
     foreach ($arg in @('-NoProfile', '-File', "$PSScriptRoot/uml-launch.ps1", $manifest)) {
         $info.ArgumentList.Add($arg)
     }
     $process = [Diagnostics.Process]::Start($info)
+    $process.StandardInput.Close()
     Write-Output "UML viewer starting (launcher pid $($process.Id)). Log: $log"
     exit 0
 } catch { [Console]::Error.WriteLine("uml: $_"); exit 1 }
