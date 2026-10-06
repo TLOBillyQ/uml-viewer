@@ -49,3 +49,17 @@ The diagram is already on screen.
 
 Do not commit or push unless asked. Esc interrupts a turn in this terminal;
 do not kill the process on interrupt.
+
+## Agent skills
+
+### Issue tracker
+
+Issues 和 specs 使用 GitHub Issues；操作前读取 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+使用五个默认 triage 标签；分类和应用标签前读取 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+领域文档采用 single-context；探索代码前读取 `docs/agents/domain.md`。
