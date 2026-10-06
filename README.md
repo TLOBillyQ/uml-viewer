@@ -76,14 +76,59 @@ chmod +x get-uml-viewer
 **gitignored** `.uml-viewer/uml-viewer/` (a nested `.git` there is invisible
 to the project's repo), writes `./uml`, and starts the viewer. `--install-only`
 skips the start. `UML_VIEWER_REPO_URL` and `UML_VIEWER_REF` override the clone
-source (default `TLOBillyQ/uml-viewer`, branch `lua`).
+source (default `TLOBillyQ/uml-viewer`, branch `lua`). Installation and analysis
+use **PowerShell 7** (`pwsh`), including on Unix. Install it yourself from
+https://aka.ms/powershell-install; Windows PowerShell 5.1 is unsupported.
+Git and Clojure CLI are also user-installed dependencies:
+https://git-scm.com/downloads and https://clojure.org/guides/install_clojure.
+The installer preserves existing policies and proposals and does not create a
+policy or generate a diagram during `--install-only`.
+
+For native Windows, download `scripts/get-uml-viewer.ps1` and optionally its
+`get-uml-viewer.cmd` sibling from the same ref, then run from the project:
+
+```powershell
+pwsh -NoProfile -File .\get-uml-viewer.ps1 --install-only
+.\uml.cmd ir
+.\uml.cmd crap
+.\uml.cmd mutate 'src/file with spaces.lua'
+```
+
+The installer writes `uml`, `uml.ps1` and `uml.cmd`; they all forward to the
+installed PowerShell runtime. `pwsh -File .\uml.ps1 ...` also works.
+Native Windows viewer startup and companion support are pending the separate
+startup tickets. Unix startup retains its existing zsh launcher in this stage.
+The installation and analysis entries have been exercised on macOS; native
+Windows and Linux process validation remains pending. A standalone downloaded
+Unix installer fetches its PS1 sibling from `UML_VIEWER_REF`; for custom hosts,
+put both files together or set `UML_VIEWER_INSTALLER_URL` explicitly.
 
 A project without `deps.edn` also gets
 [crapper](https://github.com/TLOBillyQ/crapper) and
 [mutator](https://github.com/TLOBillyQ/mutator) cloned side by side into
 `.uml-viewer/` (branch `lua`; override with `CRAPPER_REPO_URL`,
 `CRAPPER_REF`, `MUTATOR_REPO_URL`, `MUTATOR_REF`). They need Python 3.11+.
-A failed clone warns and the diagram still works.
+A failed clone warns and installation continues. On Unix the existing tool
+wrapper creates its own virtualenv on first use; the UML installer does not
+install Python or the tools' dependencies. Native Windows uses each tool's
+preinstalled `.venv/Scripts/python.exe -m crapper` (or `-m mutator`), since the
+upstream shell wrappers cannot run natively. Prepare these environments yourself:
+
+```powershell
+py -3 -m venv .uml-viewer/crapper/.venv
+& .uml-viewer/crapper/.venv/Scripts/python.exe -m pip install -e .uml-viewer/crapper
+py -3 -m venv .uml-viewer/mutator/.venv
+& .uml-viewer/mutator/.venv/Scripts/python.exe -m pip install -e .uml-viewer/mutator
+```
+
+A missing native entry reports these steps. Analysis always runs from the
+examined project, forwards individual arguments, and preserves the tool's exit
+status. `mutate` stays differential; only explicitly passing `--mutate-all`
+requests all sites. To run the isolated entry acceptance suite (Python 3 +
+PowerShell 7 + Git + Clojure CLI): `python3 -I scripts/test_entries.py`.
+Set `UML_ENTRY_TEST_TMP` to choose a scratch root. This suite never launches the
+viewer; Windows process-boundary simulations do not constitute native Windows
+acceptance.
 
 `./uml ir` runs the IR generator on `examples/<dir>.policy.edn` (else the
 first `examples/*.policy.edn`, else `policy.edn`). `./uml crap` and

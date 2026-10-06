@@ -1,102 +1,21 @@
-#!/bin/zsh
-# Fetch uml-viewer into this project and start it.
-# Install: curl -fsSL https://raw.githubusercontent.com/TLOBillyQ/uml-viewer/lua/scripts/get-uml-viewer -o get-uml-viewer
-#          chmod +x get-uml-viewer && ./get-uml-viewer
-set -euo pipefail
-
-repo_url="${UML_VIEWER_REPO_URL:-https://github.com/TLOBillyQ/uml-viewer.git}"
-ref="${UML_VIEWER_REF:-lua}"
-crapper_url="${CRAPPER_REPO_URL:-https://github.com/TLOBillyQ/crapper.git}"
-crapper_ref="${CRAPPER_REF:-lua}"
-mutator_url="${MUTATOR_REPO_URL:-https://github.com/TLOBillyQ/mutator.git}"
-mutator_ref="${MUTATOR_REF:-lua}"
-tool_dir=".uml-viewer/uml-viewer"
-quil_ver="4.3.1563"
-
-usage() {
-  echo "usage: get-uml-viewer [--install-only]" >&2
-  echo "  Run from the project you want to view. Clones uml-viewer into" >&2
-  echo "  gitignored ${tool_dir}/, writes ./uml, then starts the viewer." >&2
-  echo "  Without deps.edn it also clones crapper and mutator into .uml-viewer/." >&2
-}
-
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-  usage
-  exit 0
-fi
-
-install_only=0
-if [[ "${1:-}" == "--install-only" ]]; then
-  install_only=1
-elif [[ $# -gt 0 ]]; then
-  usage
+#!/bin/sh
+# Thin entry; supports both checkout use and a standalone downloaded file.
+if ! command -v pwsh >/dev/null 2>&1; then
+  echo 'get-uml-viewer: PowerShell 7 (pwsh) is required. Install: https://aka.ms/powershell-install' >&2
   exit 1
 fi
-
-if ! command -v git >/dev/null; then
-  echo "get-uml-viewer: git is required" >&2
+ROOT=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+if [ -f "$ROOT/get-uml-viewer.ps1" ]; then
+  exec pwsh -NoLogo -NoProfile -File "$ROOT/get-uml-viewer.ps1" "$@"
+fi
+# Downloading the implementation is bootstrap only; installation lives in PS1.
+if ! command -v curl >/dev/null 2>&1; then
+  echo 'get-uml-viewer: curl is required for standalone bootstrap. Download scripts/get-uml-viewer.ps1 beside this entry from the same ref.' >&2
   exit 1
 fi
-
-ensure_gitignore() {
-  local file=".gitignore"
-  local begin="# BEGIN UML-VIEWER"
-  local end="# END UML-VIEWER"
-  local tmp_file
-  tmp_file="$(mktemp)"
-  touch "$file"
-  awk -v begin="$begin" -v end="$end" '
-    $0 == begin { inside=1; next }
-    $0 == end { inside=0; next }
-    !inside { print }
-  ' "$file" > "$tmp_file"
-  [[ ! -s "$tmp_file" ]] || printf '\n' >> "$tmp_file"
-  printf '%s\n' "$begin" ".uml-viewer/" "uml-viewer-log.txt" "$end" >> "$tmp_file"
-  mv "$tmp_file" "$file"
-}
-
-# fetch_repo DIR URL REF: shallow clone, or update an existing clone.
-fetch_repo() {
-  local dir="$1" url="$2" rev="$3"
-  mkdir -p .uml-viewer
-  if [[ -d "$dir/.git" ]]; then
-    git -C "$dir" fetch --depth 1 origin "$rev" &&
-      git -C "$dir" checkout -q FETCH_HEAD
-  else
-    rm -rf "$dir"
-    git clone --depth 1 --branch "$rev" "$url" "$dir"
-  fi
-}
-
-# A project without deps.edn gets crapper and mutator beside uml-viewer.
-# mutator finds crapper as its sibling. A failed clone only warns: the
-# diagram still works, and ./uml crap says what is missing.
-fetch_metric_tools() {
-  [[ -f deps.edn ]] && return 0
-  fetch_repo .uml-viewer/crapper "$crapper_url" "$crapper_ref" ||
-    echo "get-uml-viewer: could not clone crapper from $crapper_url ($crapper_ref)" >&2
-  fetch_repo .uml-viewer/mutator "$mutator_url" "$mutator_ref" ||
-    echo "get-uml-viewer: could not clone mutator from $mutator_url ($mutator_ref)" >&2
-}
-
-write_uml() {
-  local abs deps template
-  abs="$(cd "$tool_dir" && pwd)"
-  deps="{:deps {uml-viewer/uml-viewer {:local/root \"$abs\"} quil/quil {:mvn/version \"$quil_ver\"}}}"
-  template="$(<"$tool_dir/scripts/uml")"
-  print -r -- "${template//__DEPS_LINE__/$deps}" > ./uml
-  chmod +x ./uml
-}
-
-ensure_gitignore
-fetch_repo "$tool_dir" "$repo_url" "$ref"
-fetch_metric_tools
-write_uml
-
-echo "Installed ./uml (uml-viewer in $tool_dir)."
-if [[ "$install_only" -eq 1 ]]; then
-  echo "Run ./uml to start the viewer."
-  exit 0
-fi
-
-exec ./uml
+TMP_DIR=$(mktemp -d) || exit 1
+trap 'rm -rf "$TMP_DIR"' EXIT HUP INT TERM
+URL=${UML_VIEWER_INSTALLER_URL:-https://raw.githubusercontent.com/TLOBillyQ/uml-viewer/${UML_VIEWER_REF:-lua}/scripts/get-uml-viewer.ps1}
+curl -fsSL "$URL" -o "$TMP_DIR/get-uml-viewer.ps1" || exit 1
+pwsh -NoLogo -NoProfile -File "$TMP_DIR/get-uml-viewer.ps1" "$@"
+exit $?

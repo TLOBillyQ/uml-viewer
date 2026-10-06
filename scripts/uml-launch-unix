@@ -1,0 +1,44 @@
+#!/bin/zsh
+# Existing Unix startup, retained until the startup/companion ticket migrates it.
+set -euo pipefail
+ROOT="$1"
+DEPS="$2"
+shift 2
+cd "$ROOT"
+LOG="uml-viewer-log.txt"
+edn_path() {
+  local name base f
+  name="$(basename "$ROOT")"
+  if [[ -f "examples/${name}.edn" ]]; then
+    echo "examples/${name}.edn"
+    return
+  fi
+  if [[ -d examples ]]; then
+    for f in examples/*.edn(N); do
+      base="${f:t}"
+      [[ "$base" == *.policy.edn ]] && continue
+      echo "$f"
+      return
+    done
+  fi
+}
+launch_viewer() {
+  {
+    printf '%s' "----- $(date '+%Y-%m-%d %H:%M:%S') starting uml-viewer"
+    [[ $# -gt 0 ]] && printf ' %s' "$@"
+    printf '\n'
+  } >> "$LOG"
+  nohup clojure -Sdeps "$DEPS" -M -m uml-viewer.main.uml-viewer "$@" >> "$LOG" 2>&1 </dev/null &
+  disown
+  echo "UML viewer started (pid $!). Log: $LOG"
+}
+if [[ "${1:-}" == '--restart' ]]; then
+  edn="$(edn_path)"
+  if [[ -n "$edn" ]]; then
+    launch_viewer --restart "$edn"
+  else
+    launch_viewer --restart
+  fi
+else
+  launch_viewer "$@"
+fi
