@@ -225,7 +225,11 @@ PowerShell module, so neither `sh` nor a bare process launch can
 resolve `clj`; put a `clj` shell script (for `sh`) and a `clj.exe`
 (for direct launches) that forward to the module on `PATH` first.
 clj-mutate also creates per-worker directory symbolic links, which on
-Windows requires Developer Mode or an administrator shell. Specs that
+Windows requires either an elevated (administrator) shell or Developer
+Mode enabled — one of the two, not both. The links are created under
+`target/mutation-workers`, so the checkout must sit on a filesystem that
+supports symlinks (local NTFS); a network or UNC share fails there even
+from an elevated shell. Specs that
 need a real Unix shell or a real Node.js process report pending with
 the missing prerequisite instead of failing. Commit `.metrics/` so a
 clone has numbers without re-running those tools.

@@ -11,7 +11,7 @@ Evidence root for this run: `/Users/billyq/.claude/jobs/c31d870c/tmp/a5/evidence
 | Criterion | macOS | Native Windows / psmux 3.3.8 | Linux / tmux | WSL / tmux |
 | --- | --- | --- | --- | --- |
 | First installation, repeated installation, preserved policy/proposal, path with spaces | Passed, local fixed-ref install and A reinstall; repeat-preservation also covered by entry tests | Pending | Pending | Pending |
-| Real `ir`, `crap`, differential `mutate` | Passed both projects, two source files individually; no forced mutation reruns | Partial: A/B crap and ir passed; original mutate blocked by symlink privilege | Pending | Pending |
+| Real `ir`, `crap`, differential `mutate` | Passed both projects, two source files individually; no forced mutation reruns | Partial: A/B crap and ir passed; A/B fixture mutate pending. 原版固定依赖的仓库级 companion/sketch 差分 mutation 已于 2026-10-07 真实执行（见 issue #9 小节），A/B 程序级 mutate 未重跑 | Pending | Pending |
 | Real Claude launch and `:display` consumed by viewer | Passed A and B; Claude generated IR and sent persistent mail | Partial: B passed, full A/B run pending | Pending | Pending |
 | FIFO context and regeneration mail, isolated from other project | Passed A `Saved` proposal context then regen; real Claude reported FIFO consumption; both queues empty; B identity unchanged | Pending | Pending | Pending |
 | Claude unexpected exit restores same pane and command | Passed: verified A Claude PID 64705 received SIGTERM; restored Claude PID 66469 in session `$1`, pane `%1`; B `$0/%0`, PID 63937 unchanged | Fixture Passed / 真实 Claude Pending：2026-10-07 fixture 受控 runner 恢复验证（issue #8，见下节）；`#{pane_pid}` 在 psmux 3.3.8 respawn 后永久为空是已定位的 psmux 元数据缺陷，身份改由 server 子进程 OS 证据验证 | Pending | Pending |
@@ -102,6 +102,19 @@ Local regression evidence is under `/Users/billyq/.claude/jobs/c31d870c/tmp/revi
 - IR 检查 `clj -M:ir examples/uml-viewer.policy.edn target/ir-check.edn`：退出 0，内容与受保护的 `examples/uml-viewer.edn` 一致（仅行尾符差异），未改动该文件。
 
 证据目录：`C:\Users\billyq\AppData\Local\Temp\uml-win-quality-20261007`，含 spec-suite、coverage、crap、两个 mutate、ir-check 日志及 clj shim 源码（`merged-*` 为合并后结果）。上一节的完整 A/B、GUI、Windows Terminal 等 Pending 项不受影响。
+
+## 原生 Windows 差分 mutation 验收 — 2026-10-07（issue #9）
+
+针对上一节记录的符号链接阻塞，在管理员提权 shell 下以原版固定依赖（`io.github.unclebob/clj-mutate` c8c0eed，未改动）完成仓库级差分 mutation，基线为 `spec-6-windows-acceptance` 9dbd655，环境同上节的便携 Temurin JDK 21.0.12.1+1 与 Clojure CLI 1.12.6.1673。
+
+- 提权验证：`net session` 通过；Temp 下 `New-Item -ItemType SymbolicLink` 创建成功（验后已清理）。子进程 JVM 继承 SeCreateSymbolicLinkPrivilege。
+- 新发现并记录的前置条件：提权只解决特权问题。仓库位于 UNC 共享（`\\Mac\Home\Desktop\dev\uml-viewer`）时，worker 在 `target\mutation-workers\run-*\worker-*` 下创建符号链接仍抛 FileSystemException（"函数不正确"）退出 1，mutants 未执行——共享文件系统不支持重解析点，与权限无关。README 已补充：提权 shell 或 Developer Mode 二选一，且 checkout 必须在支持符号链接的本地文件系统（NTFS）上。
+- 实际执行方式：将仓库（不含 `.git`/`target`/`.cpcache`）镜像到本地 NTFS 临时目录 `C:\Users\billyq\AppData\Local\Temp\uml-mut-run` 后运行，快照按相对路径与源码 SHA-256 记录，写回仓库 `.metrics/mutate/`（diff 确认仅 companion/sketch 两个快照变化）。
+- `clj -M:mutate src/uml_viewer/adapters/companion.clj`：coverage 生成成功，baseline PASS（18.2s）；113 站点 / 78 覆盖 / 12 未覆盖，执行 78 mutations，**78/78 killed（100.0%）**，退出 3。12 个未覆盖行 mutation（M014–M017 defrecord、M050–M052、M059–M063 `windows-recovered!`）属 coverage gap，按仓库语义保留快照、不强制重跑、不记失败；#8 新增差分 surface（69 个新形式 mutation）全部真实执行并 killed。
+- `clj -M:mutate src/uml_viewer/adapters/sketch.clj`：baseline PASS（16.4s）；223 站点 / 8 覆盖 / 0 未覆盖，执行 8 mutations，**8/8 killed（100.0%）**，退出 0。
+- 实验性 copy fallback 结果未计入；本次为原版工具真实执行，符号链接路径未打补丁。
+
+证据目录：`C:\Users\billyq\AppData\Local\Temp\uml-win-mutation-20261007`（companion/sketch 运行日志及 UNC 共享失败日志 `mut-companion-unc-share-fail.log`）；完整本地运行目录保留在 `C:\Users\billyq\AppData\Local\Temp\uml-mut-run`。表格中 A/B 两项目程序级 `uml.cmd mutate` 未在本轮重跑，保持 Pending。
 
 ## 原生 Windows recovery 验收 — 2026-10-07（issue #8，fixture 级）
 
