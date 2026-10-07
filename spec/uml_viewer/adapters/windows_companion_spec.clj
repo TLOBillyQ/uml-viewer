@@ -55,7 +55,7 @@
                                      "set-hook" (do (reset! hook (when-not (some #{"-u"} args) (last args))) "")
                                      "")}) nil)]
       (companion/recovery! backend "mine" "%3" "C:/project" ["pwsh.exe" "-NoProfile" "-EncodedCommand" "AAA="] true)
-      (should= "respawn-pane -k -t %3 -- pwsh.exe -NoProfile -EncodedCommand AAA=" @hook)
+      (should= "respawn-pane -k -t =mine:0.0 -- pwsh.exe -NoProfile -EncodedCommand AAA=" @hook)
       (companion/recovery! backend "mine" "%3" nil nil false)
       (should-be-nil @hook)))
   (it "tolerates terminal rendering delay before the wake effect becomes visible"
@@ -85,7 +85,7 @@
                    (catch clojure.lang.ExceptionInfo e e))]
         (should e)
         (should= :failure (:status (ex-data e))))))
-  (it "probes recovery with the verified native pane id rather than the unsupported session-pane syntax"
+  (it "routes recovery probes by session and compares the recorded native pane id"
     (let [calls (atom [])]
       (companion/windows-identity!
         (fn [args]
@@ -93,7 +93,33 @@
           {:exit 0 :out (case (last args)
                           "UML|#{session_name}|#{session_id}|#{pid}|#{pane_id}" "UML|mine|$1|442|%3"
                           "")}) "mine" "%3" nil)
-      (should (some #(= ["display-message" "-p" "-t" "%3" companion/identity-format] %) @calls))))
+      (should (some #(= ["display-message" "-p" "-t" "=mine:0.0" companion/identity-format] %) @calls))))
+  (it "isolates identity wake and recovery when two servers both assign pane %1"
+    (let [calls (atom [])
+          text (atom "before")
+          hook (atom "")
+          identity {:session "A" :session-id "$1" :server-pid "442" :pane "%1"}
+          run (fn [args]
+                (swap! calls conj args)
+                {:exit 0 :out
+                 (case (first args)
+                   "-V" "tmux 3.3.8\npsmux 3.3.8"
+                   "display-message" (if (= "=A:0.0" (nth args 3))
+                                       "UML|A|$1|442|%1" "UML|B|$2|443|%1")
+                   "capture-pane" @text
+                   "send-keys" (do (reset! text "after mail-A") "")
+                   "show-options" "on"
+                   "set-hook" (do (reset! hook (last args)) "")
+                   "show-hooks" (str "pane-died -> " @hook)
+                   "")})
+          backend (companion/psmux run identity)]
+      (should (companion/probe! backend "A"))
+      (should= "%1" (companion/bind! backend "A" "%1"))
+      (should= 0 (:exit (companion/wake! backend "%1" ["-l" "mail-A"])))
+      (companion/recovery! backend "A" "%1" "root-A" ["pwsh.exe" "-NoProfile" "-EncodedCommand" "AAA="] true)
+      (should-contain "respawn-pane -k -t =A:0.0" @hook)
+      (should-not (some #(some #{"%1" "=B:0.0"} %) @calls))))
+
   (it "passes arbitrary executable, cwd and prompt as runner data instead of respawn syntax"
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-windows-" (System/nanoTime))
           command (companion/windows-command! root ["C:/With Spaces/claude.ps1" "a'$(throw 1);\"b"])

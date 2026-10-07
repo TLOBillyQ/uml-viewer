@@ -102,8 +102,13 @@
 
 (def identity-format "UML|#{session_name}|#{session_id}|#{pid}|#{pane_id}")
 
+(defn windows-target
+  "psmux pane ids repeat across servers; route by the owned single-pane session."
+  [session]
+  (str "=" session ":0.0"))
+
 (defn windows-identity! [run session pane expected]
-  (let [r (checked! run ["display-message" "-p" "-t" (or pane (str "=" session ":0.0")) identity-format])
+  (let [r (checked! run ["display-message" "-p" "-t" (windows-target session) identity-format])
         [_ name sid pid pane-id] (re-matches #"UML\|([^|\r\n]+)\|(\$\d+)\|(\d+)\|(%\d+)" (:out r))
         observed {:session name :session-id sid :server-pid pid :pane pane-id}]
     (when-not (and (= session name) (or (nil? pane) (= pane (:pane observed)))
@@ -205,7 +210,7 @@
                         children))
         describe-child (fn [c] (select-keys c [:pid :start :name :command]))]
     (try
-      (let [pid (windows-pane-pid! run (:pane identity)
+      (let [pid (windows-pane-pid! run (windows-target (:session identity))
                                    {:timeout-ms timeout-ms :interval-ms interval-ms})
             child (first (filter #(= pid (:pid %))
                                  (matches (windows-server-children! (:server-pid identity)))))]
@@ -255,14 +260,15 @@
     (when-not (and identity (= pane (:pane identity)))
       (throw (ex-info "psmux wake requires verified explicit pane ownership" {:status :failure})))
     (windows-identity! run (:session identity) pane identity)
-    (let [before (when (= "-l" (first keys)) (:out (checked! run ["capture-pane" "-p" "-t" pane])))
-          result (checked! run (into ["send-keys" "-t" pane] keys))]
+    (let [target (windows-target (:session identity))
+          before (when (= "-l" (first keys)) (:out (checked! run ["capture-pane" "-p" "-t" target])))
+          result (checked! run (into ["send-keys" "-t" target] keys))]
       (when (= "-l" (first keys))
         ;; 2000ms/100ms default: only terminal rendering delay is awaited, so
         ;; the window stays much shorter than the recovery verification polls.
         (when-not (bounded-poll {:timeout-ms timeout-ms :interval-ms interval-ms}
                                 (fn []
-                                  (let [out (:out (checked! run ["capture-pane" "-p" "-t" pane]))]
+                                  (let [out (:out (checked! run ["capture-pane" "-p" "-t" target]))]
                                     (when (and (not= before out) (str/includes? out (second keys)))
                                       out))))
           (throw (ex-info "psmux wake effect was not observed; mail remains queued" {:status :failure}))))
@@ -271,7 +277,7 @@
   (recovery! [_ session pane cwd command enabled?]
     (windows-identity! run session (or pane (:pane identity)) identity)
     (let [target (str "=" session)
-          hook (when enabled? (str "respawn-pane -k -t " pane " -- " (str/join " " command)))]
+          hook (when enabled? (str "respawn-pane -k -t " (windows-target session) " -- " (str/join " " command)))]
       (if enabled?
         (do
           (when-not (and (re-matches #"%\d+" pane)
