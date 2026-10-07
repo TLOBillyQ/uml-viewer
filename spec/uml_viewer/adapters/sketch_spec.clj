@@ -641,6 +641,8 @@
 
 (describe "claude session"
   (it "exposes process failures and deadlines through the existing process boundary"
+    (when (sketch/windows?)
+      (pending "exercises a real Unix shell"))
     (let [failure (sketch/run-command ["/bin/sh" "-c" "printf stdout; printf stderr >&2; exit 7"])]
       (should= 7 (:exit failure))
       (should= "stdout" (:out failure))
@@ -666,7 +668,8 @@
           (should= "original" (:session (mailbox/read-companion root)))))))
 
   (it "keeps diagnostic output when every terminal opener fails"
-    (with-redefs [sketch/ghostty-path (fn [] "/Applications/Ghostty.app")
+    (with-redefs [sketch/windows? (fn [] false)
+                  sketch/ghostty-path (fn [] "/Applications/Ghostty.app")
                   sketch/run-command (fn [_] {:exit 5 :out "" :err "permission denied"})
                   sketch/run-osascript (fn [_] {:exit 6 :out "" :err "automation denied"})]
       (let [err (with-out-str (binding [*err* *out*]
@@ -686,6 +689,7 @@
   (it "falls back to Terminal when Ghostty fails without discarding the session"
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-fallback-" (System/nanoTime))]
       (with-redefs [sketch/tmux! (fn [& _] 0)
+                    sketch/windows? (fn [] false)
                     sketch/ghostty-path (fn [] "/Applications/Ghostty.app")
                     sketch/mac? (fn [] true)
                     sketch/run-command (fn [_] {:exit 3 :out "" :err "open failed"})
@@ -699,7 +703,8 @@
       (mailbox/write-companion! root {:session (sketch/session-id root) :pane "%42"})
       (with-redefs [sketch/tmux! (fn [& args]
                                  (swap! calls conj (vec args))
-                                 (if (= "send-keys" (first args)) 9 0))]
+                                 (if (= "send-keys" (first args)) 9 0))
+                    sketch/windows? (fn [] false)]
         (should-not (:woke? (sketch/request-agent! root :regen {})))
         (should= :regen (:op (first (:queue (clojure.edn/read-string (slurp (mailbox/to-agent root)))))))
         (should= ["send-keys" "-t" "%42" "-l" sketch/wake-message] (last @calls)))))
@@ -806,6 +811,7 @@
           calls (atom [])]
       (.mkdirs (java.io.File. root))
       (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& _] 0)
+                    uml-viewer.adapters.sketch/windows? (fn [] false)
                     uml-viewer.adapters.sketch/ghostty-path (fn [] "/Applications/Ghostty.app")
                     uml-viewer.adapters.sketch/run-command (fn [argv] (swap! calls conj (vec argv)) "")
                     uml-viewer.adapters.sketch/run-osascript
@@ -839,6 +845,7 @@
           calls (atom [])]
       (.mkdirs (java.io.File. root))
       (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& _] 0)
+                    uml-viewer.adapters.sketch/windows? (fn [] false)
                     uml-viewer.adapters.sketch/ghostty-path (fn [] "/Applications/Ghostty-Nightly.app")
                     uml-viewer.adapters.sketch/run-command (fn [argv] (swap! calls conj (vec argv)) "")]
         (sketch/open-in-terminal! root)
@@ -851,6 +858,7 @@
           opened (atom [])]
       (.mkdirs (java.io.File. root))
       (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& _] 0)
+                    uml-viewer.adapters.sketch/windows? (fn [] false)
                     uml-viewer.adapters.sketch/ghostty-path (fn [] nil)
                     uml-viewer.adapters.sketch/wsl-distro (fn [] nil)
                     uml-viewer.adapters.sketch/mac? (fn [] true)
@@ -866,7 +874,8 @@
           (should= "1234" (:window-id (mailbox/read-companion root)))))))
 
   (it "uses the Linux attach strategy under WSL"
-    (with-redefs [sketch/ghostty-path (fn [] nil)
+    (with-redefs [sketch/windows? (fn [] false)
+                  sketch/ghostty-path (fn [] nil)
                   sketch/mac? (fn [] false)
                   sketch/wsl-distro (fn [] "Ubuntu")
                   sketch/run-command (fn [_] (throw (Exception. "no terminal launcher")))]
@@ -884,6 +893,7 @@
                     "/uv-linux-" (System/nanoTime))]
       (.mkdirs (java.io.File. root))
       (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& _] 0)
+                    uml-viewer.adapters.sketch/windows? (fn [] false)
                     uml-viewer.adapters.sketch/ghostty-path (fn [] nil)
                     uml-viewer.adapters.sketch/wsl-distro (fn [] nil)
                     uml-viewer.adapters.sketch/mac? (fn [] false)
@@ -973,7 +983,8 @@
                       (cond
                         (not= "has-session" (first args)) 0
                         (= "uml-viewer-mine-abc" (last args)) 0
-                        :else 1))]
+                        :else 1))
+                    uml-viewer.adapters.sketch/windows? (fn [] false)]
         (should (sketch/notify-agent! root))
         (should (some #(= ["send-keys" "-t" "uml-viewer-mine-abc:0.0" "-l" sketch/wake-message] %)
                       @calls))
@@ -1008,7 +1019,8 @@
                     (fn [& args]
                       (if (= "display-message" (first args))
                         0
-                        (if (= (sketch/session-id root) (last args)) 0 1)))]
+                        (if (= (sketch/session-id root) (last args)) 0 1)))
+                    uml-viewer.adapters.sketch/windows? (fn [] false)]
         (should= (sketch/session-id root) (call 'remember-companion! root))
         (should= (sketch/session-id root) @sketch/!session-name)
         (should= (sketch/session-id root)
@@ -1023,6 +1035,7 @@
       (reset! sketch/!terminal-window-id "88")
       (reset! sketch/!session-name "other-session")
       (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& args] (swap! tmux-calls conj (vec args)) 0)
+                    uml-viewer.adapters.sketch/windows? (fn [] false)
                     uml-viewer.adapters.sketch/run-osascript (fn [s] (swap! scripts conj s) "")]
         (sketch/shutdown-children! root)
         (should (some #(= ["kill-session" "-t" "uml-viewer-mine-abc"] %) @tmux-calls))
@@ -1044,6 +1057,7 @@
       (.mkdirs (java.io.File. root))
       (mailbox/write-companion! root {:session "uml-viewer-old-ffff" :window-id "1"})
       (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& args] (swap! calls conj (vec args)) 0)
+                    uml-viewer.adapters.sketch/windows? (fn [] false)
                     uml-viewer.adapters.sketch/ghostty-path (fn [] nil)
                     uml-viewer.adapters.sketch/wsl-distro (fn [] nil)
                     uml-viewer.adapters.sketch/mac? (fn [] true)

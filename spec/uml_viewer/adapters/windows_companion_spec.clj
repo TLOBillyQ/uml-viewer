@@ -1,5 +1,6 @@
 (ns uml-viewer.adapters.windows-companion-spec
-  (:require [speclj.core :refer :all]
+  (:require [clojure.string :as str]
+            [speclj.core :refer :all]
             [uml-viewer.adapters.companion :as companion]
             [uml-viewer.adapters.sketch :as sketch]
             [uml-viewer.domain.mailbox :as mailbox]))
@@ -94,6 +95,8 @@
           node (companion/process! ["pwsh" "-NoProfile" "-Command" "(Get-Command node).Source"])
           executable (if (sketch/windows?) (clojure.java.io/file (:out node))
                          (clojure.java.io/file root "node.exe"))]
+      (when-not (and (= 0 (:exit node)) (seq (str/trim (:out node))))
+        (pending "Node.js is a prerequisite for the real native process argv boundary"))
       (clojure.java.io/make-parents fixture)
       (when-not (sketch/windows?)
         (java.nio.file.Files/createSymbolicLink (.toPath executable)
