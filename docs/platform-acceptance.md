@@ -1,6 +1,6 @@
 # Platform acceptance — issue #5 / spec #1
 
-All-platform support is **pending**. Automated backend simulations do not replace native process, terminal, and GUI acceptance. The subsequent native Windows run below covers installation, real analysis entry points, Claude display/mail and public cleanup; recovery and complete two-project acceptance remain unverified.
+All-platform support is **pending**. Automated backend simulations do not replace native process, terminal, and GUI acceptance. Native Windows issues #11/#12 have automatic process/mail/recovery/attach evidence and the user's final manual acceptance of the remaining GUI/restart behavior. The record below distinguishes captured evidence from manual confirmation; Linux/WSL and remaining macOS criteria are still pending.
 
 ## Recorded results
 
@@ -12,14 +12,14 @@ Evidence root for this run: `/Users/billyq/.claude/jobs/c31d870c/tmp/a5/evidence
 | --- | --- | --- | --- | --- |
 | First installation, repeated installation, preserved policy/proposal, path with spaces | Passed, local fixed-ref install and A reinstall; repeat-preservation also covered by entry tests | Pending | Pending | Pending |
 | Real `ir`, `crap`, differential `mutate` | Passed both projects, two source files individually; no forced mutation reruns | Passed: 新 A/B fixture 的真实 `uml.cmd ir/crap/mutate` 均 exit 0，各文件 1/1、3/3 killed；固定原版依赖与日志见本轮 #11/#12 小节。仓库级 companion/sketch 差分结果另见 issue #9 | Pending | Pending |
-| Real Claude launch and `:display` consumed by viewer | Passed A and B; Claude generated IR and sent persistent mail | Passed process/mail flow: 07fe5dc 的 A/B 真实 Claude 执行 CRAP/IR 并发送新 display，viewer 队列消费完成；屏幕显示未独立目视确认 | Pending | Pending |
-| FIFO context and regeneration mail, isolated from other project | Passed A `Saved` proposal context then regen; real Claude reported FIFO consumption; both queues empty; B identity unchanged | Partial: 公开 API 发送 Saved context/refresh-crap/regen，三个 wake 均 true；真实 Claude 按序 pop，观察期间 B 身份及 policy 不变。现场退出前未捕获最终执行报告；GUI proposal 点击 Pending | Pending | Pending |
-| Claude unexpected exit restores same pane and command | Passed: verified A Claude PID 64705 received SIGTERM; restored Claude PID 66469 in session `$1`, pane `%1`; B `$0/%0`, PID 63937 unchanged | Fixture Passed / 真实 Claude Pending：2026-10-07 fixture 受控 runner 恢复验证（issue #8，见下节）；`#{pane_pid}` 在 psmux 3.3.8 respawn 后永久为空是已定位的 psmux 元数据缺陷，身份改由 server 子进程 OS 证据验证 | Pending | Pending |
-| `:quit-for-restart` saves view, old JVM exits, wrapper starts new JVM, original companion remains | Passed process/mail flow: launcher 64680 exited; wrapper started 67033, Java child 67041; A `$1/%1`, Claude 66469 retained; B unchanged | Pending | Pending | Pending |
-| Mail works after recovery and restart | Passed public `request-agent!`/`request-regen!`, both wake results true, real Claude consumed context/regen and sent display; queues empty | Pending | Pending | Pending |
-| GUI pan/zoom/declutter/nonempty focus/proposal/open layer restored | Pending GUI interaction; complete disk roundtrip automated test passes in two valid view modes | Pending | Pending | Pending |
-| Terminal visible attach and fallback behavior | Pending visual confirmation and forced Ghostty→Terminal fallback; real pane starts successfully; opener failures covered by automated process seam | Partial: WT 存在时真实调用 exit 0；子进程 PATH 排除 WT 后真实 error 2 与绝对 psmux attach 诊断正确。现场已退出，诊断命令实际 attach 与目视 Pending | Pending terminal strategy | Pending compatibility terminal strategy |
-| GUI normal close disables recovery and cleans only owned session | Pending GUI click. Public shutdown boundary actually cleaned A while B stayed alive, then B; automatic shutdown ordering tests pass | Pending | Pending | Pending |
+| Real Claude launch and `:display` consumed by viewer | Passed A and B; Claude generated IR and sent persistent mail | Passed: A/B 真实 Claude CRAP/IR/display 与 viewer 消费已自动记录；屏幕显示由用户最终人工验收确认 | Pending | Pending |
+| FIFO context and regeneration mail, isolated from other project | Passed A `Saved` proposal context then regen; real Claude reported FIFO consumption; both queues empty; B identity unchanged | Passed（自动证据 + 用户人工验收）：context/refresh-crap/regen wake 均 true、按序 pop、B 身份/policy 不变；恢复后 context/regen/display 完整消费已捕获；GUI 操作及剩余行为由用户确认 | Pending | Pending |
+| Claude unexpected exit restores same pane and command | Passed: verified A Claude PID 64705 received SIGTERM; restored Claude PID 66469 in session `$1`, pane `%1`; B `$0/%0`, PID 63937 unchanged | Passed 真实 Claude：受控终止14012后恢复4564，同 session `$49` / pane `%1` / server4304 / cwd / command；原 pane 输入与 context/regen 实际消费，B 不变。pane_pid 缺陷使用恢复 API OS 回退 | Pending | Pending |
+| `:quit-for-restart` saves view, old JVM exits, wrapper starts new JVM, original companion remains | Passed process/mail flow: launcher 64680 exited; wrapper started 67033, Java child 67041; A `$1/%1`, Claude 66469 retained; B unchanged | Passed（用户人工验收）；本轮 harness 未捕获 saved EDN / 旧新 JVM / companion 身份连续链 | Pending | Pending |
+| Mail works after recovery and restart | Passed public `request-agent!`/`request-regen!`, both wake results true, real Claude consumed context/regen and sent display; queues empty | Passed：恢复后真实 mail/display 自动捕获；restart 后 mail 由用户人工验收确认 | Pending | Pending |
+| GUI pan/zoom/declutter/nonempty focus/proposal/open layer restored | Pending GUI interaction; complete disk roundtrip automated test passes in two valid view modes | Passed（用户人工验收）：两轮 namespace focus 与 Saved proposal/open layer、非默认 pan/zoom/declutter 恢复；未捕获本轮 GUI 截图/EDN | Pending | Pending |
+| Terminal visible attach and fallback behavior | Pending visual confirmation and forced Ghostty→Terminal fallback; real pane starts successfully; opener failures covered by automated process seam | Passed：WT 真实调用 exit 0；排除 WT 后真实 error 2、绝对路径诊断及手动 attach 新稳定 client 已捕获；可见终端和颜色由用户人工确认 | Pending terminal strategy | Pending compatibility terminal strategy |
+| GUI normal close disables recovery and cleans only owned session | Pending GUI click. Public shutdown boundary actually cleaned A while B stayed alive, then B; automatic shutdown ordering tests pass | Passed（用户人工验收）；本轮 harness 未捕获 hook 禁用→session 销毁顺序或无 respawn 时间序列 | Pending | Pending |
 
 macOS GUI automation was refused with Apple Event error `-1743` for System Events. No permission bypass or interaction with existing viewer sessions was attempted. Consequently GUI acceptance remains pending even though real JVM, Claude, mail, and tmux behavior was exercised.
 
@@ -130,7 +130,7 @@ Local regression evidence is under `/Users/billyq/.claude/jobs/c31d870c/tmp/revi
 
 本机证据目录：`C:\Users\billyq\AppData\Local\Temp\uml-issue8\evidence-20261007-105856`，含 `psmux-version.txt`、`before-recovery.txt`（原始身份与命令）、`hook-armed.txt`、`quit-sent.txt`、`after-recovery.txt`（OS 回退证据）、`pane-pid-after-respawn.txt`（缺陷证据）、`identity-verdict.txt`、`mail-after-recovery.txt`、`session-cleanup.txt`。该行为 fixture 级恢复证据；表格中 “Mail works after recovery and restart” 行的 restart 部分仍 Pending。
 
-## 原生 Windows A/B 现场验收 — 2026-10-07（issues #11/#12，未完成）
+## 原生 Windows A/B 现场验收 — 2026-10-07（issues #11/#12，自动证据与用户人工确认）
 
 使用独立 fixture `C:\tmp\ab-20261007\Project A With Spaces` 与 `Project B With Spaces`，没有把已有用户项目作为测试资源。安装后同步到固定 checkout `07fe5dc8bc4659d4825dd9470d93c7bfe71800d2`；psmux 仍固定 3.3.8。证据与 harness 位于 `C:\Users\billyq\AppData\Local\Temp\uml-win-ab-gui-20261007`。
 
@@ -141,7 +141,20 @@ Local regression evidence is under `/Users/billyq/.claude/jobs/c31d870c/tmp/revi
 - 2026-10-07T12:45:00Z 至 12:45:01Z 只读核实 A/B 旧 launcher/JVM/server/Claude 均已退出，两份 companion 为 `{}`，两项目 `session.edn` 均不存在。此轮执行者没有发送 quit、终止进程或调用 cleanup；用户随后明确确认关闭了窗口，因此退出来源已确认是用户操作。viewer log 无关闭顺序证据。没有自动 fresh 重建，未触碰既有 psmux5356。不能据此证明 GUI close、hook 先禁用、无 respawn 或 A 关闭时 B 仍可用。证据为 `A-unexpected-A-close.txt`、`B-after-A-close.txt` 及两项目 `uml-viewer-log.txt`。
 - 颜色问题只读白名单发现工具父环境 `NO_COLOR=1`，TERM/COLORTERM/FORCE_COLOR/CLICOLOR/CLICOLOR_FORCE 未设置。这只是 inherited 单色候选原因；未在真实 Claude pane 内确认环境，也未用目视验证色彩。普通 capture 文本没有 ANSI 不构成单色证据，未修改用户 profile 或全局颜色变量。
 
-本轮现场退出后，真实 Claude recovery、恢复后 mail、`:quit-for-restart` → `uml.cmd --restart` 的新 JVM 与原 companion 身份保持、GUI 非默认 pan/zoom/declutter/focus、proposal 展开层恢复、GUI close 及 fallback 实际 attach 均 Blocked/Pending。以上新增证据不构成 issues #11/#12 完整通过，也不改变全平台 Pending 声明。
+首轮现场退出时，真实 Claude recovery、恢复后 mail、`:quit-for-restart` → `uml.cmd --restart` 的新 JVM 与原 companion 身份保持、GUI 非默认 pan/zoom/declutter/focus、proposal 展开层恢复、GUI close 及 fallback 实际 attach 均 Blocked/Pending。用户随后明确授权重开 fixture 完成剩余验收，续跑事实如下；issues #11/#12 尚未完整通过，全平台仍 Pending。
+
+### 用户最终人工验收确认 — 2026-10-07
+
+用户在剩余验收流程中明确确认“都验收了，没问题”，作为 issues #11/#12 剩余 GUI 状态、两轮 namespace focus 与命名 proposal 展开层恢复、公开 wrapper restart、重启后 mail、GUI close、终端和颜色行为的人工验收结果。对应表格以 Passed（用户人工验收）限定；已有自动捕获的恢复/mail/attach 证据单独保留。
+
+人工确认没有提供新的具体 PID、saved session EDN、GUI 截图或 hook 事件顺序。因此本轮 harness 未捕获的 `:quit-for-restart` 保存→旧 JVM 退出→wrapper 新 JVM→原 companion PID 保持链，以及 GUI close 禁 hook→销毁自身 session→无 respawn 时间序列，均不能表述为自动观测结果。第一轮退出本身也不作为该顺序的证据。收到最终确认后停止追加自动重启、GUI 请求及窗口操作，没有重开或清理用户窗口。原生 Windows #11/#12 的验收结论不代替 macOS/Linux/WSL 验收，全平台声明保持 Pending。
+
+### 授权重开后的真实恢复与 fallback — 2026-10-07
+
+- 在确认两个 fixture 的旧资源均已退出、安装仍为 07fe5dc 后，13:13:54Z 起通过真实 `uml.cmd` 依次重开 B/A（均 exit 0），新 display baseline A6/B13，真实 Claude 新 display 消费后 A7/B14。新 A JVM1560 / Claude14012 / server4304 / session `$49` / pane `%1`；B JVM13532 / Claude11384 / server1180。没有重跑已通过的 mutation 或仓库质量门。
+- 精确核对 A server/runner 命令 token、父子关系及真实 Claude PID14012 的创建时间后，仅终止该 fixture Claude。原 recovery hook 实际 respawn；`windows-recovered!` 确认同 server4304 下携带原 encoded command token 的唯一新 runner12756。真实进程树为 runner12756 → pwsh10908 → Claude4564，原 session/cwd/command 保持，pane_pid 空缺仍由恢复 API 的 OS 证据回退处理。随后向原 session 的 pane 发送指令，并通过公开 API 发送 context Saved id4/regen id5，wake 均 true；恢复后的真实 Claude 明确报告处理两条 mail、执行 IR 并发送 display，A next-id7→8、两队列为空。这同时提供恢复进程实际位于原 pane 的输入消费证据。13:20:43Z B 原 JVM/Claude/server、policy hash 及 mail 不变。证据为 `A-continuation-before-recovery.json`、`A-continuation-termination.json`、`A-continuation-recovered.edn`、`A-post-recovery-{context,regen}.edn`、`A-post-recovery-mail.json`、`A-post-recovery-complete-pane.txt`、`A-post-recovery-mail-complete.txt`、`B-post-recovery-mail-control.txt`。
+- 对新 A session 真实排除 wt.exe，再得到 error2 与绝对路径手动 attach 诊断。原样在新 PowerShell 执行诊断命令，psmux list-clients 出现原 `/dev/pts/20` 之外的新稳定 client `/dev/pts/276`；OS 核对 psmux client980 为 pwsh8180 的子进程、command target 为原 A session。初始 harness 把 activity 时间变化误当新 client，已纠正，以稳定 tty 和真实子进程保存最终证据，不重复打开窗口。证据为 `A-continuation-WT-absent.edn`、`A-continuation-manual-attach.json`。可见窗口与色彩仍待用户目视确认。
+- 仅在 fixture wrapper 启动子进程撤销父环境 NO_COLOR；未设全局 FORCE_COLOR 或修改用户 profile。恢复后真实 Claude 将实际工具白名单写入 `.uml-viewer/color-whitelist.json`：NO_COLOR 空、TERM `xterm-256color`、COLORTERM `truecolor`、FORCE_COLOR null。该结果确认新进程不再继承禁色标记，但屏幕色彩仍需目视。GUI 状态和两轮 wrapper restart 尚待用户设置，未用 EDN 修改代替 GUI 操作。
 
 ## Repeatable native acceptance procedure
 
