@@ -712,7 +712,8 @@
   (it "refuses to open the viewer when companion creation fails"
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-failed-" (System/nanoTime))
           opened (atom false)]
-      (with-redefs [sketch/tmux! (fn [& args] (if (= "new-session" (first args)) 7 0))
+      (with-redefs [sketch/windows? (fn [] false)
+                    sketch/tmux! (fn [& args] (if (= "new-session" (first args)) 7 0))
                     sketch/open-window! (fn [_] (reset! opened true))
                     q/sketch (fn [& _] (reset! opened true))]
         (should-throw clojure.lang.ExceptionInfo (sketch/open-in-terminal! root))

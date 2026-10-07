@@ -35,7 +35,7 @@
   (create! [backend session cwd command])
   (probe! [backend session])
   (bind! [backend session pane])
-  (wake! [backend pane keys])
+  (wake! [backend pane keys] [backend pane keys opts])
   (recovery! [backend session pane cwd command enabled?])
   (cleanup! [backend session]))
 
@@ -57,6 +57,8 @@
       (if (seq out) out (or pane (str session ":0.0")))))
   (wake! [_ pane keys]
     (checked! run (into ["send-keys" "-t" pane] keys)))
+  (wake! [this pane keys _opts]
+    (wake! this pane keys))
   (recovery! [_ session pane cwd command enabled?]
     (if enabled?
       (do
@@ -100,34 +102,59 @@
 
 (def identity-format "UML|#{session_name}|#{session_id}|#{pid}|#{pane_id}")
 
+(defn windows-identity! [run session pane expected]
+  (let [r (checked! run ["display-message" "-p" "-t" (or pane (str "=" session ":0.0")) identity-format])
+        [_ name sid pid pane-id] (re-matches #"UML\|([^|\r\n]+)\|(\$\d+)\|(\d+)\|(%\d+)" (:out r))
+        observed {:session name :session-id sid :server-pid pid :pane pane-id}]
+    (when-not (and (= session name) (or (nil? pane) (= pane (:pane observed)))
+                   (or (nil? expected) (= (select-keys expected [:session :session-id :server-pid :pane]) observed)))
+      (throw (ex-info "psmux identity probe failed; session absence is not proven" (assoc r :status :failure :expected expected :observed observed))))
+    observed))
+
+(defn- bounded-poll
+  "Shared bounded poll: call probe every interval-ms until it returns truthy,
+  giving up after timeout-ms (returns nil). probe may throw to abort early.
+  Each caller passes its own {:timeout-ms :interval-ms} options; defaults
+  differ per site because they wait for different things (see each caller's
+  docstring)."
+  [{:keys [timeout-ms interval-ms]} probe]
+  (let [deadline (+ (System/nanoTime) (* 1000000 (long timeout-ms)))]
+    (loop []
+      (or (probe)
+          (when (< (System/nanoTime) deadline)
+            (Thread/sleep (long interval-ms))
+            (recur))))))
+
 ;; psmux 3.3.8 defect (issue #8): after respawn-pane, #{pane_pid} stays empty
 ;; permanently even though a live respawned process exists (pane_dead = 0).
 ;; #{pane_pid} must therefore be polled with a deadline and never parsed when
 ;; empty; persistent emptiness is handled by windows-recovered! below.
 (defn windows-pane-pid!
-  "Bounded poll of #{pane_pid} for one pane. Empty metadata is retried until
+  "Recovery verification API (acceptance / external harness entry point):
+  bounded poll of #{pane_pid} for one pane. Empty metadata is retried until
   the deadline instead of being parsed; persistent emptiness throws with the
   pane state so timing, psmux metadata defects and identity mismatches stay
-  distinguishable."
+  distinguishable. Defaults 5000ms/100ms: when psmux fills the metadata at all
+  it does so sub-second, so five seconds amply separates timing from defect."
   ([run pane] (windows-pane-pid! run pane {}))
   ([run pane {:keys [timeout-ms interval-ms] :or {timeout-ms 5000 interval-ms 100}}]
-   (let [deadline (+ (System/nanoTime) (* 1000000 (long timeout-ms)))]
-     (loop []
-       (let [out (:out (checked! run ["display-message" "-p" "-t" pane "#{pane_pid}"]))]
-         (cond
-           (re-matches #"[1-9][0-9]*" out) (Long/parseLong out)
-           (seq out) (throw (ex-info "psmux pane pid metadata is malformed"
-                                     {:status :failure :pane pane :observed out}))
-           (< (System/nanoTime) deadline) (do (Thread/sleep (long interval-ms)) (recur))
-           :else (throw (ex-info "psmux pane pid metadata stayed empty past the deadline"
-                                 {:status :pane-pid-unavailable
-                                  :pane pane
-                                  :pane-dead (:out (checked! run ["display-message" "-p" "-t" pane "#{pane_dead}"]))
-                                  :pane-command (:out (checked! run ["display-message" "-p" "-t" pane "#{pane_current_command}"]))
-                                  :timeout-ms timeout-ms}))))))))
+   (or (bounded-poll {:timeout-ms timeout-ms :interval-ms interval-ms}
+                     (fn []
+                       (let [out (:out (checked! run ["display-message" "-p" "-t" pane "#{pane_pid}"]))]
+                         (cond
+                           (re-matches #"[1-9][0-9]*" out) (Long/parseLong out)
+                           (seq out) (throw (ex-info "psmux pane pid metadata is malformed"
+                                                     {:status :failure :pane pane :observed out}))))))
+       (throw (ex-info "psmux pane pid metadata stayed empty past the deadline"
+                       {:status :pane-pid-unavailable
+                        :pane pane
+                        :pane-dead (:out (checked! run ["display-message" "-p" "-t" pane "#{pane_dead}"]))
+                        :pane-command (:out (checked! run ["display-message" "-p" "-t" pane "#{pane_current_command}"]))
+                        :timeout-ms timeout-ms})))))
 
 (defn windows-server-children!
-  "OS enumeration of the direct children of the verified psmux server process.
+  "Recovery verification API (acceptance / external harness entry point):
+  OS enumeration of the direct children of the verified psmux server process.
   This is the fallback recovery identity evidence while #{pane_pid} stays empty
   after respawn-pane on psmux 3.3.8 (issue #8)."
   [server-pid]
@@ -149,16 +176,21 @@
                                 "")})))
           (str/split-lines out))))
 
-(declare windows-identity!)
-
 (defn windows-recovered!
-  "Verify that a controlled exit respawned exactly one new process carrying the
+  "Recovery verification API (acceptance / external harness entry point):
+  verify that a controlled exit respawned exactly one new process carrying the
   original command identity. Primary evidence is #{pane_pid} metadata; on
   psmux 3.3.8 respawn-pane leaves that metadata permanently empty (issue #8),
   so the verified server's OS children are the documented fallback evidence.
-  :command-token is a unique substring of the original command line (the
-  encoded runner payload ties the process to its original cwd and argv);
-  :died-after is the UTC tick at which the old process was terminated."
+  Note the fallback proves a unique new process under the verified server with
+  the original command; it does not by itself prove binding to the recorded
+  pane, because pane metadata is exactly what is defective — pane-level
+  evidence must come from input delivered to that pane being consumed by the
+  process. :command-token is a unique substring of the original command line
+  (the encoded runner payload ties the process to its original cwd and argv);
+  :died-after is the UTC tick at which the old process was terminated.
+  Defaults 10000ms/200ms: the poll must span the pane-died hook, respawn-pane
+  and process spawn, which is slower than a plain metadata read."
   [run identity {:keys [command-token died-after timeout-ms interval-ms]
                  :or {timeout-ms 10000 interval-ms 200}}]
   (when-not (and (string? command-token) (seq command-token))
@@ -195,15 +227,6 @@
                               {:status :failure :reason :ambiguous-recovered-processes
                                :candidates (mapv describe-child candidates)})))))))))
 
-(defn windows-identity! [run session pane expected]
-  (let [r (checked! run ["display-message" "-p" "-t" (or pane (str "=" session ":0.0")) identity-format])
-        [_ name sid pid pane-id] (re-matches #"UML\|([^|\r\n]+)\|(\$\d+)\|(\d+)\|(%\d+)" (:out r))
-        observed {:session name :session-id sid :server-pid pid :pane pane-id}]
-    (when-not (and (= session name) (or (nil? pane) (= pane (:pane observed)))
-                   (or (nil? expected) (= (select-keys expected [:session :session-id :server-pid :pane]) observed)))
-      (throw (ex-info "psmux identity probe failed; session absence is not proven" (assoc r :status :failure :expected expected :observed observed))))
-    observed))
-
 (defn windows-owner!
   "OS evidence for the recorded server only; PID reuse is never live-owner evidence."
   [identity]
@@ -222,28 +245,27 @@
         {:status :exists :owner-start start}
         :else (throw (ex-info "Windows owner process probe is ambiguous" (assoc r :status :failure)))))))
 
-(def wake-observe-timeout-ms 2000)
-(def wake-observe-interval-ms 100)
-
 (defrecord Psmux [run identity]
   SessionBackend
   (create! [_ session cwd command] (checked! run (into ["new-session" "-d" "-s" session "--"] command)))
   (probe! [_ session] (windows-identity! run session (:pane identity) identity) true)
   (bind! [_ session pane] (:pane (windows-identity! run session pane identity)))
-  (wake! [_ pane keys]
+  (wake! [this pane keys] (wake! this pane keys {}))
+  (wake! [_ pane keys {:keys [timeout-ms interval-ms] :or {timeout-ms 2000 interval-ms 100}}]
     (when-not (and identity (= pane (:pane identity)))
       (throw (ex-info "psmux wake requires verified explicit pane ownership" {:status :failure})))
     (windows-identity! run (:session identity) pane identity)
     (let [before (when (= "-l" (first keys)) (:out (checked! run ["capture-pane" "-p" "-t" pane])))
           result (checked! run (into ["send-keys" "-t" pane] keys))]
       (when (= "-l" (first keys))
-        (let [deadline (+ (System/nanoTime) (* wake-observe-timeout-ms 1000000))]
-          (loop []
-            (let [out (:out (checked! run ["capture-pane" "-p" "-t" pane]))]
-              (when-not (and (not= before out) (str/includes? out (second keys)))
-                (if (< (System/nanoTime) deadline)
-                  (do (Thread/sleep wake-observe-interval-ms) (recur))
-                  (throw (ex-info "psmux wake effect was not observed; mail remains queued" {:status :failure}))))))))
+        ;; 2000ms/100ms default: only terminal rendering delay is awaited, so
+        ;; the window stays much shorter than the recovery verification polls.
+        (when-not (bounded-poll {:timeout-ms timeout-ms :interval-ms interval-ms}
+                                (fn []
+                                  (let [out (:out (checked! run ["capture-pane" "-p" "-t" pane]))]
+                                    (when (and (not= before out) (str/includes? out (second keys)))
+                                      out))))
+          (throw (ex-info "psmux wake effect was not observed; mail remains queued" {:status :failure}))))
       (windows-identity! run (:session identity) pane identity)
       result))
   (recovery! [_ session pane cwd command enabled?]
@@ -274,13 +296,9 @@
     (when (= :exists (:status (windows-owner! identity)))
       (recovery! this session (:pane identity) nil nil false)
       (checked! run ["kill-session" "-t" (str "=" session)]))
-    (let [deadline (+ (System/nanoTime) 2000000000)]
-      (loop []
-        (if (= :missing (:status (windows-owner! identity)))
-          true
-          (if (< (System/nanoTime) deadline)
-            (do (Thread/sleep 50) (recur))
-            (throw (ex-info "Windows companion owner did not exit after cleanup" {:status :timeout :session session}))))))))
+    (when-not (bounded-poll {:timeout-ms 2000 :interval-ms 50}
+                            (fn [] (when (= :missing (:status (windows-owner! identity))) true)))
+      (throw (ex-info "Windows companion owner did not exit after cleanup" {:status :timeout :session session})))))
 
 (defn psmux [run identity]
   (let [r (checked! run ["-V"])]

@@ -74,7 +74,7 @@
                                      "capture-pane" "pane before mail"
                                      "")})
                     {:session "mine" :pane "%3" :session-id "$1" :server-pid "442"})]
-      (let [e (try (companion/wake! backend "%3" ["-l" "woke text"]) nil
+      (let [e (try (companion/wake! backend "%3" ["-l" "woke text"] {:timeout-ms 60 :interval-ms 10}) nil
                    (catch clojure.lang.ExceptionInfo e e))]
         (should e)
         (should= :failure (:status (ex-data e))))))
