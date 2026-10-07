@@ -6,6 +6,13 @@
             [uml-viewer.domain.mailbox :as mailbox]))
 
 (describe "Native Windows companion at the external process boundary"
+  (before
+    (reset! sketch/!session-name nil)
+    (reset! sketch/!terminal-window-id nil))
+  (around [run-spec]
+    (with-redefs [sketch/run-command (fn [argv] (throw (ex-info "Unexpected terminal command in unit spec" {:argv argv})))
+                  sketch/run-osascript (fn [_] (throw (ex-info "Unexpected AppleScript in unit spec" {})))]
+      (run-spec)))
   (it "rejects a tmux-compatible version line without fixed psmux provenance"
     (should-throw clojure.lang.ExceptionInfo
       (companion/psmux (fn [_] {:exit 0 :out "tmux 3.3.8"}) nil)))
@@ -134,12 +141,22 @@
             result (companion/process! (assoc command 0 "pwsh"))]
         (should= 19 (:exit result))
         (should= "[\"quoted \\\"value\\\"\",\"first\\nsecond\",\"\",\"literal;$(throw 1)&%PATH%!\",\"末尾\\\\\"]" (:out result)))))
-  (it "preserves an owned Windows companion when Windows Terminal is unavailable"
+  (it "attaches Windows Terminal with the resolved executable when its PATH differs"
+    (let [calls (atom [])]
+      (with-redefs [sketch/windows? (fn [] true)
+                    companion/process! (fn [_] {:exit 0 :out "C:\\Tools With Spaces\\psmux.exe"})
+                    sketch/run-command (fn [args] (swap! calls conj args) {:exit 0})]
+        (should= :windows-terminal (:terminal (sketch/open-window! "mine")))
+        (should= [["wt.exe" "-w" "new" "new-tab" "--title" "mine"
+                   "C:\\Tools With Spaces\\psmux.exe" "attach-session" "-t" "=mine"]]
+                 @calls))))
+  (it "preserves an owned Windows companion with a copyable PowerShell attach when Windows Terminal is unavailable"
     (with-redefs [sketch/windows? (fn [] true)
+                  companion/process! (fn [_] {:exit 0 :out "C:\\Tools' With Spaces\\psmux.exe"})
                   sketch/run-command (fn [_] {:exit nil :err "wt missing"})]
-      (let [out (sketch/open-window! "mine")]
+      (let [out (sketch/open-window! "mine'1")]
         (should= :none (:terminal out))
-        (should= "psmux.exe attach-session -t =mine" (:attach out)))))
+        (should= "& 'C:\\Tools'' With Spaces\\psmux.exe' attach-session -t '=mine''1'" (:attach out)))))
   (it "does not create a replacement when a Windows project already has an ambiguous owner record"
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-win-existing-" (System/nanoTime))
           calls (atom [])]

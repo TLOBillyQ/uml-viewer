@@ -425,9 +425,13 @@
   "会话已经创建；终端失败只提供 attach，不销毁会话。WSL 与 Linux 相同。"
   [session]
   (if (windows?)
-    (let [attach (str "psmux.exe attach-session -t =" session)
+    (let [script "$ErrorActionPreference='Stop';[Console]::Write((Get-Command psmux.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source)"
+          executable (:out (companion/checked! companion/process!
+                                              ["pwsh.exe" "-NoProfile" "-EncodedCommand" (companion/encoded script)]))
+          quote-ps #(str "'" (str/replace % "'" "''") "'")
+          attach (str "& " (quote-ps executable) " attach-session -t " (quote-ps (str "=" session)))
           result (run-command ["wt.exe" "-w" "new" "new-tab" "--title" session
-                               "psmux.exe" "attach-session" "-t" (str "=" session)])]
+                               executable "attach-session" "-t" (str "=" session)])]
       (when-not (command-ok? result)
         (binding [*out* *err*] (println "UML viewer: attach to the companion with:" attach)))
       {:terminal (if (= 0 (:exit result)) :windows-terminal :none)

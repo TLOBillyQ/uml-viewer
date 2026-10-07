@@ -12,6 +12,7 @@
             [uml-viewer.engine.layout :as layout]
             [uml-viewer.domain.ir :as ir]
             [uml-viewer.adapters.sketch :as sketch]
+            [uml-viewer.adapters.companion :as companion]
             [uml-viewer.adapters.source-window :as source-window]
             [uml-viewer.domain.mailbox :as mailbox])
   (:import [java.awt Frame]
@@ -639,7 +640,7 @@
               (should (fn? (:key-released @opts)))
               (should= :s ((:key-released @opts) :s {:key :esc}))))))))
 
-(describe "claude session"
+(describe "external process integration"
   (it "exposes process failures and deadlines through the existing process boundary"
     (when (sketch/windows?)
       (pending "exercises a real Unix shell"))
@@ -649,7 +650,24 @@
       (should= "stderr" (:err failure)))
     (let [missing (sketch/run-command ["/no/such/uml-viewer-command"])]
       (should-be-nil (:exit missing))
-      (should (seq (:err missing)))))
+      (should (seq (:err missing))))))
+
+(describe "claude session"
+  ;; Platform mutants may bypass platform stubs; the process boundary stays sealed.
+  (around [run-spec]
+    (with-redefs [sketch/claude-executable (fn [] "claude")
+                  companion/process! (fn [argv] (throw (ex-info "Unexpected external process in unit spec" {:argv argv})))
+                  sketch/run-command (fn [argv] (throw (ex-info "Unexpected terminal command in unit spec" {:argv argv})))
+                  sketch/run-osascript (fn [_] (throw (ex-info "Unexpected AppleScript in unit spec" {})))]
+      (run-spec)))
+
+  (it "seals terminal commands even when a platform mutant selects Windows"
+    (with-redefs [sketch/windows? (fn [] true)
+                  companion/process! (fn [_] {:exit 0 :out "psmux.exe"})]
+      (should-throw clojure.lang.ExceptionInfo "Unexpected terminal command in unit spec"
+                    (sketch/open-window! "unit-spec-no-session"))
+      (with-redefs [sketch/run-command (fn [_] {:exit 0})]
+        (should= :windows-terminal (:terminal (sketch/open-window! "unit-spec-no-session"))))))
 
   (it "stops before opening the viewer on restart probe timeout or bind failure"
     (let [root (java.io.File. "target" (str "restart-failure-" (System/nanoTime)))
