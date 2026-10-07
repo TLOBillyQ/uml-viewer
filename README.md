@@ -526,9 +526,10 @@ namespace. Otherwise the class id owns that name (`bookwriter.model`
 owns `model`), a dotted child rolls up (`pdf` owns `pdf.Layout`), and
 the policy prefix belongs to the single undotted Rust class. `::` is
 read as `.`. A source file drawn inside its directory keeps its own
-CRAP and mutation scores. The directory box still rolls up the worst
-descendant, and a descendant with no data is red. A class with no CRAP
-or mutation data is red.
+CRAP and mutation scores. The directory box pools the functions under
+it, one weight per function. A file with no snapshot stays red, and in
+that pool it counts as one red function per op, or one function when it
+lists none. A class with no CRAP or mutation data is red.
 
 ## IR
 
@@ -582,8 +583,10 @@ Optional authored metrics, used when snapshots are missing:
 Package and class **color** maps CRAP (`μ + σ`) and mutation score each onto
 1–10 using `uml-viewer.domain.config` cutoffs, averages them, and paints a
 0–10 red–green fill. Missing CRAP or mutation data counts as red (grade 1),
-not unknown. Parents take the worst CRAP and worst mutation of their
-children, and a child with no data is the worst. A **C** and **M** dot in
+not unknown. A parent pools CRAP by function count: μ and σ of the
+functions underneath, then the same grade. It pools mutation by summing
+killed and survived. A child with no data tints that pool once per
+function. It does not replace the parent. A **C** and **M** dot in
 the upper-right show the two scores. The boxes no longer print μ / max / σ.
 
 On the class card, a `Crap μ … max … σ …` line sits above the table (max is
