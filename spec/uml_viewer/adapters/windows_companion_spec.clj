@@ -50,6 +50,33 @@
       (should= "respawn-pane -k -t %3 -- pwsh.exe -NoProfile -EncodedCommand AAA=" @hook)
       (companion/recovery! backend "mine" "%3" nil nil false)
       (should-be-nil @hook)))
+  (it "tolerates terminal rendering delay before the wake effect becomes visible"
+    (let [captures (atom 0)
+          backend (companion/psmux
+                    (fn [args]
+                      {:exit 0 :out (case (first args)
+                                     "-V" "tmux 3.3.8\npsmux 3.3.8"
+                                     "display-message" "UML|mine|$1|442|%3"
+                                     "capture-pane" (if (< (swap! captures inc) 4)
+                                                      "pane before mail"
+                                                      "pane before mail and woke text")
+                                     "")})
+                    {:session "mine" :pane "%3" :session-id "$1" :server-pid "442"})]
+      (should= 0 (:exit (companion/wake! backend "%3" ["-l" "woke text"])))
+      (should (>= @captures 4))))
+  (it "still fails wake and keeps mail queued when no pane effect appears in time"
+    (let [backend (companion/psmux
+                    (fn [args]
+                      {:exit 0 :out (case (first args)
+                                     "-V" "tmux 3.3.8\npsmux 3.3.8"
+                                     "display-message" "UML|mine|$1|442|%3"
+                                     "capture-pane" "pane before mail"
+                                     "")})
+                    {:session "mine" :pane "%3" :session-id "$1" :server-pid "442"})]
+      (let [e (try (companion/wake! backend "%3" ["-l" "woke text"]) nil
+                   (catch clojure.lang.ExceptionInfo e e))]
+        (should e)
+        (should= :failure (:status (ex-data e))))))
   (it "probes recovery with the verified native pane id rather than the unsupported session-pane syntax"
     (let [calls (atom [])]
       (companion/windows-identity!
