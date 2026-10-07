@@ -232,3 +232,98 @@
         (should-throw clojure.lang.ExceptionInfo (sketch/open-in-terminal! root))
         (should-not (some #(some #{"new-session" "kill-session"} %) @calls)))))
 )
+
+(describe "Windows recovery pane identity at the external process boundary"
+  (it "returns the pane pid once psmux populates delayed metadata"
+    (let [calls (atom [])]
+      (should= 5123 (companion/windows-pane-pid!
+                      (fn [args]
+                        (swap! calls conj args)
+                        {:exit 0 :out (if (< (count @calls) 3) "" "5123")})
+                      "%3" {:timeout-ms 1000 :interval-ms 1}))
+      (should= 3 (count @calls))))
+  (it "reports pane state instead of parsing metadata that stays empty"
+    (let [e (try (companion/windows-pane-pid!
+                   (fn [args] {:exit 0 :out (case (last args)
+                                              "#{pane_pid}" ""
+                                              "#{pane_dead}" "0"
+                                              "#{pane_current_command}" "pwsh"
+                                              "")})
+                   "%3" {:timeout-ms 20 :interval-ms 1})
+                 nil
+                 (catch clojure.lang.ExceptionInfo e e))]
+      (should e)
+      (should= :pane-pid-unavailable (:status (ex-data e)))
+      (should= "%3" (:pane (ex-data e)))
+      (should= "0" (:pane-dead (ex-data e)))
+      (should= "pwsh" (:pane-command (ex-data e)))))
+  (it "rejects malformed pane pid metadata instead of parsing it"
+    (let [e (try (companion/windows-pane-pid!
+                   (fn [_] {:exit 0 :out "BILLYPARALLEL"}) "%3" {:timeout-ms 1000 :interval-ms 1})
+                 nil
+                 (catch clojure.lang.ExceptionInfo e e))]
+      (should e)
+      (should= :failure (:status (ex-data e)))
+      (should= "BILLYPARALLEL" (:observed (ex-data e)))))
+  (it "enumerates direct server children as OS recovery evidence"
+    (with-redefs [companion/process!
+                  (fn [args]
+                    (should= "pwsh.exe" (first args))
+                    {:exit 0 :out (str "CHILD|5636|12345678|pwsh.exe|"
+                                       (.encodeToString (java.util.Base64/getEncoder)
+                                         (.getBytes "pwsh.exe -NoProfile -EncodedCommand AAA=" "UTF-8")))})]
+      (should= [{:pid 5636 :start "12345678" :name "pwsh.exe"
+                 :command "pwsh.exe -NoProfile -EncodedCommand AAA="}]
+               (companion/windows-server-children! "6992"))))
+  (letfn [(b64 [s] (.encodeToString (java.util.Base64/getEncoder) (.getBytes s "UTF-8")))
+          (child [pid start cmd] (str "CHILD|" pid "|" start "|pwsh.exe|" (b64 cmd)))
+          (identity-run [pane-pid]
+            (fn [args]
+              {:exit 0 :out (case (last args)
+                              "UML|#{session_name}|#{session_id}|#{pid}|#{pane_id}" "UML|mine|$1|442|%3"
+                              "#{pane_pid}" pane-pid
+                              "")}))
+          (identity [] {:session "mine" :pane "%3" :session-id "$1" :server-pid "442"})]
+    (it "verifies the recovered process through pane metadata when psmux populates it"
+      (with-redefs [companion/process!
+                    (fn [_] {:exit 0 :out (child 5636 200 "pwsh.exe -NoProfile -EncodedCommand AAA=")})]
+        (should= {:evidence :pane-metadata :pid 5636
+                  :process {:pid 5636 :start "200" :name "pwsh.exe"
+                            :command "pwsh.exe -NoProfile -EncodedCommand AAA="}}
+                 (companion/windows-recovered! (identity-run "5636") (identity)
+                                               {:command-token "EncodedCommand AAA=" :died-after "100"
+                                                :timeout-ms 50 :interval-ms 1}))))
+    (it "falls back to server children when psmux 3.3.8 never repopulates pane_pid after respawn"
+      (with-redefs [companion/process!
+                    (fn [_] {:exit 0 :out (child 5636 200 "pwsh.exe -NoProfile -EncodedCommand AAA=")})]
+        (should= {:evidence :server-children :psmux-pane-pid-defect true :pid 5636
+                  :process {:pid 5636 :start "200" :name "pwsh.exe"
+                            :command "pwsh.exe -NoProfile -EncodedCommand AAA="}}
+                 (companion/windows-recovered! (identity-run "") (identity)
+                                               {:command-token "EncodedCommand AAA=" :died-after "100"
+                                                :timeout-ms 20 :interval-ms 1}))))
+    (it "rejects recovery when no new process matches the original command identity"
+      (with-redefs [companion/process! (fn [_] {:exit 0 :out ""})]
+        (let [e (try (companion/windows-recovered! (identity-run "") (identity)
+                                                   {:command-token "EncodedCommand AAA=" :died-after "100"
+                                                    :timeout-ms 20 :interval-ms 1})
+                     nil (catch clojure.lang.ExceptionInfo e e))]
+          (should= :no-recovered-process (:reason (ex-data e))))))
+    (it "rejects ambiguous recovery when multiple new processes match"
+      (with-redefs [companion/process!
+                    (fn [_] {:exit 0 :out (str (child 5636 200 "pwsh.exe -NoProfile -EncodedCommand AAA=") "\n"
+                                               (child 5640 201 "pwsh.exe -NoProfile -EncodedCommand AAA="))})]
+        (let [e (try (companion/windows-recovered! (identity-run "") (identity)
+                                                   {:command-token "EncodedCommand AAA=" :died-after "100"
+                                                    :timeout-ms 20 :interval-ms 1})
+                     nil (catch clojure.lang.ExceptionInfo e e))]
+          (should= :ambiguous-recovered-processes (:reason (ex-data e)))
+          (should= 2 (count (:candidates (ex-data e)))))))
+    (it "rejects a pane pid whose process does not carry the original command identity"
+      (with-redefs [companion/process!
+                    (fn [_] {:exit 0 :out (child 5636 200 "pwsh.exe -NoProfile -EncodedCommand OTHER=")})]
+        (let [e (try (companion/windows-recovered! (identity-run "5636") (identity)
+                                                   {:command-token "EncodedCommand AAA=" :died-after "100"
+                                                    :timeout-ms 50 :interval-ms 1})
+                     nil (catch clojure.lang.ExceptionInfo e e))]
+          (should= :recovered-identity-mismatch (:reason (ex-data e))))))))
