@@ -4,3 +4,12 @@ target
 .DS_Store
 .uml-viewer/
 uml-viewer-log.txt
+
+# teaching workspace (/teach)
+MISSION.md
+NOTES.md
+RESOURCES.md
+assets/
+learning-records/
+lessons/
+reference/
