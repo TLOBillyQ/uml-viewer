@@ -127,6 +127,9 @@
         {:status :exists :owner-start start}
         :else (throw (ex-info "Windows owner process probe is ambiguous" (assoc r :status :failure)))))))
 
+(def wake-observe-timeout-ms 2000)
+(def wake-observe-interval-ms 100)
+
 (defrecord Psmux [run identity]
   SessionBackend
   (create! [_ session cwd command] (checked! run (into ["new-session" "-d" "-s" session "--"] command)))
@@ -139,9 +142,13 @@
     (let [before (when (= "-l" (first keys)) (:out (checked! run ["capture-pane" "-p" "-t" pane])))
           result (checked! run (into ["send-keys" "-t" pane] keys))]
       (when (= "-l" (first keys))
-        (let [out (:out (checked! run ["capture-pane" "-p" "-t" pane]))]
-          (when-not (and (not= before out) (str/includes? out (second keys)))
-            (throw (ex-info "psmux wake effect was not observed; mail remains queued" {:status :failure})))))
+        (let [deadline (+ (System/nanoTime) (* wake-observe-timeout-ms 1000000))]
+          (loop []
+            (let [out (:out (checked! run ["capture-pane" "-p" "-t" pane]))]
+              (when-not (and (not= before out) (str/includes? out (second keys)))
+                (if (< (System/nanoTime) deadline)
+                  (do (Thread/sleep wake-observe-interval-ms) (recur))
+                  (throw (ex-info "psmux wake effect was not observed; mail remains queued" {:status :failure}))))))))
       (windows-identity! run (:session identity) pane identity)
       result))
   (recovery! [_ session pane cwd command enabled?]
