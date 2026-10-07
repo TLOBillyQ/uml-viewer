@@ -100,6 +100,101 @@
 
 (def identity-format "UML|#{session_name}|#{session_id}|#{pid}|#{pane_id}")
 
+;; psmux 3.3.8 defect (issue #8): after respawn-pane, #{pane_pid} stays empty
+;; permanently even though a live respawned process exists (pane_dead = 0).
+;; #{pane_pid} must therefore be polled with a deadline and never parsed when
+;; empty; persistent emptiness is handled by windows-recovered! below.
+(defn windows-pane-pid!
+  "Bounded poll of #{pane_pid} for one pane. Empty metadata is retried until
+  the deadline instead of being parsed; persistent emptiness throws with the
+  pane state so timing, psmux metadata defects and identity mismatches stay
+  distinguishable."
+  ([run pane] (windows-pane-pid! run pane {}))
+  ([run pane {:keys [timeout-ms interval-ms] :or {timeout-ms 5000 interval-ms 100}}]
+   (let [deadline (+ (System/nanoTime) (* 1000000 (long timeout-ms)))]
+     (loop []
+       (let [out (:out (checked! run ["display-message" "-p" "-t" pane "#{pane_pid}"]))]
+         (cond
+           (re-matches #"[1-9][0-9]*" out) (Long/parseLong out)
+           (seq out) (throw (ex-info "psmux pane pid metadata is malformed"
+                                     {:status :failure :pane pane :observed out}))
+           (< (System/nanoTime) deadline) (do (Thread/sleep (long interval-ms)) (recur))
+           :else (throw (ex-info "psmux pane pid metadata stayed empty past the deadline"
+                                 {:status :pane-pid-unavailable
+                                  :pane pane
+                                  :pane-dead (:out (checked! run ["display-message" "-p" "-t" pane "#{pane_dead}"]))
+                                  :pane-command (:out (checked! run ["display-message" "-p" "-t" pane "#{pane_current_command}"]))
+                                  :timeout-ms timeout-ms}))))))))
+
+(defn windows-server-children!
+  "OS enumeration of the direct children of the verified psmux server process.
+  This is the fallback recovery identity evidence while #{pane_pid} stays empty
+  after respawn-pane on psmux 3.3.8 (issue #8)."
+  [server-pid]
+  (when-not (and (string? server-pid) (re-matches #"[1-9][0-9]*" server-pid))
+    (throw (ex-info "No verified Windows server PID" {:status :failure})))
+  (let [script (str "$ErrorActionPreference='Stop';"
+                    "Get-CimInstance Win32_Process -Filter \"ParentProcessId=" server-pid "\" | ForEach-Object {"
+                    "$c=if($_.CommandLine){[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($_.CommandLine))}else{''};"
+                    "[Console]::WriteLine(('CHILD|{0}|{1}|{2}|{3}' -f $_.ProcessId,$_.CreationDate.ToUniversalTime().Ticks,$_.Name,$c))}")
+        out (:out (checked! process! ["pwsh.exe" "-NoProfile" "-EncodedCommand" (encoded script)]))]
+    (into []
+          (keep (fn [line]
+                  (when-let [[_ pid start name cmd] (re-matches #"CHILD\|([1-9][0-9]*)\|([0-9]+)\|([^|\r\n]+)\|([A-Za-z0-9+/=]*)" line)]
+                    {:pid (Long/parseLong pid)
+                     :start start
+                     :name name
+                     :command (if (seq cmd)
+                                (String. (.decode (java.util.Base64/getDecoder) cmd) "UTF-8")
+                                "")})))
+          (str/split-lines out))))
+
+(declare windows-identity!)
+
+(defn windows-recovered!
+  "Verify that a controlled exit respawned exactly one new process carrying the
+  original command identity. Primary evidence is #{pane_pid} metadata; on
+  psmux 3.3.8 respawn-pane leaves that metadata permanently empty (issue #8),
+  so the verified server's OS children are the documented fallback evidence.
+  :command-token is a unique substring of the original command line (the
+  encoded runner payload ties the process to its original cwd and argv);
+  :died-after is the UTC tick at which the old process was terminated."
+  [run identity {:keys [command-token died-after timeout-ms interval-ms]
+                 :or {timeout-ms 10000 interval-ms 200}}]
+  (when-not (and (string? command-token) (seq command-token))
+    (throw (ex-info "Windows recovery verification requires the original command token"
+                    {:status :failure})))
+  (windows-identity! run (:session identity) (:pane identity) identity)
+  (let [matches (fn [children]
+                  (into [] (filter (fn [{:keys [start command]}]
+                                     (and (str/includes? (or command "") command-token)
+                                          (or (nil? died-after)
+                                              (>= (bigint start) (bigint died-after))))))
+                        children))
+        describe-child (fn [c] (select-keys c [:pid :start :name :command]))]
+    (try
+      (let [pid (windows-pane-pid! run (:pane identity)
+                                   {:timeout-ms timeout-ms :interval-ms interval-ms})
+            child (first (filter #(= pid (:pid %))
+                                 (matches (windows-server-children! (:server-pid identity)))))]
+        (if child
+          {:evidence :pane-metadata :pid pid :process (describe-child child)}
+          (throw (ex-info "psmux pane pid does not match the original command identity"
+                          {:status :failure :reason :recovered-identity-mismatch :pane-pid pid}))))
+      (catch clojure.lang.ExceptionInfo e
+        (if (not= :pane-pid-unavailable (:status (ex-data e)))
+          (throw e)
+          (let [candidates (matches (windows-server-children! (:server-pid identity)))]
+            (case (count candidates)
+              0 (throw (ex-info "No recovered process matches the original command identity"
+                                {:status :failure :reason :no-recovered-process
+                                 :pane (:pane identity)}))
+              1 {:evidence :server-children :psmux-pane-pid-defect true
+                 :pid (:pid (first candidates)) :process (describe-child (first candidates))}
+              (throw (ex-info "Multiple recovered processes match the original command identity"
+                              {:status :failure :reason :ambiguous-recovered-processes
+                               :candidates (mapv describe-child candidates)})))))))))
+
 (defn windows-identity! [run session pane expected]
   (let [r (checked! run ["display-message" "-p" "-t" (or pane (str "=" session ":0.0")) identity-format])
         [_ name sid pid pane-id] (re-matches #"UML\|([^|\r\n]+)\|(\$\d+)\|(\d+)\|(%\d+)" (:out r))
@@ -127,6 +222,9 @@
         {:status :exists :owner-start start}
         :else (throw (ex-info "Windows owner process probe is ambiguous" (assoc r :status :failure)))))))
 
+(def wake-observe-timeout-ms 2000)
+(def wake-observe-interval-ms 100)
+
 (defrecord Psmux [run identity]
   SessionBackend
   (create! [_ session cwd command] (checked! run (into ["new-session" "-d" "-s" session "--"] command)))
@@ -139,9 +237,13 @@
     (let [before (when (= "-l" (first keys)) (:out (checked! run ["capture-pane" "-p" "-t" pane])))
           result (checked! run (into ["send-keys" "-t" pane] keys))]
       (when (= "-l" (first keys))
-        (let [out (:out (checked! run ["capture-pane" "-p" "-t" pane]))]
-          (when-not (and (not= before out) (str/includes? out (second keys)))
-            (throw (ex-info "psmux wake effect was not observed; mail remains queued" {:status :failure})))))
+        (let [deadline (+ (System/nanoTime) (* wake-observe-timeout-ms 1000000))]
+          (loop []
+            (let [out (:out (checked! run ["capture-pane" "-p" "-t" pane]))]
+              (when-not (and (not= before out) (str/includes? out (second keys)))
+                (if (< (System/nanoTime) deadline)
+                  (do (Thread/sleep wake-observe-interval-ms) (recur))
+                  (throw (ex-info "psmux wake effect was not observed; mail remains queued" {:status :failure}))))))))
       (windows-identity! run (:session identity) pane identity)
       result))
   (recovery! [_ session pane cwd command enabled?]
