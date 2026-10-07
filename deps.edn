@@ -17,7 +17,8 @@
                     "-c" "--tag" "~no-mutate" "spec"
                     "--" "-p" "src" "-s" "spec" "--lcov"]}
   :crap {:extra-deps {io.github.unclebob/crap4clj
-                      {:local/root "../clojure/crap4clj"}}
+                      {:git/url "https://github.com/unclebob/crap4clj.git"
+                       :git/sha "e90be2e7aa02c2ec5d6544e9cecddc6b73ad3e4d"}}
          :main-opts ["-m" "crap4clj.core"]}
   :mutate {:extra-paths ["spec"]
            :extra-deps {io.github.unclebob/clj-mutate

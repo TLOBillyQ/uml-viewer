@@ -89,6 +89,20 @@ Local regression evidence is under `/Users/billyq/.claude/jobs/c31d870c/tmp/revi
 
 本机证据目录：`C:\Users\billyq\AppData\Local\Temp\uml-win-full-20261006-222855\evidence`。包含 B observe、mail-sent/mail-observed/mail-pane、before-recovery、quit-sent，以及 `mutation-experimental-copy.patch`；fixture 的 policy、metrics、mailbox、session EDN 和 viewer log 保留在相邻 A/B 项目。实验 mutation 快照不应被当作原版工具的验收证据。
 
+## 原生 Windows 质量检查修正 — 2026-10-07
+
+针对上一节记录的质量检查失败（issue #10），在独立 worktree（分支 `issue-10-quality`，基线 `spec-6-windows-acceptance` c317a9d）修正，合并 issue #7/#8（a19e1ab）后在合并树上真实重跑，环境同上节的便携 Temurin JDK 21.0.12.1+1 与 Clojure CLI 1.12.6.1673。
+
+- `:crap` alias 由不存在的本地路径 `../clojure/crap4clj` 改为按 git SHA 固定 `io.github.unclebob/crap4clj`（e90be2e），与 `:mutate` 的固定方式一致。crap4clj 经 `sh -c "clj -M:cov --lcov"`、clj-mutate 经直接进程启动调用 `clj`，而官方 Windows Clojure CLI 只有 PowerShell 模块；按要求声明 prerequisite：在 `C:\Users\billyq\.local\bin` 放置转发到 ClojureTools 模块的 `clj`（sh 脚本）与 `clj.exe`（.NET Framework csc 编译的转发器，源码随证据保存），README 已记录该前置条件。
+- spec 修正：macOS/Linux fixture 规格的 `with-redefs` 补 `sketch/windows? (fn [] false)`（与 windows_companion_spec 既有 stub 风格一致）；路径断言改为与 `existing-file` 的正斜杠归一一致；stderr 换行断言改用 `System/lineSeparator`；真实 `/bin/sh` 进程规格在无 Unix shell 时、真实 Node 原生 argv 规格在检测不到 Node 时以 speclj `pending` 声明缺失 prerequisite，不再失败。
+- 全 spec 套件 `clj -M:spec`：501 examples / 0 failures / 2007 assertions / 2 pending（Unix shell、Node），退出 0。
+- 全 coverage `clj -M:cov`（随 CRAP 内部运行）：501 examples / 0 failures，退出 0，LCOV 写入 `target/coverage/lcov.info`，ALL FILES 93.34% 行 / 96.46% 形式。
+- CRAP `clj -M:crap`：退出 0；固定版本重写 `.metrics/crap.edn`（单行格式），973 条目（含 #8 新增 3 条），相对旧快照 8 条数值变化，全部位于本分支与 #7/#8 触及的 sketch/companion。
+- 差分 mutation：`clj -M:mutate src/uml_viewer/adapters/companion.clj` 与 `.../sketch.clj` 的 coverage 生成均成功、baseline 均 PASS（18.5s），随后 worker 目录 `Files/createSymbolicLink` 因 Windows 缺少符号链接特权（Developer Mode 未启用、非管理员）抛 FileSystemException，退出 1，mutants 未执行，既有快照保留。companion 运行另报告 11 个未覆盖行 mutation（其中 M037–M050 位于 #8 新增的 `windows-recovered!`）。这是 #9 的符号链接权限阻塞，不算 mutation 验收通过，也未改动外部依赖；#8 新增的差分 surface 同样未执行 mutants。
+- IR 检查 `clj -M:ir examples/uml-viewer.policy.edn target/ir-check.edn`：退出 0，内容与受保护的 `examples/uml-viewer.edn` 一致（仅行尾符差异），未改动该文件。
+
+证据目录：`C:\Users\billyq\AppData\Local\Temp\uml-win-quality-20261007`，含 spec-suite、coverage、crap、两个 mutate、ir-check 日志及 clj shim 源码（`merged-*` 为合并后结果）。上一节的完整 A/B、GUI、Windows Terminal 等 Pending 项不受影响。
+
 ## 原生 Windows recovery 验收 — 2026-10-07（issue #8）
 
 环境同上（Windows 11 build 26300 ARM64、PowerShell 7.6.6、固定 psmux 3.3.8 `66cf613 2026-08-18`）。使用全新 fixture 与独立 psmux session，没有触碰任何真实 Claude 或既有 psmux session；fixture 为可长期运行的假 Claude（`fake-claude.ps1`，逐行消费 stdin 并写 receipt），通过真实 adapter 的受控 encoded runner（`windows-command!` manifest）启动，因此 respawn 恢复的是与生产完全相同的 runner 命令路径。

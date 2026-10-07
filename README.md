@@ -214,9 +214,21 @@ clj -M:crap                          # writes .metrics/crap.edn
 clj -M:mutate src/uml_viewer/engine/layout.clj
 ```
 
-This project's `:crap` alias uses `../clojure/crap4clj`. `:mutate` pins
-[clj-mutate](https://github.com/unclebob/clj-mutate) by git SHA. Commit
-`.metrics/` so a clone has numbers without re-running those tools.
+This project's `:crap` alias pins
+[crap4clj](https://github.com/unclebob/crap4clj) and `:mutate` pins
+[clj-mutate](https://github.com/unclebob/clj-mutate), both by git SHA.
+Both tools spawn `clj` as a child process: crap4clj runs
+`sh -c "clj -M:cov --lcov"` and clj-mutate launches `clj -M:spec` /
+`clj -M:cov` directly. On macOS/Linux the standard Clojure CLI install
+covers both. On native Windows the official Clojure CLI is only a
+PowerShell module, so neither `sh` nor a bare process launch can
+resolve `clj`; put a `clj` shell script (for `sh`) and a `clj.exe`
+(for direct launches) that forward to the module on `PATH` first.
+clj-mutate also creates per-worker directory symbolic links, which on
+Windows requires Developer Mode or an administrator shell. Specs that
+need a real Unix shell or a real Node.js process report pending with
+the missing prerequisite instead of failing. Commit `.metrics/` so a
+clone has numbers without re-running those tools.
 
 Rename or move of a function is a new form: overlay does not match old names.
 
