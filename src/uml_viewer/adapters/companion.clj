@@ -4,19 +4,24 @@
   (:import [java.util.concurrent TimeUnit]))
 
 (defn process!
-  "外部进程边界：保留退出状态、两个输出流与超时。"
+  "外部进程边界：保留退出状态、两个输出流与超时。env-remove 列出
+  不传给子进程的环境变量（工具父环境可能导出 NO_COLOR=1，psmux
+  客户端的 crossterm 渲染会响应它而退化为单色）。"
   ([argv] (process! argv 10000))
-  ([argv timeout-ms]
+  ([argv timeout-ms] (process! argv timeout-ms nil))
+  ([argv timeout-ms env-remove]
    (try
-     (let [p (.start (ProcessBuilder. (into-array String argv)))
-           out (future (slurp (.getInputStream p)))
-           err (future (slurp (.getErrorStream p)))
-           done? (.waitFor p (long timeout-ms) TimeUnit/MILLISECONDS)]
-       (when-not done? (.destroy p))
-       {:exit (when done? (.exitValue p))
-        :out (if done? (str/trim @out) "")
-        :err (if done? (str/trim @err) "process timed out")
-        :timeout? (not done?)})
+     (let [pb (ProcessBuilder. (into-array String argv))]
+       (doseq [v env-remove] (.remove (.environment pb) ^String v))
+       (let [p (.start pb)
+             out (future (slurp (.getInputStream p)))
+             err (future (slurp (.getErrorStream p)))
+             done? (.waitFor p (long timeout-ms) TimeUnit/MILLISECONDS)]
+         (when-not done? (.destroy p))
+         {:exit (when done? (.exitValue p))
+          :out (if done? (str/trim @out) "")
+          :err (if done? (str/trim @err) "process timed out")
+          :timeout? (not done?)}))
      (catch Exception e {:exit nil :out "" :err (.getMessage e) :timeout? false}))))
 
 (defn checked!
@@ -95,6 +100,9 @@
                     "$ext=[IO.Path]::GetExtension($exe).ToLowerInvariant();"
                     "if($ext -notin @('.exe','.ps1')){throw 'Unsafe Claude wrapper. Set CLAUDE_BIN to the native claude.exe or a .ps1 adapter invoking node.exe with the official @anthropic-ai/claude-code/cli.js; .cmd/.bat cannot preserve arbitrary argv.'};"
                     "$PSNativeCommandArgumentPassing='Standard';"
+                    ;; The viewer JVM may be launched from a tool shell that exports
+                    ;; NO_COLOR=1; without clearing it the companion Claude renders monochrome.
+                    "Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue;"
                     "$argv=@($m.launch.argv.arg|ForEach-Object{D $_});& $exe @argv;exit $LASTEXITCODE")]
     (io/make-parents file)
     (spit file manifest)

@@ -658,6 +658,7 @@
     (with-redefs [sketch/claude-executable (fn [] "claude")
                   companion/process! (fn [argv] (throw (ex-info "Unexpected external process in unit spec" {:argv argv})))
                   sketch/run-command (fn [argv] (throw (ex-info "Unexpected terminal command in unit spec" {:argv argv})))
+                  sketch/run-attach-command (fn [argv] (throw (ex-info "Unexpected terminal command in unit spec" {:argv argv})))
                   sketch/run-osascript (fn [_] (throw (ex-info "Unexpected AppleScript in unit spec" {})))]
       (run-spec)))
 
@@ -666,7 +667,7 @@
                   companion/process! (fn [_] {:exit 0 :out "psmux.exe"})]
       (should-throw clojure.lang.ExceptionInfo "Unexpected terminal command in unit spec"
                     (sketch/open-window! "unit-spec-no-session"))
-      (with-redefs [sketch/run-command (fn [_] {:exit 0})]
+      (with-redefs [sketch/run-attach-command (fn [_] {:exit 0})]
         (should= :windows-terminal (:terminal (sketch/open-window! "unit-spec-no-session"))))))
 
   (it "stops before opening the viewer on restart probe timeout or bind failure"

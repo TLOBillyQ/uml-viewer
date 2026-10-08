@@ -11,6 +11,7 @@
     (reset! sketch/!terminal-window-id nil))
   (around [run-spec]
     (with-redefs [sketch/run-command (fn [argv] (throw (ex-info "Unexpected terminal command in unit spec" {:argv argv})))
+                  sketch/run-attach-command (fn [argv] (throw (ex-info "Unexpected attach command in unit spec" {:argv argv})))
                   sketch/run-osascript (fn [_] (throw (ex-info "Unexpected AppleScript in unit spec" {})))]
       (run-spec)))
   (it "rejects a tmux-compatible version line without fixed psmux provenance"
@@ -149,6 +150,17 @@
             result (companion/process! (assoc command 0 "pwsh"))]
         (should= 17 (:exit result))
         (should= "[\"quoted \\\"value\\\"\",\"first\\nsecond\",\"\",\"literal;$(throw 1)&%PATH%!\",\"末尾\\\\\"]" (slurp output)))))
+  (it "clears an inherited NO_COLOR before the real Claude adapter runs"
+    (let [root (str (or (System/getenv "UML_ENTRY_TEST_TMP") (System/getProperty "java.io.tmpdir")) "/nocolor-" (System/nanoTime))
+          fixture (clojure.java.io/file root "Claude adapter.ps1")
+          output (clojure.java.io/file root "observed.txt")]
+      (clojure.java.io/make-parents fixture)
+      (spit fixture "[IO.File]::WriteAllText((Join-Path (Get-Location) 'observed.txt'), ('NO_COLOR=[' + [string]$env:NO_COLOR + ']'))")
+      (let [command (companion/windows-command! root [(.getAbsolutePath fixture)])
+            result (companion/process! ["pwsh" "-NoProfile" "-Command"
+                                        (str "$env:NO_COLOR='1';& pwsh -NoProfile -EncodedCommand '" (last command) "'")])]
+        (should= 0 (:exit result))
+        (should= "NO_COLOR=[]" (slurp output)))))
   (it "delivers quoted multiline and empty argv to a real native process without Legacy parsing"
     (let [root (str (or (System/getenv "UML_ENTRY_TEST_TMP") (System/getProperty "java.io.tmpdir")) "/native-" (System/nanoTime))
           fixture (clojure.java.io/file root "argv.js")
@@ -171,7 +183,7 @@
     (let [calls (atom [])]
       (with-redefs [sketch/windows? (fn [] true)
                     companion/process! (fn [_] {:exit 0 :out "C:\\Tools With Spaces\\psmux.exe"})
-                    sketch/run-command (fn [args] (swap! calls conj args) {:exit 0})]
+                    sketch/run-attach-command (fn [args] (swap! calls conj args) {:exit 0})]
         (should= :windows-terminal (:terminal (sketch/open-window! "mine")))
         (should= [["wt.exe" "-w" "new" "new-tab" "--title" "mine"
                    "C:\\Tools With Spaces\\psmux.exe" "attach-session" "-t" "=mine"]]
@@ -179,7 +191,7 @@
   (it "preserves an owned Windows companion with a copyable PowerShell attach when Windows Terminal is unavailable"
     (with-redefs [sketch/windows? (fn [] true)
                   companion/process! (fn [_] {:exit 0 :out "C:\\Tools' With Spaces\\psmux.exe"})
-                  sketch/run-command (fn [_] {:exit nil :err "wt missing"})]
+                  sketch/run-attach-command (fn [_] {:exit nil :err "wt missing"})]
       (let [out (sketch/open-window! "mine'1")]
         (should= :none (:terminal out))
         (should= "& 'C:\\Tools'' With Spaces\\psmux.exe' attach-session -t '=mine''1'" (:attach out)))))
@@ -373,3 +385,15 @@
                                                     :timeout-ms 50 :interval-ms 1})
                      nil (catch clojure.lang.ExceptionInfo e e))]
           (should= :recovered-identity-mismatch (:reason (ex-data e))))))))
+
+(describe "run-attach-command at the external process boundary"
+  (it "strips an inherited NO_COLOR so the psmux client does not render monochrome"
+    (let [removed (atom nil)]
+      (with-redefs [companion/process! (fn [_ _ env-remove] (reset! removed env-remove) {:exit 0 :out ""})]
+        (sketch/run-attach-command ["wt.exe" "anything"])
+        (should= ["NO_COLOR"] @removed))))
+  (it "removes the listed variables from the real child process environment"
+    (let [result (companion/process! ["pwsh" "-NoProfile" "-Command" "[Console]::Write('U=' + [string]$env:USERNAME)"]
+                                     10000 ["USERNAME"])]
+      (should= 0 (:exit result))
+      (should= "U=" (:out result)))))

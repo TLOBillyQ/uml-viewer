@@ -322,6 +322,12 @@
 (defn run-command [argv]
   (companion/process! argv))
 
+(defn run-attach-command
+  "Attach 客户端边界：psmux 客户端经 crossterm 响应 NO_COLOR 退化为单色，
+  从工具父环境启动 wt/psmux 时必须剥掉它。"
+  [argv]
+  (companion/process! argv 10000 ["NO_COLOR"]))
+
 (defn osascript
   "AppleScript that opens a Terminal window on `shell-cmd`, painted like the diagram.
   Raises only that window, not every Terminal window. Returns the new window id."
@@ -430,8 +436,8 @@
                                               ["pwsh.exe" "-NoProfile" "-EncodedCommand" (companion/encoded script)]))
           quote-ps #(str "'" (str/replace % "'" "''") "'")
           attach (str "& " (quote-ps executable) " attach-session -t " (quote-ps (str "=" session)))
-          result (run-command ["wt.exe" "-w" "new" "new-tab" "--title" session
-                               executable "attach-session" "-t" (str "=" session)])]
+          result (run-attach-command ["wt.exe" "-w" "new" "new-tab" "--title" session
+                                      executable "attach-session" "-t" (str "=" session)])]
       (when-not (command-ok? result)
         (binding [*out* *err*] (println "UML viewer: attach to the companion with:" attach)))
       {:terminal (if (= 0 (:exit result)) :windows-terminal :none)
