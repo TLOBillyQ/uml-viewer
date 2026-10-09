@@ -1,6 +1,7 @@
 (ns uml-viewer.lua-language.graph-lua
   "Lua LanguageGraph: one class per module, require edges, metatable
-  inheritance, function ops."
+  inheritance, function ops. Scan option `:exclude` skips directories
+  by name (e.g. vendor \"packages\"), anywhere in the tree."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [uml-viewer.graph :as graph]))
@@ -9,18 +10,20 @@
   #{"lua_modules" "spec" "tests" "test"
     "dist" "build" "target" "out" "coverage"})
 
-(defn- skip-dir? [name]
+(defn- skip-dir? [name exclude]
   (or (str/starts-with? name ".")
-      (contains? skip-dir-names name)))
+      (contains? skip-dir-names name)
+      (contains? exclude name)))
 
 (defn- excluded-name? [name]
   (str/ends-with? name "_spec.lua"))
 
-(defn- source-files [root]
+(defn- source-files [root exclude]
   (let [root (.getCanonicalFile (io/file root))]
     (->> (tree-seq (fn [f]
                      (and (.isDirectory f)
-                          (or (= f root) (not (skip-dir? (.getName f))))))
+                          (or (= f root)
+                              (not (skip-dir? (.getName f) exclude)))))
                    (fn [dir] (vec (.listFiles dir)))
                    root)
          (filter #(.isFile %))
@@ -324,7 +327,7 @@
     (let [prefix (or (:prefix opts) "app")
           ns-prefix (or (:ns-prefix opts) prefix)
           rootf (.getCanonicalFile (io/file root))
-          files (source-files rootf)
+          files (source-files rootf (set (:exclude opts)))
           metas (mapv #(file-meta % rootf prefix ns-prefix) files)
           by-rel (into {} (keep (fn [m]
                                   (when-not (str/blank? (:relative m))

@@ -187,4 +187,26 @@
       (should= ["M.classify" "M.total"] (map :name (:ops (by-id :calc))))
       (should= ["M.clamp" "M.untested"] (map :name (:ops (by-id :util))))
       (should= #{{:from :calc :to :util :kind :dependency}}
-               (set (:edges g))))))
+               (set (:edges g)))))
+
+  (it "excludes directories named in :exclude and keeps their requires foreign"
+    (let [dir (temp-root)]
+      (spit-file dir "server/api.lua"
+                 (str "local vend = require(\"server.packages.vend\")\n"
+                      "local M = {}\n"
+                      "function M.go() return vend.x end\n"
+                      "return M\n"))
+      (spit-file dir "server/packages/vend.lua" "return {}\n")
+      (spit-file dir "server/_trigger/function_0.lua" "return {}\n")
+      (spit-file dir "server/deep/packages/nested.lua" "return {}\n")
+      (let [g (graph/scan (graph/lookup :lua) (io/file dir "server")
+                          {:prefix "" :ns-prefix "server"
+                           :exclude ["packages" "_trigger"]})
+            by-id (into {} (map (juxt :id identity) (:classes g)))]
+        (should= #{:server.api :server.packages.vend}
+                 (set (map :id (:classes g))))
+        (should-not (:foreign (by-id :server.api)))
+        (should (:foreign (by-id :server.packages.vend)))
+        (should= #{{:from :server.api :to :server.packages.vend
+                    :kind :dependency}}
+                 (set (:edges g)))))))
