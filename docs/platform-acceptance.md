@@ -2,6 +2,64 @@
 
 All-platform support is **pending**. Automated backend simulations do not replace native process, terminal, and GUI acceptance. Native Windows issues #11/#12 have automatic process/mail/recovery/attach evidence and the user's final manual acceptance of the remaining GUI/restart behavior. The record below distinguishes captured evidence from manual confirmation; Linux/WSL and remaining macOS criteria are still pending.
 
+## mutator Lua 接入复验 — 2026-10-10
+
+接入版本为 `TLOBillyQ/mutator` 的 `lua` 分支
+`b36c6f832b8d1b2db86fa06ebc91c64e70f38e2a`。安装器已跟踪该分支，
+无需修改 Clojure `:mutate` 依赖。复验使用本仓库 `lua-fixture/` 的独立副本，
+未改动已提交快照或已有 viewer。
+
+- 新版扫描退出 0，识别 `calc` / `calc.util` 共 15 个 sites，公有及私有 form id 正确。
+- 当前会话没有继承用户已设置的 LuaRocks PATH、`LUA_PATH`、`LUA_CPATH`。
+  临时恢复这些变量后，已安装的 Busted、LuaCov、LCOV reporter 均可加载；
+  真实解释器为 Lua 5.4.6。没有修改永久环境变量。
+- 未修改的 `scripts/uml-command.ps1` 经 scratch `.uml-viewer/mutator/.venv`
+  调用真实 mutator。覆盖率运行得到 2 successes / 0 failures，并生成 LCOV。
+- 使用显式 `--test-command` 调用真实 Lua/Busted 后，差分仅执行 6 个 covered
+  survivors，保留 7 个 killed，另有 2 个 uncovered；最终为
+  7 killed / 6 survived / 2 uncovered / 15 sites，退出 3。没有强制全量重跑。
+- viewer 的 `load-mutate` 与 Lua scanner / `apply-metrics` 实际读取并关联新快照，
+  上述四个汇总断言通过。全量规格为 508 examples / 0 failures /
+  2028 assertions / 1 pending（Unix shell）。原生入口检查为 4 passed /
+  4 pending（当前未安装 ClojureTools 模块）。
+
+初次复验时，默认 mutation 命令存在原生 Windows 限制：mutator 用 argv
+调用裸 `busted`，本机 LuaRocks 仅提供 `busted.bat`，默认 baseline 报
+WinError 2、退出 2。初次通过的测试使用项目内 bootstrap：
+
+```lua
+pcall(require, 'luarocks.loader')
+require('busted.runner')({standalone = false})
+os.exit(0)
+```
+
+将其保存为 `native-busted.lua` 后，显式传入
+`--test-command '"C:/path/to/lua.exe" native-busted.lua --ignore-lua'`。
+覆盖率仍由 crapper 正常生成，没有使用 `--no-coverage`。
+
+随后在同一 `b36c6f8` 基线的本地 mutator 工作区修复默认 Lua plan：
+直接使用选定的真实 Lua 解释器加载 `busted.runner`，传入 `--ignore-lua`，
+沿用匹配版本 crapper 的 LuaRocks 模块路径设置，避免 BAT 启动及 shell re-exec。
+真实回归执行生成的默认命令，含空格解释器路径和自定义 `.busted` 测试目录均通过；
+测试成功退出 0、测试失败退出 1。mutator 全量测试为 83 passed / 1 skipped
+（Windows 跳过 POSIX `bin/python` virtualenv 布局检查）。
+
+修复后的未修改 viewer 入口再次执行默认差分，未传 `--test-command` 或
+`--no-coverage`，覆盖率生成成功，最终仍为
+7 killed / 6 survived / 2 uncovered / 15 sites、退出 3。
+viewer 实际读取并关联新快照，上述四个汇总断言再次通过。
+默认入口修复已在本地提交为 mutator `85ae015`，尚未推送；远端 `lua`
+分支仍需显式 override。
+该 Lua 流程的验证不等于全平台验收；CLI 仍会输出原生 Windows 支持警告。
+另行验证真实失败 baseline 时，默认入口正确退出 2，但整次运行的快照字节保持
+断言失败，输出还包含其他扫描文件的 snapshot writes。未保存字段差异，
+不能据此认定失败文件自身被重写；该现象仍需独立排查。本次没有修改 engine。
+失败测试只发生在独立验证副本中；恢复测试后默认差分再次得到 7/6/2/15。
+
+本机证据保留在 `target/lua-validation-b36c6f8/fixture/`：
+`.metrics/mutate/{calc,calc.util}.edn`、`target/coverage/lua/lcov.info`
+及 `native-busted.lua`。这些是 gitignored 运行产物。
+
 ## Recorded results
 
 macOS host: Darwin 27.0.0; PowerShell 7.6.6; tmux 3.7c; Temurin Java 21.0.12.1; Claude Code 2.1.291. Installed checkout `f90023c`; restart checkout `ca7fa57`. Two independent fixture directories contained spaces and two nested Clojure namespaces, with a pre-existing named `Saved` proposal.

@@ -135,11 +135,13 @@ A project without `deps.edn` also gets
 [mutator](https://github.com/TLOBillyQ/mutator) cloned side by side into
 `.uml-viewer/` (branch `lua`; override with `CRAPPER_REPO_URL`,
 `CRAPPER_REF`, `MUTATOR_REPO_URL`, `MUTATOR_REF`). They need Python 3.11+.
-A failed clone warns and installation continues. On Unix the existing tool
-wrapper creates its own virtualenv on first use; the UML installer does not
-install Python or the tools' dependencies. Native Windows uses each tool's
-preinstalled `.venv/Scripts/python.exe -m crapper` (or `-m mutator`), since the
-upstream shell wrappers cannot run natively. Prepare these environments yourself:
+Re-run `get-uml-viewer --install-only` to fetch updates to these tool checkouts;
+existing editable installations use the updated source. A failed clone warns
+and installation continues. On Unix the existing tool wrapper creates its own
+virtualenv on first use; the UML installer does not install Python or the tools'
+dependencies. Native Windows entries use each tool's preinstalled
+`.venv/Scripts/python.exe -m crapper` (or `-m mutator`), since the upstream shell
+wrappers cannot run natively. Prepare these environments yourself:
 
 ```powershell
 py -3 -m venv .uml-viewer/crapper/.venv
@@ -148,11 +150,33 @@ py -3 -m venv .uml-viewer/mutator/.venv
 & .uml-viewer/mutator/.venv/Scripts/python.exe -m pip install -e .uml-viewer/mutator
 ```
 
-A missing native entry reports these steps. Analysis always runs from the
-examined project, forwards individual arguments, and preserves the tool's exit
-status. `mutate` stays differential; only explicitly passing `--mutate-all`
-requests all sites. To run the isolated entry acceptance suite (Python 3 +
-PowerShell 7 + Git + Clojure CLI): `python3 -I scripts/test_entries.py`.
+A missing native entry reports these steps. The mutator `lua` branch includes
+argument-vector test commands and Windows process-tree timeout cleanup. WSL2
+with Ubuntu remains its recommended Windows setup. Keep a WSL project in the
+Linux home directory, rather than `/mnt/c`, and install Lua/coverage
+prerequisites with mutator's `scripts/setup-ubuntu.sh`. Native Lua validation
+is recorded in
+[platform acceptance](docs/platform-acceptance.md#mutator-lua-接入复验--2026-10-10).
+The local default-runner fix loads `busted.runner` directly in the selected Lua
+interpreter; it does not require a native Busted executable or a custom
+`--test-command`. Use it with the matching crapper `lua` checkout for LuaRocks
+module-path setup. It needs a real `lua5.4` or `lua` executable; interpreter
+`.cmd` / `.bat` shims are resolved by crapper when possible. LuaRocks
+installations also need their `bin` directory on PATH and their Lua module
+directories in `LUA_PATH` / `LUA_CPATH`; a terminal
+opened before these variables were set may need to be reopened. See
+[mutator's setup and limitations](https://github.com/TLOBillyQ/mutator/tree/lua#windows).
+
+Analysis always runs from the examined project, forwards individual arguments,
+and preserves the tool's exit status. `mutate` stays differential; only
+explicitly passing `--mutate-all` requests all sites. Passing `--max-workers 3`
+to `./uml mutate src/calc/init.lua` caps parallel workers without changing
+differential selection. Mutator writes the same
+`.metrics/mutate/<namespace>.edn` snapshots used by the overlay, including
+private Lua functions as `defn-/…`.
+
+To run the isolated entry acceptance suite (Python 3 + PowerShell 7 + Git +
+Clojure CLI): `python3 -I scripts/test_entries.py`.
 Set `UML_ENTRY_TEST_TMP` to choose a scratch root. This suite never launches the
 viewer; Windows process-boundary simulations do not constitute native Windows
 acceptance.
