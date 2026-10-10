@@ -4,15 +4,15 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
 }
 $ErrorActionPreference = 'Stop'
 function Fetch-Repo($Directory, $Url, $Ref) {
-    if (Test-Path "$Directory/.git") {
-        & git -C $Directory fetch --depth 1 origin $Ref
-        if ($LASTEXITCODE -ne 0) { throw "git fetch failed: $Directory" }
-        & git -C $Directory checkout -q FETCH_HEAD
-    } else {
+    if (-not (Test-Path "$Directory/.git")) {
         if (Test-Path $Directory) { throw "Refusing to replace non-git directory: $Directory" }
-        & git clone --depth 1 --branch $Ref $Url $Directory
+        & git init -q $Directory
+        if ($LASTEXITCODE -ne 0) { throw "git init failed: $Directory" }
     }
-    if ($LASTEXITCODE -ne 0) { throw "git failed: $Directory" }
+    & git -C $Directory fetch --depth 1 $Url $Ref
+    if ($LASTEXITCODE -ne 0) { throw "git fetch failed: $Directory" }
+    & git -C $Directory checkout -q FETCH_HEAD
+    if ($LASTEXITCODE -ne 0) { throw "git checkout failed: $Directory" }
 }
 function Setting($Name, $Default) {
     $value = [Environment]::GetEnvironmentVariable($Name)

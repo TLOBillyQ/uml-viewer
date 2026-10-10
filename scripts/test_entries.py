@@ -46,6 +46,22 @@ class Entries(unittest.TestCase):
             self.assertFalse((self.project / 'uml-viewer-log.txt').exists())
         self.assertEqual(1, (self.project / '.gitignore').read_text().count('# BEGIN UML-VIEWER'))
 
+    def test_install_accepts_fixed_commit_without_full_clone(self):
+        sha = subprocess.run(['git', '-C', str(self.source), 'rev-parse', 'HEAD'],
+                             check=True, capture_output=True, text=True).stdout.strip()
+        entry = self.source / 'scripts/uml.ps1'
+        entry.write_text(entry.read_text() + '\n# later revision\n')
+        subprocess.run(['git', '-C', str(self.source), 'add', 'scripts/uml.ps1'], check=True)
+        subprocess.run(['git', '-C', str(self.source), '-c', 'user.name=Test', '-c', 'user.email=test@example.org',
+                        'commit', '-m', 'later'], check=True, capture_output=True)
+        self.env['UML_VIEWER_REF'] = sha
+        result = self.install()
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertNotIn('later revision', (self.project / 'uml.ps1').read_text())
+        commits = subprocess.run(['git', '-C', str(self.project / '.uml-viewer/uml-viewer'), 'rev-list', '--all', '--count'],
+                                 check=True, capture_output=True, text=True).stdout.strip()
+        self.assertEqual('1', commits)
+
     def test_ir_uses_real_generator_from_another_working_directory(self):
         self.assertEqual(0, self.install().returncode)
         result = self.run_entry([str(self.project / 'uml'), 'ir', 'diagram with spaces.edn'], cwd=self.root)
