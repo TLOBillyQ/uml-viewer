@@ -180,7 +180,7 @@ the IR. Type there; Esc is the real TUI interrupt. Closing the diagram kills
 stay
 up. If that Claude process dies, tmux respawns it in the same pane. That
 instance also runs `./uml crap`, `./uml mutate`, and `./uml ir` after later
-changes. Project-wide rules live in `CLAUDE.md`.
+changes. Project-wide rules live in `AGENTS.md`.
 
 Prefer `./uml` in the examined project (from `get-uml-viewer`). Aliases
 `:uml-viewer` / `:uml-viewer-restart` still work if present.
