@@ -39,8 +39,9 @@ class Entries(unittest.TestCase):
         for _ in range(2):
             result = self.install()
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-            for name in ['uml', 'uml.ps1', 'uml.cmd']:
+            for name in ['uml', 'uml.ps1']:
                 self.assertTrue((self.project / name).is_file(), name)
+            self.assertFalse((self.project / 'uml.cmd').exists())
             self.assertEqual(policy, (self.project / 'policy.edn').read_bytes())
             self.assertFalse((self.project / 'uml-viewer-log.txt').exists())
         self.assertEqual(1, (self.project / '.gitignore').read_text().count('# BEGIN UML-VIEWER'))

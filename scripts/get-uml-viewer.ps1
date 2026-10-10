@@ -41,14 +41,22 @@ try {
     $ignore = if (Test-Path '.gitignore') { [string](Get-Content '.gitignore' -Raw) } else { '' }
     $ignore = [regex]::Replace($ignore, '(?ms)^# BEGIN UML-VIEWER\r?\n.*?^# END UML-VIEWER\r?\n?', '')
     [IO.File]::WriteAllText((Join-Path $root '.gitignore'), $ignore.TrimEnd() + "`n# BEGIN UML-VIEWER`n.uml-viewer/`numl-viewer-log.txt`n# END UML-VIEWER`n")
-    foreach ($name in @('uml', 'uml.ps1', 'uml.cmd')) {
+    foreach ($name in @('uml', 'uml.ps1')) {
         Copy-Item ".uml-viewer/uml-viewer/scripts/$name" (Join-Path $root $name) -Force
+    }
+    # Earlier installers also wrote a uml.cmd shim. Windows now runs uml.ps1
+    # through pwsh directly; remove a stale shim only when its content is the
+    # one this installer generated, so a user's own uml.cmd is never touched.
+    $stale = Join-Path $root 'uml.cmd'
+    if ((Test-Path -LiteralPath $stale) -and
+        ((Get-Content -LiteralPath $stale -Raw) -match '-NoProfile -File "%~dp0uml\.ps1"')) {
+        Remove-Item -LiteralPath $stale -Force
     }
     if (-not $IsWindows) {
         & chmod +x (Join-Path $root 'uml')
         if ($LASTEXITCODE -ne 0) { throw 'Could not make ./uml executable' }
     }
-    Write-Output 'Installed uml, uml.ps1 and uml.cmd. Run ./uml (Windows: .\uml.cmd) to start.'
+    Write-Output 'Installed uml and uml.ps1. Run ./uml (Windows: pwsh -File .\uml.ps1) to start.'
     if ($args.Count -eq 0) { & (Join-Path $root 'uml.ps1'); exit $LASTEXITCODE }
     exit 0
 } catch { [Console]::Error.WriteLine("get-uml-viewer: $_"); exit 1 }

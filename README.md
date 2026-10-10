@@ -84,18 +84,20 @@ https://git-scm.com/downloads and https://clojure.org/guides/install_clojure.
 The installer preserves existing policies and proposals and does not create a
 policy or generate a diagram during `--install-only`.
 
-For native Windows, download `scripts/get-uml-viewer.ps1` and optionally its
-`get-uml-viewer.cmd` sibling from the same ref, then run from the project:
+For native Windows, download `scripts/get-uml-viewer.ps1` from the same ref,
+then run from the project:
 
 ```powershell
 pwsh -NoProfile -File .\get-uml-viewer.ps1 --install-only
-.\uml.cmd ir
-.\uml.cmd crap
-.\uml.cmd mutate 'src/file with spaces.lua'
+.\uml.ps1 ir
+.\uml.ps1 crap
+.\uml.ps1 mutate 'src/file with spaces.lua'
 ```
 
-The installer writes `uml`, `uml.ps1` and `uml.cmd`; they all forward to the
-installed PowerShell runtime. `pwsh -File .\uml.ps1 ...` also works.
+The installer writes `uml` and `uml.ps1`; both forward to the installed
+PowerShell runtime, and Windows uses `.\uml.ps1` (or `pwsh -File .\uml.ps1 ...`)
+directly. No `.cmd` shim is installed: a batch wrapper hands arguments to
+`cmd.exe`, which re-quotes them and cannot carry literal shell characters.
 Viewer startup also uses PowerShell 7: a detached launcher starts the Clojure
 process with individual arguments and writes its output to the project log.
 Companion backends are tmux on macOS/Linux/WSL and psmux **v3.3.8** on native

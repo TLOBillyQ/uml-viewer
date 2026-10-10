@@ -1,10 +1,14 @@
-# Native Windows regression: real uml.cmd -> PS7 -> official ClojureTools -> JVM.
-# Requires PowerShell 7, Java and the ClojureTools module; no Python or Node.
+# Native Windows regression: real pwsh -File uml.ps1 -> Clojure CLI -> JVM.
+# Requires PowerShell 7 and Java; missing CLI/module prerequisites report pending.
 $ErrorActionPreference = 'Stop'
 if (-not $IsWindows -or $PSVersionTable.PSVersion.Major -lt 7) {
     throw 'Run this test with PowerShell 7 on native Windows.'
 }
-Import-Module ClojureTools -ErrorAction Stop
+$nativeCli = Get-Command clojure.exe -CommandType Application -ErrorAction SilentlyContinue
+$clojureTools = $null
+$moduleReason = $null
+try { $clojureTools = Import-Module ClojureTools -PassThru -ErrorAction Stop }
+catch { $moduleReason = $_.Exception.Message }
 function Native-Path([string]$Path) {
     return [IO.Path]::GetFullPath(([uri]$Path).LocalPath)
 }
@@ -13,20 +17,27 @@ $temp = Native-Path (Join-Path $env:LOCALAPPDATA ('Temp/uml native entries ' + [
 $project = Native-Path (Join-Path $temp 'project with spaces')
 $installed = Join-Path $project '.uml-viewer/uml-viewer/scripts'
 $originalPath = $env:PATH
-$originalModulePath = $env:PSModulePath
+$passed = 0
+$pending = 0
 function Assert-Equal($Expected, $Actual, [string]$Message) {
     if ($Expected -cne $Actual) { throw "$Message`nExpected: $Expected`nActual: $Actual" }
 }
-function Run-Entry([string]$Alias) {
-    $command = '""' + (Join-Path $project 'uml.cmd') + '" ' + $Alias + ' "src/file with spaces.clj" "literal;$value""'
-    $process = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/d', '/s', '/c', $command) -WorkingDirectory $temp `
+function Run-Entry([string]$Alias, [switch]$WithoutModules, [switch]$WithModule) {
+    # Start-Process re-parses ArgumentList; spaced paths must include quotes.
+    $entry = if ($WithoutModules) { Join-Path $temp 'without modules.ps1' }
+             elseif ($WithModule) { Join-Path $temp 'with module.ps1' }
+             else { Join-Path $project 'uml.ps1' }
+    $process = Start-Process -FilePath 'pwsh.exe' `
+        -ArgumentList @('-NoLogo', '-NoProfile', '-File', ('"' + $entry + '"'),
+                        $Alias, '"src/file with spaces.clj"', '"literal;$value"') `
+        -WorkingDirectory $temp `
         -RedirectStandardOutput (Join-Path $temp 'stdout.txt') -RedirectStandardError (Join-Path $temp 'stderr.txt') -Wait -PassThru -NoNewWindow
     $result = @{ Code = $process.ExitCode; Out = Get-Content (Join-Path $temp 'stdout.txt') -Raw; Err = Get-Content (Join-Path $temp 'stderr.txt') -Raw }
     $process.Dispose()
     return $result
 }
 function Assert-Result($Result, [string[]]$Argv) {
-    Assert-Equal 23 $Result.Code ("uml.cmd must retain alias exit status. stdout=$($Result.Out) stderr=$($Result.Err)")
+    Assert-Equal 23 $Result.Code ("uml.ps1 must retain alias exit status. stdout=$($Result.Out) stderr=$($Result.Err)")
     $raw = [IO.File]::ReadAllBytes((Join-Path $temp 'stdout.txt'))
     $ansi = [regex]'\x1b\[[0-9;]*m'
     $lines = @($ansi.Replace([Text.Encoding]::UTF8.GetString($raw), '') -split '\r?\n' | Where-Object {
@@ -44,7 +55,7 @@ function Assert-Result($Result, [string[]]$Argv) {
 }
 try {
     $null = New-Item -ItemType Directory -Path $installed -Force
-    Copy-Item (Join-Path $repoScripts 'uml.cmd'), (Join-Path $repoScripts 'uml.ps1') $project
+    Copy-Item (Join-Path $repoScripts 'uml.ps1') $project
     Copy-Item (Join-Path $repoScripts 'uml-command.ps1') $installed
     @'
 {:paths ["src"]
@@ -64,12 +75,34 @@ try {
   (.flush System/err)
   (System/exit 23))
 '@ | Set-Content (Join-Path $project 'src/entry_fixture.clj') -Encoding utf8
+    # The executable consumes -M:<alias>; main-opts supplies the alias to -main.
+    if ($nativeCli) { $env:PATH = (Split-Path $nativeCli.Source) + ';' + $originalPath }
     foreach ($alias in @('crap', 'mutate')) {
+        if (-not $nativeCli) {
+            Write-Host "PENDING clojure.exe uml.ps1 ${alias}: clojure.exe is not on PATH"
+            $pending++
+            continue
+        }
         Assert-Result (Run-Entry $alias) @($alias, 'src/file with spaces.clj', 'literal;$value')
-        Write-Host "PASS ClojureTools uml.cmd ${alias}: argv, cwd, streams, exit=23"
+        Write-Host "PASS clojure.exe uml.ps1 ${alias}: real JVM argv, cwd, streams, exit=23"
+        $passed++
     }
-    # A PATH shim would shadow module auto-loading in uml.cmd's fresh -NoProfile PS7.
-    # uml-command.ps1 must import ClojureTools anyway and resolve the module alias.
+    # Import inside the child so the module command wins over any installed exe.
+    @'
+Import-Module ClojureTools -ErrorAction Stop
+& (Join-Path $PSScriptRoot 'project with spaces/uml.ps1') @args
+exit $LASTEXITCODE
+'@ | Set-Content (Join-Path $temp 'with module.ps1') -Encoding utf8
+    foreach ($alias in @('crap', 'mutate')) {
+        if (-not $clojureTools) {
+            Write-Host "PENDING ClojureTools uml.ps1 ${alias}: $moduleReason"
+            $pending++
+            continue
+        }
+        Assert-Result (Run-Entry $alias -WithModule) @($alias, 'src/file with spaces.clj', 'literal;$value')
+        Write-Host "PASS ClojureTools uml.ps1 ${alias}: argv, cwd, streams, exit=23"
+        $passed++
+    }
     $tools = Join-Path $temp 'external tools'
     $null = New-Item -ItemType Directory -Path $tools
     @'
@@ -80,21 +113,32 @@ Write-Output 'fixture-stdout'
 [Console]::Error.WriteLine('fixture-stderr')
 exit 23
 '@ | Set-Content (Join-Path $tools 'clojure.ps1') -Encoding utf8
-    $env:PATH = $tools + ';' + $env:PATH
+    # A PATH PS1 makes uml-command.ps1 import the module even when an exe exists.
+    $env:PATH = $tools + ';' + $originalPath
     foreach ($alias in @('crap', 'mutate')) {
+        if (-not $clojureTools) {
+            Write-Host "PENDING PATH-shim uml.ps1 ${alias}: ClojureTools module required to resolve over shim; $moduleReason"
+            $pending++
+            continue
+        }
         Assert-Result (Run-Entry $alias) @($alias, 'src/file with spaces.clj', 'literal;$value')
-        Write-Host "PASS PATH-shim uml.cmd ${alias}: module alias resolved over shim, exit=23"
+        Write-Host "PASS PATH-shim uml.ps1 ${alias}: module alias resolved over shim, exit=23"
+        $passed++
     }
-    # 没有官方模块时，外部 PS1 保留常规的单参数 alias 协议。
-    $emptyModules = Join-Path $temp 'empty modules'
-    $null = New-Item -ItemType Directory -Path $emptyModules
-    $env:PSModulePath = $emptyModules
+    # PS7 restores default module paths at startup; clear them inside the child.
+    $null = New-Item -ItemType Directory -Path (Join-Path $temp 'empty modules')
+    @'
+$env:PSModulePath = Join-Path $PSScriptRoot 'empty modules'
+& (Join-Path $PSScriptRoot 'project with spaces/uml.ps1') @args
+exit $LASTEXITCODE
+'@ | Set-Content (Join-Path $temp 'without modules.ps1') -Encoding utf8
     foreach ($alias in @('crap', 'mutate')) {
-        Assert-Result (Run-Entry $alias) @("-M:$alias", 'src/file with spaces.clj', 'literal;$value')
-        Write-Host "PASS ExternalScript uml.cmd ${alias}: original argv, cwd, streams, exit=23"
+        Assert-Result (Run-Entry $alias -WithoutModules) @("-M:$alias", 'src/file with spaces.clj', 'literal;$value')
+        Write-Host "PASS ExternalScript uml.ps1 ${alias}: original argv, cwd, streams, exit=23"
+        $passed++
     }
+    Write-Host "passed=$passed pending=$pending"
 } finally {
-    $env:PSModulePath = $originalModulePath
     $env:PATH = $originalPath
     Remove-Item -LiteralPath $temp -Recurse -Force
 }
