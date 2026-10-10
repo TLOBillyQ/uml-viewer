@@ -100,8 +100,20 @@ directly. No `.cmd` shim is installed: a batch wrapper hands arguments to
 `cmd.exe`, which re-quotes them and cannot carry literal shell characters.
 Viewer startup also uses PowerShell 7: a detached launcher starts the Clojure
 process with individual arguments and writes its output to the project log.
-Companion backends are tmux on macOS/Linux/WSL and psmux **v3.3.8** on native
-Windows. Windows Terminal is optional; opening a terminal can fail while the
+Fresh startup defaults to tmux on macOS/Linux/WSL and psmux **v3.3.8** on
+native Windows. Select explicitly with `./uml --backend tmux` or
+`.\uml.ps1 --backend psmux`; JVM aliases accept the same `--backend` option.
+`--restart` without a selection follows persisted companion ownership;
+a conflicting explicit selection refuses takeover. Wake and close also follow
+that record. Unknown or duplicate selections fail before creating resources.
+`--backend herdr` checks the preinstalled **0.9.3** CLI and bundled protocol **22**
+without starting a server, terminal, companion or detached Viewer. Install from
+[the official release](https://github.com/herdrdev/herdr/releases/tag/v0.9.3)
+or [herdr.dev](https://herdr.dev) (macOS: Homebrew `herdr`, then verify the version).
+There is no download, upgrade or fallback. The Herdr adapter belongs to #17:
+a valid installation currently reports that it is not integrated and stops.
+Native Windows visible Herdr attachment is still unverified; see
+[the backend contract](docs/herdr-backend-contract.md). Windows Terminal is optional; opening a terminal can fail while the
 owned companion remains available through the reported attach command.
 All-platform support remains **pending**; see [platform acceptance](docs/platform-acceptance.md)
 for recorded macOS results and the remaining native Windows, Linux, WSL and GUI checks. A standalone downloaded

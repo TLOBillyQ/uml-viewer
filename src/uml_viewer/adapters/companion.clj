@@ -1,6 +1,8 @@
 (ns uml-viewer.adapters.companion
   (:require [clojure.string :as str]
-            [clojure.java.io :as io])
+            [clojure.edn :as edn]
+            [clojure.java.io :as io]
+            [uml-viewer.domain.mailbox :as mailbox])
   (:import [java.util.concurrent TimeUnit]))
 
 (defn process!
@@ -351,3 +353,84 @@
     (when-not (re-matches #"tmux 3\.3\.8\r?\npsmux 3\.3\.8(?: \([^\r\n]+\))?" (:out r))
       (throw (ex-info "Native Windows requires the psmux 3.3.8 baseline" r)))
     (->Psmux run identity)))
+
+(defn selection-args
+  "Remove backend options without reinterpreting the remaining argv."
+  [args]
+  (loop [remaining (seq args) forwarded [] selected nil]
+    (if-let [arg (first remaining)]
+      (if (= "--backend" arg)
+        (let [value (second remaining)]
+          (when (or selected (not (#{"herdr" "tmux" "psmux"} value)))
+            (throw (ex-info "Unknown or duplicate companion backend; use --backend herdr|tmux|psmux" {:status :failure})))
+          (recur (nnext remaining) forwarded (keyword value)))
+        (recur (next remaining) (conj forwarded arg) selected))
+      {:args forwarded :backend selected})))
+
+(defn recorded-backend
+  "Read persisted provenance, including pre-marker records. Never infer from OS."
+  [record]
+  (or (:backend record)
+      (cond
+        (and (:session-id record) (:server-pid record) (:owner-start record)) :psmux
+        (and (:cwd record) (:pane record) (not (:server-pid record)) (not (:session-id record))) :tmux)))
+
+(def herdr-guidance
+  "Herdr 0.9.3 (protocol 22) is required. Install the verified version from https://herdr.dev (official releases: https://github.com/herdrdev/herdr/releases/tag/v0.9.3); macOS: Homebrew herdr. No automatic download, upgrade or fallback.")
+
+(defn select-backend!
+  "Read-only selection/preflight, before any viewer, terminal or companion resources."
+  [root requested restart? os run]
+  (let [file (mailbox/companion-file root)
+        record (when (.exists file) (edn/read-string (slurp file)))
+        _ (when (and (.exists file) (not (map? record)))
+            (throw (ex-info "Present companion ownership is corrupt or unreadable; file retained" {:status :failure})))
+        recorded (when (seq record) (recorded-backend record))
+        _ (when (and (seq record) (not (#{:tmux :psmux :herdr} recorded)))
+            (throw (ex-info "Unknown recorded companion backend; ownership retained" {:status :failure})))
+        _ (when (and (seq record)
+                     (or (:provisional record)
+                         (and (= :psmux recorded)
+                              (not (and (:session-id record) (:server-pid record) (:owner-start record))))
+                         (not (and (seq (:session record)) (seq (:pane record)) (:cwd record)))
+                         (not= (.getCanonicalPath (io/file root))
+                               (.getCanonicalPath (io/file (or (:cwd record) root))))
+                         (and (contains? record :owner-role) (not= :companion (:owner-role record)))))
+            (throw (ex-info "Companion ownership is incomplete, provisional or belongs to another project; file retained" {:status :failure})))
+        _ (when (and requested recorded (not= requested recorded))
+            (throw (ex-info "Requested companion backend conflicts with recorded ownership; refusing takeover" {:status :failure :requested requested :recorded recorded})))
+        windows? (str/starts-with? os "Windows")
+        selected (or requested recorded (if windows? :psmux :tmux))]
+    (when (and restart? (not recorded))
+      (throw (ex-info "Companion ownership is missing; cannot restart" {:status :failure})))
+    (when-not (#{:tmux :psmux :herdr} selected)
+      (throw (ex-info "Unknown companion backend; use --backend herdr|tmux|psmux" {:status :failure})))
+    (case selected
+      :herdr
+      (do
+        (when-not (or windows? (str/starts-with? os "Mac"))
+          (throw (ex-info (str "Herdr is verified only on macOS and Windows. " herdr-guidance) {:status :failure})))
+        (let [version (run ["herdr" "--version"])
+              schema (when (and (= 0 (:exit version)) (= "herdr 0.9.3" (:out version)))
+                       (run ["herdr" "api" "schema" "--json"]))]
+          (when-not (and schema (= 0 (:exit schema))
+                         ;; Bundled schema is local: never starts a server. Only
+                         ;; the top-level protocol field certifies this build.
+                         (re-find #"(?s)^\s*\{\s*\"\$schema\"\s*:\s*\"[^\"]*\"\s*,\s*\"protocol\"\s*:\s*22\s*," (:out schema)))
+            (throw (ex-info herdr-guidance {:status :failure :version version :schema schema}))))
+        (throw (ex-info "Herdr 0.9.3 preflight passed; SessionBackend adapter is not integrated yet (issue #17). No resources created. Select --backend tmux or --backend psmux explicitly." {:status :unavailable})))
+      :psmux (psmux #(run (into ["psmux.exe"] %)) nil)
+      :tmux (checked! run ["tmux" "-V"]))
+    (when (and (not restart?) (not= windows? (= selected :psmux)))
+      (throw (ex-info "Selected legacy backend cannot create companions on this platform; use tmux on Unix or psmux on native Windows" {:status :failure})))
+    selected))
+
+(defn -main
+  "Lightweight foreground wrapper preflight: no Quil or GUI namespaces."
+  [root os & args]
+  (try
+    (let [{:keys [backend args]} (selection-args args)]
+      (println (name (select-backend! root backend (boolean (some #{"--restart"} args)) os process!))))
+    (catch Throwable t
+      (binding [*out* *err*] (println "uml:" (.getMessage t)))
+      (System/exit 1))))

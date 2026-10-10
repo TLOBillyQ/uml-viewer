@@ -44,7 +44,7 @@
                                            "capture-pane" sketch/wake-message "")})))
                     q/sketch (fn [& _] (throw (Exception. "Must not open viewer")))]
         (should-not (:woke? (sketch/request-agent! root :regen {})))
-        (should-throw clojure.lang.ExceptionInfo (sketch/start! (.getPath (io/file root "external.edn")) :source true))
+        (should-throw clojure.lang.ExceptionInfo (sketch/start! (.getPath (io/file root "external.edn")) :source true root))
         (should-not (some #{"send-keys" "display-message"} @operations))
         (should= record (mailbox/read-companion root))
         (should= :regen (:op (first (:queue (edn/read-string (slurp (mailbox/to-agent root))))))))))

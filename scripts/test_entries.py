@@ -13,7 +13,7 @@ TMP = Path(os.environ.get('UML_ENTRY_TEST_TMP', str(Path(tempfile.gettempdir()) 
 class Entries(unittest.TestCase):
     def setUp(self):
         TMP.mkdir(parents=True, exist_ok=True)
-        self.root = Path(tempfile.mkdtemp(prefix='project with spaces ', dir=TMP))
+        self.root = Path(tempfile.mkdtemp(prefix='project with spaces ', dir=TMP)).resolve()
         self.project = self.root / 'sample project'
         self.project.mkdir()
         self.source = self.root / 'viewer source'
@@ -61,10 +61,10 @@ class Entries(unittest.TestCase):
         bin_dir = self.root / 'startup tools'
         bin_dir.mkdir()
         cli = bin_dir / 'clojure'
-        cli.write_text('#!/bin/sh\npwd > launched.txt\nprintf "%s\\n" "$@" >> launched.txt\necho fixture-stdout\necho fixture-stderr >&2\n')
+        cli.write_text('#!/bin/sh\ncase "$*" in *uml-viewer.adapters.companion*) printf "%s\\n" "${TEST_BACKEND:-tmux}"; exit 0;; esac\npwd > launched.txt\nprintf "%s\\n" "$@" >> launched.txt\necho fixture-stdout\necho fixture-stderr >&2\n')
         cli.chmod(0o755)
         env = dict(self.env, PATH=str(bin_dir) + os.pathsep + self.env['PATH'])
-        result = self.run_entry([str(self.project / 'uml'), 'diagram with spaces.edn', 'literal;$(touch injected)'], cwd=self.root, env=env)
+        result = self.run_entry([str(self.project / 'uml'), 'diagram with spaces.edn', 'literal;$(touch injected)', '--BACKEND', 'literal.edn'], cwd=self.root, env=env)
         self.assertEqual(0, result.returncode, result.stderr)
         import time
         deadline = time.monotonic() + 10
@@ -72,11 +72,11 @@ class Entries(unittest.TestCase):
         while time.monotonic() < deadline:
             if (self.project / 'launched.txt').exists():
                 argv = (self.project / 'launched.txt').read_text().splitlines()
-                if len(argv) == 8:
+                if len(argv) == 12:
                     break
             time.sleep(0.05)
         self.assertEqual(str(self.project), argv[0])
-        self.assertEqual(['-M', '-m', 'uml-viewer.main.uml-viewer', 'diagram with spaces.edn', 'literal;$(touch injected)'], argv[3:])
+        self.assertEqual(['-M', '-m', 'uml-viewer.main.uml-viewer', '--backend', 'tmux', 'diagram with spaces.edn', 'literal;$(touch injected)', '--BACKEND', 'literal.edn'], argv[3:])
         self.assertFalse((self.project / 'injected').exists())
         deadline = time.monotonic() + 10
         log = ''
@@ -94,7 +94,7 @@ class Entries(unittest.TestCase):
         tools = self.root / 'detach tools'
         tools.mkdir()
         cli = tools / 'clojure'
-        cli.write_text('#!/bin/sh\nsleep 6\n')
+        cli.write_text('#!/bin/sh\ncase "$*" in *uml-viewer.adapters.companion*) printf "%s\\n" "${TEST_BACKEND:-tmux}"; exit 0;; esac\nsleep 6\n')
         cli.chmod(0o755)
         env = dict(self.env, PATH=str(tools) + os.pathsep + self.env['PATH'])
         started = time.monotonic()
@@ -109,7 +109,7 @@ class Entries(unittest.TestCase):
         tools = self.root / 'restart tools'
         tools.mkdir()
         cli = tools / 'clojure'
-        cli.write_text('#!/bin/sh\ntouch restarted.txt\n')
+        cli.write_text('#!/bin/sh\ncase "$*" in *uml-viewer.adapters.companion*) printf "%s\\n" "${TEST_BACKEND:-tmux}"; exit 0;; esac\ntouch restarted.txt\n')
         cli.chmod(0o755)
         env = dict(self.env, PATH=str(tools) + os.pathsep + self.env['PATH'])
         fixture = self.root / 'old viewer.ps1'
@@ -126,7 +126,7 @@ class Entries(unittest.TestCase):
         import threading
         reaper = threading.Thread(target=old.wait)
         reaper.start()
-        result = self.run_entry([str(self.project / 'uml'), '--restart'], env=env)
+        result = self.run_entry([str(self.project / 'uml'), 'custom.edn', '--backend', 'tmux', '--restart'], env=env)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIsNotNone(old.poll(), 'wrapper returned while the old viewer process was alive')
         old.communicate(timeout=10)
@@ -136,7 +136,7 @@ class Entries(unittest.TestCase):
         bin_dir = self.root / 'fake tools'
         bin_dir.mkdir()
         cli = bin_dir / 'clojure'
-        cli.write_text('#!/bin/sh\npwd > received.txt\nprintf "%s\\n" "$@" >> received.txt\nexit 23\n')
+        cli.write_text('#!/bin/sh\ncase "$*" in *uml-viewer.adapters.companion*) printf "%s\\n" "${TEST_BACKEND:-tmux}"; exit 0;; esac\npwd > received.txt\nprintf "%s\\n" "$@" >> received.txt\nexit 23\n')
         cli.chmod(0o755)
         env = dict(self.env, PATH=str(bin_dir) + os.pathsep + self.env['PATH'])
         for command in ['crap', 'mutate']:
@@ -225,14 +225,14 @@ class Entries(unittest.TestCase):
         tools = self.root / 'windows launch tools'
         tools.mkdir()
         cli = tools / 'clojure'
-        cli.write_text('#!/bin/sh\npwd > windows-launched.txt\nprintf "%s\\n" "$@" >> windows-launched.txt\n')
+        cli.write_text('#!/bin/sh\ncase "$*" in *uml-viewer.adapters.companion*) printf "%s\\n" "${TEST_BACKEND:-tmux}"; exit 0;; esac\npwd > windows-launched.txt\nprintf "%s\\n" "$@" >> windows-launched.txt\n')
         cli.chmod(0o755)
         psmux = tools / 'psmux.exe'
         psmux.write_text('#!/bin/sh\nprintf "tmux 3.3.8\\npsmux 3.3.8 (baseline)\\n"\n')
         psmux.chmod(0o755)
         runner = self.root / 'windows startup boundary.ps1'
         runner.write_text('Set-Variable IsWindows -Value $true -Force\n& $env:TEST_ENTRY @args\nexit $LASTEXITCODE\n')
-        env = dict(self.env, TEST_ENTRY=str(self.project / 'uml.ps1'), PATH=str(tools) + os.pathsep + self.env['PATH'])
+        env = dict(self.env, TEST_ENTRY=str(self.project / 'uml.ps1'), TEST_BACKEND='psmux', PATH=str(tools) + os.pathsep + self.env['PATH'])
         result = self.run_entry(['pwsh', '-NoProfile', '-File', str(runner), 'diagram with spaces.edn'], env=env)
         self.assertEqual(0, result.returncode, result.stderr)
         import time
@@ -240,6 +240,7 @@ class Entries(unittest.TestCase):
         while not (self.project / 'windows-launched.txt').exists() and time.monotonic() < deadline:
             time.sleep(0.05)
         self.assertTrue((self.project / 'windows-launched.txt').exists())
+        cli.write_text("#!/bin/sh\necho 'psmux 3.3.8 is required' >&2\nexit 1\n")
         psmux.write_text('#!/bin/sh\nprintf "tmux 3.4\\npsmux 3.4\\n"\n')
         result = self.run_entry(['pwsh', '-NoProfile', '-File', str(runner)], env=env)
         self.assertNotEqual(0, result.returncode)
@@ -258,12 +259,81 @@ class Entries(unittest.TestCase):
                           "[pscustomobject]@{CommandType='Application';Source='C:/tools/clojure.cmd';ModuleName='';Name='clojure.cmd'} "
                           "} else { Microsoft.PowerShell.Core\\Get-Command $Name } }\n"
                           "& $env:TEST_ENTRY @args;exit $LASTEXITCODE\n")
-        env = dict(self.env, TEST_ENTRY=str(self.project / 'uml.ps1'), PATH=str(tools) + os.pathsep + self.env['PATH'])
+        env = dict(self.env, TEST_ENTRY=str(self.project / 'uml.ps1'), TEST_BACKEND='psmux', PATH=str(tools) + os.pathsep + self.env['PATH'])
         result = self.run_entry(['pwsh', '-NoProfile', '-File', str(runner)], env=env)
         self.assertNotEqual(0, result.returncode)
         self.assertIn('ClojureTools', result.stderr)
         self.assertIn('.cmd/.bat', result.stderr)
         self.assertFalse((self.project / '.uml-viewer/viewer-process.json').exists())
+
+    def test_backend_preflight_real_installed_entry_has_no_launch_side_effects(self):
+        import time
+        self.assertEqual(0, self.install().returncode)
+        help_result = self.run_entry([str(self.project / 'uml'), '--help'])
+        self.assertEqual(0, help_result.returncode)
+        self.assertIn('--backend tmux|psmux|herdr', help_result.stdout)
+        tools = self.root / 'backend tools'
+        tools.mkdir()
+        herdr = tools / 'herdr'
+        herdr.write_text('#!/bin/sh\necho herdr 0.9.4\n')
+        herdr.chmod(0o755)
+        env = dict(self.env, PATH=str(tools) + os.pathsep + self.env['PATH'])
+        boundary = self.root / 'windows backend boundary.ps1'
+        boundary.write_text('Set-Variable IsWindows -Value $true -Force\n& $env:TEST_ENTRY @args;exit $LASTEXITCODE\n')
+        env['TEST_ENTRY'] = str(self.project / 'uml.ps1')
+        elapsed = []
+        for entry in [[str(self.project / 'uml')], ['pwsh', '-NoProfile', '-File', str(boundary)]]:
+            for args, diagnostic in [(['--backend', 'invalid'], 'Unknown or duplicate'),
+                                     (['--backend'], 'Unknown or duplicate'),
+                                     (['--backend', 'herdr'], 'Herdr 0.9.3')]:
+                started = time.monotonic()
+                result = self.run_entry(entry + args, env=env)
+                elapsed.append(time.monotonic() - started)
+                self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+                self.assertIn(diagnostic, result.stderr)
+                self.assertEqual('', result.stdout)
+                self.assertFalse((self.project / '.uml-viewer/viewer-process.json').exists())
+                self.assertFalse(list((self.project / '.uml-viewer').glob('launch-*.json')))
+                self.assertFalse((self.project / 'uml-viewer-log.txt').exists())
+        # A missing executable (exit 127 from the process boundary) is diagnostic too.
+        herdr.write_text('#!/bin/sh\necho "herdr: command not found" >&2\nexit 127\n')
+        result = self.run_entry([str(self.project / 'uml'), '--backend', 'herdr'], env=env)
+        self.assertEqual(1, result.returncode)
+        self.assertIn('Herdr 0.9.3', result.stderr)
+        self.assertFalse((self.project / 'uml-viewer-log.txt').exists())
+        # Version-valid local schema passes dependency checks, but #17 remains unavailable.
+        herdr.write_text("#!/bin/sh\ncase \"$1\" in --version) echo herdr 0.9.3;; *) printf '%s\\n' '{\"$schema\":\"fixture\",\"protocol\":22,\"schema_version\":1}';; esac\n")
+        result = self.run_entry([str(self.project / 'uml'), '--backend', 'herdr'], env=env)
+        self.assertEqual(1, result.returncode)
+        self.assertIn('issue #17', result.stderr)
+        # Persisted ownership conflict is rejected before any backend command.
+        record = self.project / '.uml-viewer/companion.edn'
+        record.write_text('{:backend :tmux :session "saved" :pane "%1" :cwd ' +
+                          '"' + str(self.project) + '"}')
+        original = record.read_bytes()
+        result = self.run_entry([str(self.project / 'uml'), '--restart', '--backend', 'herdr'], env=env)
+        self.assertEqual(1, result.returncode)
+        self.assertIn('conflicts with recorded ownership', result.stderr)
+        self.assertEqual(original, record.read_bytes())
+        self.assertFalse((self.project / 'uml-viewer-log.txt').exists())
+        print('real backend preflight seconds: ' + ', '.join(f'{value:.2f}' for value in elapsed))
+
+    def test_empty_or_failed_foreground_verifier_cannot_launch(self):
+        self.assertEqual(0, self.install().returncode)
+        tools = self.root / 'verifier tools'
+        tools.mkdir()
+        cli = tools / 'clojure'
+        cli.chmod(0o755) if cli.exists() else None
+        env = dict(self.env, PATH=str(tools) + os.pathsep + self.env['PATH'])
+        for body, code, diagnostic in [('exit 0', 1, 'invalid output'),
+                                       ('echo verifier-failed >&2; exit 23', 23, 'verifier-failed')]:
+            cli.write_text('#!/bin/sh\n' + body + '\n')
+            cli.chmod(0o755)
+            result = self.run_entry([str(self.project / 'uml')], env=env)
+            self.assertEqual(code, result.returncode)
+            self.assertIn(diagnostic, result.stderr)
+            self.assertFalse(list((self.project / '.uml-viewer').glob('launch-*.json')))
+            self.assertFalse((self.project / 'uml-viewer-log.txt').exists())
 
     def test_windows_metric_process_boundary_uses_preinstalled_python_module(self):
         # Simulate the OS boundary only; invoke the generated PS1 and real fixture process.

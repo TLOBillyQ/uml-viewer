@@ -39,3 +39,14 @@
           (should= ["doc.edn" :src false] @args)
           (should (re-find #"Watching" out))
           (should (re-find #"real diagram above Proposals" out)))))))
+
+(describe "backend selection before viewer creation"
+  (it "preserves positional argv and diagnoses missing duplicate and unknown selection"
+    (should= {:path "with spaces.edn" :restart? true :help? false :backend :tmux}
+             (core/parse-args ["with spaces.edn" "--backend" "tmux" "--restart"]))
+    (doseq [args [["--backend"] ["--backend" "other"] ["--backend" "tmux" "--backend" "tmux"]]]
+      (should-throw clojure.lang.ExceptionInfo (core/parse-args args))))
+  (it "does not start the sketch when preflight fails"
+    (with-redefs [uml-viewer.adapters.companion/select-backend! (fn [& _] (throw (ex-info "preflight" {})))
+                  sketch/start! (fn [& _] (throw (AssertionError. "viewer created")))]
+      (should-throw clojure.lang.ExceptionInfo "preflight" (core/start! :source "--backend" "herdr")))))

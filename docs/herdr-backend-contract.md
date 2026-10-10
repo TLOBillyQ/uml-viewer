@@ -13,15 +13,19 @@ Herdr 0.9.3 / protocol 22）；未验证的行为明确标注为缺口，不得�
 
 **唯一有证据的版本是 Herdr 0.9.3（socket protocol 22）。** 不虚构范围：
 
-- 启动器在创建任何资源之前执行预检，三步全部通过才继续：
-  1. `herdr --version` 输出 `0.9.3`；
-  2. `herdr --session <name> status server` 报告 `endpoint_compatible: yes`
-     且 `private_protocol: 22`（server 未运行时先跳过协议核对，server 启动后复核）；
-  3. 平台为 macOS 或 Windows。
-- 任何一步失败：不创建 session/workspace/pane，报错并给出安装指引
-  （Homebrew `herdr` 或 https://herdr.dev），不自动下载、不升级、
-  不静默回退旧后端；旧后端只能由用户明确选择。
-- 其他版本（包括更高版本）视为未验证，按缺失处理并提示已验证版本号。
+- wrapper 与 JVM 共用只读预检，创建 detached Viewer、终端或 companion 前执行
+  `herdr --version`（必须为 `herdr 0.9.3`）及 `herdr api schema --json`
+  （bundled schema 的顶层 `protocol` 必须为 22），且平台为 macOS 或 Windows。
+  schema 是随 CLI 分发的本地数据；预检禁止为了协议核对创建 server。
+  #17 创建已拥有的 server 后还须核对实际 endpoint 兼容性。
+- 官方来源：[Herdr 0.9.3 release](https://github.com/herdrdev/herdr/releases/tag/v0.9.3)
+  与 https://herdr.dev；macOS 可使用 Homebrew `herdr`，但安装后仍必须核对版本。
+  其他版本（包括更高版本）、缺失依赖或协议不匹配均失败，给出安装指引；
+  不自动下载、升级或静默回退。
+- #16 的 fresh 默认仍是 Unix tmux / native Windows psmux 3.3.8。
+  `--backend herdr|tmux|psmux` 明确选择；restart 未指定时按 ownership，
+  显式选择与记录冲突则拒绝接管。Herdr 通过预检后明确报 adapter 尚未接入
+  （#17），本阶段不创建任何 Herdr 资源。
 
 ## 2. 身份与 ownership 契约
 
@@ -84,7 +88,7 @@ Herdr 的 pane ID 是 **session 局部** 的：两个命名 session 各自都有
 - 退出码不由 Herdr 上报，桥接器负责显式捕获（`echo EXIT=$?` 模式或
   runner 写状态文件）。已验证 exit 37/0 均可捕获。
 - 终端可见 attach：macOS 有原生 TUI（`herdr session attach <name>`；
-  已人工确认 TUI 打开、中文渲染、输入回显、`Ctrl+B q` detach，
+  已人工确认 TUI 打开、中文渲染、`Ctrl+B q` detach；输入回显尚未人工确认，
   且 detach 后 pane 与会话存活；无 TTY 时干净失败 exit 1）。
   Windows 直连终端 attach 不支持，app attachment 有文档但未验证——
   Windows 的可见终端路径是实现期缺口，#16 必须给出明确方案或记录限制。
@@ -93,8 +97,9 @@ Herdr 的 pane ID 是 **session 局部** 的：两个命名 session 各自都有
 
 ## 5. wake 效果确认
 
-沿用 #7 的语义：wake 投递后须用 `pane wait-output`（或 socket
-`pane.wait_for_output`）在有限窗口内观察消费效果，而非信任写入成功。
+wake 投递成功或 `pane wait-output`（socket `pane.wait_for_output`）匹配输出
+不能单独证明 Claude 消费输入：匹配可能来自旧快照或终端回显。#17 须使用
+本次投递的唯一 token 与应用确认/邮件队列推进等消费证据，在有限窗口内核对。
 已验证 `wait-output` 会立即搜索已有快照再轮询，超时 exit 1。唤醒失败
 不丢邮件（队列保留由现有 mailbox 语义保证）。
 
@@ -114,15 +119,17 @@ Herdr 的 pane ID 是 **session 局部** 的：两个命名 session 各自都有
 因此契约如下：
 
 - **runner**：companion 不由 shell 直接跑 Claude，而是跑项目拥有的
-  runner（脚本/manifest 进程），runner exec Claude 并把退出码、退出
+  runner（脚本/manifest 进程），runner supervise Claude 子进程，等待并把退出码、退出
   时间、信号信息写到项目 `.uml-viewer/` 下的状态文件。这是区分
   正常/异常退出的唯一可靠来源。
 - **监督层**：项目实现有限退避重试（次数上限、退避序列、计数重置规则
   在实现时明确记录并确定性测试）。监督通过轮询 `pane process-info`
   的 foreground + 读 runner 状态文件判断退出；`pane.exited` 仅用于
-  pane 整体死亡（此时 runner 也死了，视为恢复失败或按配置重建）。
-- **区分语义**：runner 状态文件退出码 0 + 主动关闭标记 → 不恢复；
-  其他 → 异常，进入退避重试；Viewer 关闭 → 先注销监督取消待重试。
+  pane 整体死亡（此时 runner 也死了，视为恢复失败；重建的 ownership
+  规则须由 #19 单独定义，不能猜测或自动替代身份缺失的资源）。
+- **区分语义**：runner 状态文件退出码 0 → 正常退出，不恢复；主动关闭
+  标记也独立禁止恢复。非零退出且未主动关闭 → 异常，进入退避重试；
+  Viewer 关闭 → 先注销监督取消待重试。
 - **恢复动作**：在原 pane 重新投递 runner 命令（同 pane 重启已验证）。
 - 若未来 Herdr 版本提供带子进程退出码的事件，可简化 runner，但
   0.9.3 必须按上述实现。
@@ -134,7 +141,7 @@ Herdr 的 pane ID 是 **session 局部** 的：两个命名 session 各自都有
   pane/shell_pid/owner-start），不创建新 companion。记录缺失或身份
   含糊 → 明确报错，不开 viewer、不建替代会话。
 - Herdr server 独立于 Viewer JVM 存活（headless server 模型已验证），
-  companion 跨 JVM 更换存活由架构保证，但端到端 JVM 连续性属
+  companion 跨 JVM 更换存活是设计预期，端到端 JVM 连续性属
   #20 的原生验收项，本契约不预支结论。
 
 ## 8. 明确未验证项（实现与验收时必须重新确认）

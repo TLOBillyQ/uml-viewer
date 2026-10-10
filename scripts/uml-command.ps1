@@ -27,7 +27,7 @@ try {
     $escapedRoot = $toolRoot.Replace('"', '\"')
     $deps = '{:deps {uml-viewer/uml-viewer {:local/root "' + $escapedRoot + '"} quil/quil {:mvn/version "4.3.1563"}}}'
     if ($commandArgs.Count -gt 0 -and $commandArgs[0] -in @('-h', '--help')) {
-        Write-Output 'usage: uml [--restart | ir | crap | mutate] [args]'; exit 0
+        Write-Output 'usage: uml [--backend tmux|psmux|herdr] [--restart | ir | crap | mutate] [args]'; exit 0
     }
     if ($commandArgs.Count -gt 0 -and $commandArgs[0] -eq 'ir') {
         $name = Split-Path $root -Leaf
@@ -75,17 +75,21 @@ try {
         exit $LASTEXITCODE
     }
     $cli = Clojure-Command
-    if ($IsWindows) {
-        $mux = Get-Command psmux.exe -ErrorAction SilentlyContinue
-        if (-not $mux) { throw 'psmux v3.3.8 is required: https://github.com/psmux/psmux/releases/tag/v3.3.8' }
-        $version = (& $mux -V) -join "`n"
-        if ($LASTEXITCODE -ne 0 -or $version -notmatch '^tmux 3\.3\.8\r?\npsmux 3\.3\.8(?: \([^\r\n]+\))?$') {
-            throw 'Native Windows requires the fixed psmux v3.3.8 baseline; other versions are pending verification.'
-        }
-    } elseif (-not (Get-Command tmux -ErrorAction SilentlyContinue)) {
-        throw 'tmux is required for the companion. Install tmux with your system package manager.'
+    # One lightweight JVM implements selection and EDN ownership parsing for
+    # both platforms. It loads no Quil and creates no launch manifest or owner.
+    $platform = if ($IsWindows) { 'Windows' } elseif ($IsMacOS) { 'Mac OS X' } else { 'Linux' }
+    $checked = @(& $cli -Sdeps $deps -M -m uml-viewer.adapters.companion $root $platform @commandArgs)
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    if ($checked.Count -ne 1 -or $checked[0] -cnotin @('tmux', 'psmux', 'herdr')) {
+        throw 'Backend preflight returned invalid output; no viewer was launched.'
     }
-    if ($commandArgs.Count -gt 0 -and $commandArgs[0] -eq '--restart') {
+    $selectedBackend = [string]$checked[0]
+    $forwarded = @()
+    for ($i = 0; $i -lt $commandArgs.Count; $i++) {
+        if ($commandArgs[$i] -ceq '--backend') { $i++ } else { $forwarded += $commandArgs[$i] }
+    }
+    $commandArgs = $forwarded
+    if ($commandArgs -ccontains '--restart') {
         # The launcher owns and waits for its CLI/JVM child. Waiting for this
         # exact process therefore waits for the old JVM without signalling it.
         $record = Join-Path $root '.uml-viewer/viewer-process.json'
@@ -111,9 +115,10 @@ try {
                 Where-Object { $_.Name -notlike '*.policy.edn' } | Sort-Object Name | Select-Object -First 1
             if ($first) { $first.FullName }
         }
-        $commandArgs = @('--restart')
-        if ($diagram) { $commandArgs += $diagram }
+        # Preserve explicit path/argv; only supply a diagram when none was given.
+        if ($commandArgs.Count -eq 1 -and $diagram) { $commandArgs += $diagram }
     }
+    $commandArgs = @('--backend', $selectedBackend) + $commandArgs
     # 参数写入数据文件；后台 PS7 进程直接用 ArgumentList 启动 JVM，不经 shell 再解析。
     $directory = Join-Path $root '.uml-viewer'
     $null = New-Item -ItemType Directory -Force -Path $directory
