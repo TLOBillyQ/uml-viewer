@@ -83,10 +83,11 @@ Herdr 的 pane ID 是 **session 局部** 的：两个命名 session 各自都有
   反引号、`$`、`&`、`;`、Unicode/中文、空串、尾部反斜杠。
 - 退出码不由 Herdr 上报，桥接器负责显式捕获（`echo EXIT=$?` 模式或
   runner 写状态文件）。已验证 exit 37/0 均可捕获。
-- 终端可见 attach：macOS 有原生 TUI（`herdr session attach <name>`，
-  无 TTY 时干净失败 exit 1；交互行为待人工确认）。Windows 直连终端
-  attach 不支持，app attachment 有文档但未验证——Windows 的可见终端
-  路径是实现期缺口，#16 必须给出明确方案或记录限制。
+- 终端可见 attach：macOS 有原生 TUI（`herdr session attach <name>`；
+  已人工确认 TUI 打开、中文渲染、输入回显、`Ctrl+B q` detach，
+  且 detach 后 pane 与会话存活；无 TTY 时干净失败 exit 1）。
+  Windows 直连终端 attach 不支持，app attachment 有文档但未验证——
+  Windows 的可见终端路径是实现期缺口，#16 必须给出明确方案或记录限制。
 - companion 的 EDN 邮箱联动不依赖 TUI：socket/CLI 控制与面板输入在
   无 TTY 下全部可用（已验证）。
 
@@ -138,9 +139,7 @@ Herdr 的 pane ID 是 **session 局部** 的：两个命名 session 各自都有
 
 ## 8. 明确未验证项（实现与验收时必须重新确认）
 
-- 交互式 TUI attach 的 GUI 行为（双平台；macOS 仅验证了无 TTY 时
-  干净失败）。
-- Windows app attachment。
+- Windows 终端可见 attach（直连不支持，app attachment 未验证）。
 - 真实 Viewer JVM restart 后 Herdr ownership 重绑定的端到端连续性。
 - 0.9.3 以外的任何版本。
 - Linux/WSL（不在本次目标平台内，删除旧后端前须单独说明其路径）。
