@@ -117,11 +117,14 @@
   [:focus :proposal-id :proposal :open-layer :declutter
    :cam-x :cam-y :zoom :selected :detail-id])
 
+(defn project-root [state]
+  (or (:project-root state) (overlay/metrics-root (:path state))))
+
 (defn save-session!
   "Write the current view (depth, pan, zoom, proposal) for --restart."
   [state]
   (when-let [path (:path state)]
-    (mailbox/write-session! (overlay/metrics-root path)
+    (mailbox/write-session! (project-root state)
                             (select-keys state session-keys)))
   state)
 
@@ -194,15 +197,16 @@
 
 (defn restart-state
   "Load `path` and restore the last saved view, if any."
-  [path]
-  (restore-session (dissoc (load-path path) :waiting)
-                   (mailbox/read-session (overlay/metrics-root path))))
+  ([path] (restart-state path (overlay/metrics-root path)))
+  ([path root]
+   (restore-session (assoc (dissoc (load-path path) :waiting) :project-root root)
+                    (mailbox/read-session root))))
 
 (defn- resolve-display-path [state p]
   (let [f (io/file p)]
     (if (.isAbsolute f)
       (.getPath f)
-      (.getPath (io/file (overlay/metrics-root (:path state)) p)))))
+      (.getPath (io/file (project-root state) p)))))
 
 (defn apply-mail
   "Act on one unread command from the companion Claude."
@@ -211,7 +215,7 @@
     (case (keyword (:op cmd))
       :display (if-let [p (:path cmd)]
                  (-> (load-path (resolve-display-path state p))
-                     (assoc :mail-seen (:id cmd))
+                     (assoc :mail-seen (:id cmd) :project-root (project-root state))
                      (dissoc :waiting))
                  state)
       :quit-for-restart (assoc state :quit-for-restart true)
@@ -221,7 +225,7 @@
   [state]
   (if-not (:path state)
     state
-    (let [root (overlay/metrics-root (:path state))
+    (let [root (project-root state)
           f (mailbox/to-viewer root)]
       (loop [state state]
         (if-let [cmd (mailbox/take-command! f (:mail-seen state))]

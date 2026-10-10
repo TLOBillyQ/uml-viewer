@@ -3,10 +3,52 @@
             [clojure.java.io :as io]
             [clojure.edn :as edn]
             [quil.core :as q]
+            [uml-viewer.application.document :as document]
             [uml-viewer.adapters.sketch :as sketch]
             [uml-viewer.domain.mailbox :as mailbox]))
 
 (describe "Recorded companion ownership"
+  (it "keeps startup mail and view ownership when display points into another project's metrics directory"
+    (let [a (str (System/getProperty "java.io.tmpdir") "/root-mail-a-" (System/nanoTime))
+          b (str (System/getProperty "java.io.tmpdir") "/root-mail-b-" (System/nanoTime))
+          diagram (io/file b "external.edn")]
+      (.mkdirs (io/file b ".metrics"))
+      (spit diagram "{:layers []}")
+      (mailbox/write-command! (mailbox/to-viewer a) :display {:path (.getAbsolutePath diagram)})
+      (mailbox/write-command! (mailbox/to-viewer b) :quit-for-restart {})
+      (let [state (document/poll-mail (assoc (document/waiting-state "waiting.edn" a) :project-root a :mail-seen 0))]
+        (should= a (:project-root state))
+        (should= (.getAbsolutePath diagram) (:path state))
+        (should-not (:quit-for-restart state))
+        (document/save-session! (assoc state :cam-x 42))
+        (should= 42 (:cam-x (mailbox/read-session a)))
+        (should-be-nil (mailbox/read-session b))
+        (should= a (:project-root (document/restart-state (.getAbsolutePath diagram) a)))
+        (should= 42 (:cam-x (document/restart-state (.getAbsolutePath diagram) a)))
+        (should= 1 (count (:queue (edn/read-string (slurp (mailbox/to-viewer b)))))))))
+
+  (it "rejects a recycled native owner before wake or restart and retains its mail and record"
+    (let [root (str (System/getProperty "java.io.tmpdir") "/recycled-owner-" (System/nanoTime))
+          record {:backend :psmux :cwd root :session "A" :pane "%1" :session-id "$1"
+                  :server-pid "100" :owner-start "123"}
+          operations (atom [])]
+      (mailbox/write-companion! root record)
+      (with-redefs [uml-viewer.adapters.companion/process!
+                    (fn [argv]
+                      (if (= "pwsh.exe" (first argv))
+                        {:exit 0 :out "OWNER|100|999|psmux"}
+                        (do (swap! operations conj (second argv))
+                            {:exit 0 :out (case (second argv)
+                                           "-V" "tmux 3.3.8\npsmux 3.3.8"
+                                           "display-message" "UML|A|$1|100|%1"
+                                           "capture-pane" sketch/wake-message "")})))
+                    q/sketch (fn [& _] (throw (Exception. "Must not open viewer")))]
+        (should-not (:woke? (sketch/request-agent! root :regen {})))
+        (should-throw clojure.lang.ExceptionInfo (sketch/start! (.getPath (io/file root "external.edn")) :source true))
+        (should-not (some #{"send-keys" "display-message"} @operations))
+        (should= record (mailbox/read-companion root))
+        (should= :regen (:op (first (:queue (edn/read-string (slurp (mailbox/to-agent root))))))))))
+
   (it "rebinds a legacy project on restart and closes its companion using startup root after JVM cwd changes"
     (let [a (str (System/getProperty "java.io.tmpdir") "/ownership-restart-a-" (System/nanoTime))
           b (str (System/getProperty "java.io.tmpdir") "/ownership-restart-b-" (System/nanoTime))
@@ -27,7 +69,7 @@
                                        "kill-session" (do (swap! live disj (subs (last args) 1)) {:exit 0})
                                        "set-hook" {:exit 0}
                                        (throw (ex-info "Restart must not create replacement" {:args args}))))]
-          (sketch/start! (.getPath (io/file a "diagram.edn")) :source true)
+          (sketch/start! (.getPath (io/file a "diagram.edn")) :source true a)
           (should= 1 @opened)
           (should= :tmux (:backend (mailbox/read-companion a)))
           (should= "$1" (:session-id (mailbox/read-companion a)))
@@ -50,6 +92,31 @@
           (sketch/shutdown-children! a)
           (should= (or record {}) (mailbox/read-companion a))))
       (should= [1 2 3 4] (mapv :id (:queue (edn/read-string (slurp (mailbox/to-agent a))))))))
+
+  (it "rejects explicit launcher and JVM owners without touching their resources"
+    (let [root (str (System/getProperty "java.io.tmpdir") "/wrong-role-" (System/nanoTime))]
+      (doseq [role [:launcher :jvm]]
+        (let [record {:backend :tmux :cwd root :session "A" :pane "%1" :owner-role role}
+              touched (atom false)]
+          (mailbox/write-companion! root record)
+          (with-redefs [sketch/tmux! (fn [& _] (reset! touched true) {:exit 0 :out "UML|A|$1|100|%1"})]
+            (should-not (:woke? (sketch/request-agent! root :regen {})))
+            (sketch/shutdown-children! root)
+            (should-not @touched)
+            (should= record (mailbox/read-companion root)))))))
+
+  (it "preserves corrupt present ownership instead of creating fresh resources"
+    (doseq [contents ["{" "[:invalid]" "nil"]]
+      (let [root (str (System/getProperty "java.io.tmpdir") "/corrupt-owner-" (System/nanoTime))
+            file (mailbox/companion-file root)
+            touched (atom false)]
+        (io/make-parents file)
+        (spit file contents)
+        (with-redefs [sketch/windows? (fn [] true)
+                      uml-viewer.adapters.companion/process! (fn [& _] (reset! touched true) (throw (Exception. "Must not run")))]
+          (should-throw clojure.lang.ExceptionInfo (sketch/open-in-terminal! root))
+          (should-not @touched)
+          (should= contents (slurp file))))))
 
   (it "retains provisional ownership after fresh creation fails and refuses a second creation"
     (let [root (str (System/getProperty "java.io.tmpdir") "/ownership-partial-" (System/nanoTime))

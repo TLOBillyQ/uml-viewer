@@ -155,6 +155,9 @@
 (defn tmux! [& args]
   (companion/process! (into ["tmux"] args)))
 
+(def startup-project-root
+  (.getCanonicalPath (io/file (or (System/getenv "UML_VIEWER_PROJECT_ROOT")
+                                  (System/getProperty "user.dir")))))
 (defonce !project-root (atom nil))
 
 (defn- backend
@@ -165,8 +168,17 @@
      :tmux (companion/tmux #(apply tmux! %) info)
      (throw (ex-info "Unknown companion backend" {:status :failure :record info})))))
 
+(defn- read-ownership! [root]
+  (let [file (mailbox/companion-file root)]
+    (when (.exists file)
+      (let [record (mailbox/read-companion root)]
+        (when-not (map? record)
+          (throw (ex-info "Present companion ownership is corrupt or unreadable; file retained"
+                          {:status :failure :file (str file)})))
+        record))))
+
 (defn- owned-record! [root]
-  (let [info (mailbox/read-companion root)
+  (let [info (read-ownership! root)
         canonical #(.getCanonicalPath (io/file %))
         kind (or (:backend info)
                  ;; Pre-marker records are interpreted from their persisted
@@ -177,6 +189,7 @@
                         (not (:server-pid info)) (not (:session-id info))) :tmux))]
     (when-not (and (seq (:session info)) (seq (:pane info))
                    (:cwd info) (= (canonical root) (canonical (:cwd info)))
+                   (or (not (contains? info :owner-role)) (= :companion (:owner-role info)))
                    (#{:tmux :psmux} kind) (not (:provisional info))
                    (or (= :tmux kind)
                        (and (:session-id info) (:server-pid info) (:owner-start info))))
@@ -277,7 +290,7 @@
   "Tell the companion which diagram is under discussion."
   [state]
   (when-let [path (:path state)]
-    (let [root (overlay/metrics-root path)]
+    (let [root (or (:project-root state) @!project-root startup-project-root)]
       (if-let [id (:proposal-id state)]
         (request-agent! root :context
                         {:context :proposal
@@ -456,7 +469,7 @@
       (do (print-attach-hint! session) {:terminal :none :session session :window-id nil})))))
 
 (defn- open-windows-companion! [cwd]
-  (let [info (mailbox/read-companion cwd)]
+  (let [info (read-ownership! cwd)]
     (when (seq info)
       (let [kind (:backend (owned-record! cwd))]
         (when-not (and (= :psmux kind) (:owner-start info)
@@ -490,7 +503,7 @@
      (reset! !project-root cwd)
      (if (windows?) (open-windows-companion! cwd)
        (do
-         (when (seq (mailbox/read-companion cwd))
+         (when (seq (read-ownership! cwd))
            (throw (ex-info "Companion ownership already recorded; use --restart or resolve it before fresh start"
                            {:status :failure :root cwd})))
          (let [session (session-id cwd)
@@ -853,7 +866,7 @@
 
 (defn- popup-element-menu! [event x y state sel]
   (let [anchor (popup-anchor event x y)
-        root (overlay/metrics-root (:path state))
+        root (or (:project-root state) @!project-root startup-project-root)
         target (element-target state sel)]
     (later!
       (fn []
@@ -914,7 +927,7 @@
                      (:invoker anchor) (:x anchor) (:y anchor))))))
 
 (defn- regen-press [state]
-  (let [root (overlay/metrics-root (:path state))
+  (let [root (or (:project-root state) @!project-root startup-project-root)
         {:keys [woke?]} (request-regen! root)]
     (assoc state :mail-status (if woke?
                                 "Regen requested."
@@ -1028,8 +1041,10 @@
   ([path source-impl]
    (start! path source-impl false))
   ([path source-impl restart?]
+   (start! path source-impl restart? startup-project-root))
+  ([path source-impl restart? root]
    (swap! !bridge assoc :source source-impl)
-   (let [root (overlay/metrics-root path)]
+   (let [root (.getCanonicalPath (io/file root))]
      (if restart?
        (remember-companion! root)
        (open-in-terminal! root)))
@@ -1037,7 +1052,11 @@
     :title "UML viewer"
     :size [window-width window-height]
     :features [:resizable]
-    :setup (fn [] (setup path restart?))
+    :setup (fn []
+             (let [state (setup path false)]
+               (if restart?
+                 (document/restart-state path root)
+                 (assoc state :project-root root :mail-seen (mailbox/last-id (mailbox/to-viewer root))))))
     :update #'update-state
     :draw #'draw/draw-state
     :mouse-pressed #'on-main-press

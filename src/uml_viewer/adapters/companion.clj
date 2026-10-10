@@ -45,11 +45,17 @@
   (cleanup! [backend session])
   (identity! [backend session pane]))
 
+(def identity-format "UML|#{session_name}|#{session_id}|#{pid}|#{pane_id}")
+
+(defn- parse-identity [text]
+  (let [[_ name sid pid pane] (re-matches #"UML\|([^|\r\n]+)\|(\$\d+)\|(\d+)\|(%\d+)" text)]
+    {:session name :session-id sid :server-pid pid :pane pane}))
+
 (defn- tmux-identity! [run session pane expected]
-  (let [r (checked! run ["display-message" "-p" "-t" (or pane (str "=" session ":0.0"))
-                        "UML|#{session_name}|#{session_id}|#{pid}|#{pane_id}"])
-        [_ name sid pid seen] (re-matches #"UML\|([^|\r\n]+)\|(\$\d+)\|(\d+)\|(%\d+)" (:out r))
-        observed {:session name :session-id sid :server-pid pid :pane seen}]
+  (let [r (checked! run ["display-message" "-p" "-t" (or pane (str "=" session ":0.0")) identity-format])
+        observed (parse-identity (:out r))
+        name (:session observed)
+        seen (:pane observed)]
     (when-not (and (= session name) (or (nil? pane) (= pane seen))
                    (every? (fn [[k v]] (= v (get observed k)))
                            (select-keys expected [:session :session-id :server-pid :pane])))
@@ -129,17 +135,21 @@
     (spit file manifest)
     ["pwsh.exe" "-NoProfile" "-EncodedCommand" (encoded runner)]))
 
-(def identity-format "UML|#{session_name}|#{session_id}|#{pid}|#{pane_id}")
-
 (defn windows-target
   "psmux pane ids repeat across servers; route by the owned single-pane session."
   [session]
   (str "=" session ":0.0"))
 
+(declare windows-owner!)
+
 (defn windows-identity! [run session pane expected]
+  (when (:owner-start expected)
+    (when-not (= :exists (:status (windows-owner! expected)))
+      (throw (ex-info "Recorded Windows companion owner no longer matches"
+                      {:status :failure :expected expected}))))
   (let [r (checked! run ["display-message" "-p" "-t" (windows-target session) identity-format])
-        [_ name sid pid pane-id] (re-matches #"UML\|([^|\r\n]+)\|(\$\d+)\|(\d+)\|(%\d+)" (:out r))
-        observed {:session name :session-id sid :server-pid pid :pane pane-id}]
+        observed (parse-identity (:out r))
+        name (:session observed)]
     (when-not (and (= session name) (or (nil? pane) (= pane (:pane observed)))
                    (or (nil? expected) (= (select-keys expected [:session :session-id :server-pid :pane]) observed)))
       (throw (ex-info "psmux identity probe failed; session absence is not proven" (assoc r :status :failure :expected expected :observed observed))))

@@ -236,10 +236,11 @@
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-win-mail-" (System/nanoTime))]
       (mailbox/write-companion! root {:cwd root :backend :psmux :session "mine" :pane "%3" :session-id "$1" :server-pid "442" :owner-start "123"})
       (with-redefs [sketch/windows? (fn [] true)
-                    companion/process! (fn [args] {:exit 0 :out (case (second args)
+                    companion/process! (fn [args] {:exit 0 :out (if (= "pwsh.exe" (first args)) "OWNER|442|123|psmux"
+                                                               (case (second args)
                                                                  "-V" "tmux 3.3.8\npsmux 3.3.8"
                                                                  "display-message" "UML|mine|$1|442|%3"
-                                                                 "")})]
+                                                                 ""))})]
         (should-not (:woke? (sketch/request-agent! root :context {:context :real})))
         (should= :context (:op (first (:queue (clojure.edn/read-string (slurp (mailbox/to-agent root))))))))))
   (it "reports legacy session-prefixed Windows pane records instead of silently converting them"
@@ -258,9 +259,9 @@
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-win-restart-" (System/nanoTime))]
       (mailbox/write-companion! root {:cwd root :backend :psmux :session "mine" :pane "%3" :session-id "$1" :server-pid "442" :owner-start "123"})
       (with-redefs [sketch/windows? (fn [] true)
-                    companion/process! (fn [args] {:exit 0 :out (if (= "-V" (second args))
-                                                                 "tmux 3.3.8\npsmux 3.3.8"
-                                                                 "UML|mine|$1|443|%3")})]
+                    companion/process! (fn [args] {:exit 0 :out (cond (= "pwsh.exe" (first args)) "OWNER|442|123|psmux"
+                                                                (= "-V" (second args)) "tmux 3.3.8\npsmux 3.3.8"
+                                                                :else "UML|mine|$1|443|%3")})]
         (should-throw clojure.lang.ExceptionInfo
           ((ns-resolve 'uml-viewer.adapters.sketch 'remember-companion!) root)))))
   (it "releases a normally closed Windows owner so the next fresh launch is possible"

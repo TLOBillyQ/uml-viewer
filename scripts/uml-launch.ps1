@@ -31,6 +31,7 @@ try {
     $info = [Diagnostics.ProcessStartInfo]::new($executable)
     $info.UseShellExecute = $false
     $info.WorkingDirectory = $launch.cwd
+    $info.Environment['UML_VIEWER_PROJECT_ROOT'] = [IO.Path]::GetFullPath($launch.cwd)
     $info.RedirectStandardInput = $true
     $info.RedirectStandardOutput = $true
     $info.RedirectStandardError = $true

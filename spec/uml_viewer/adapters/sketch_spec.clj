@@ -622,7 +622,7 @@
                                           state)
                           uml-viewer.adapters.sketch/on-main-close (fn [state] state)
                           uml-viewer.adapters.sketch/exit-app! (fn [])]
-              (should= {:path "doc.edn" :waiting true} ((:setup @opts)))
+              (should= {:path "doc.edn" :waiting true} (select-keys ((:setup @opts)) [:path :waiting]))
               ((:mouse-moved @opts) :s {:x 4 :y 5})
               (should= [:s 4 5] @moved)
               ((:key-pressed @opts) :s {:key :r})
@@ -684,16 +684,18 @@
           path (java.io.File. root "doc.edn")
           opened (atom false)]
       (.mkdirs (java.io.File. root ".metrics"))
-      (mailbox/write-companion! root {:session "original" :pane "%42"})
+      (mailbox/write-companion! root {:backend :tmux :cwd (str root) :session "original" :pane "%42"})
       (doseq [failed-command ["has-session" "display-message"]]
-        (with-redefs [sketch/tmux! (fn [& args]
-                                    (if (= failed-command (first args))
-                                      {:exit nil :out "" :err "deadline" :timeout? true}
-                                      0))
-                      q/sketch (fn [& _] (reset! opened true))]
-          (should-throw clojure.lang.ExceptionInfo (sketch/start! (.getPath path) :src true))
-          (should-not @opened)
-          (should= "original" (:session (mailbox/read-companion root)))))))
+        (let [reached (atom false)]
+          (with-redefs [sketch/tmux! (fn [& args]
+                                      (if (= failed-command (first args))
+                                        (do (reset! reached true) {:exit nil :out "" :err "deadline" :timeout? true})
+                                        {:exit 0 :out "UML|original|$1|100|%42"}))
+                        q/sketch (fn [& _] (reset! opened true))]
+            (should-throw clojure.lang.ExceptionInfo (sketch/start! (.getPath path) :src true root))
+            (should @reached)
+            (should-not @opened)
+            (should= "original" (:session (mailbox/read-companion root))))))))
 
   (it "keeps diagnostic output when every terminal opener fails"
     (with-redefs [sketch/windows? (fn [] false)
