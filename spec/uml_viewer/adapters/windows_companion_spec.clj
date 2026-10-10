@@ -234,7 +234,7 @@
       (should= "C:\\With Spaces\\claude.ps1" (sketch/claude-executable))))
   (it "keeps queued Windows mail when the literal wake has no visible pane effect"
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-win-mail-" (System/nanoTime))]
-      (mailbox/write-companion! root {:backend :psmux :session "mine" :pane "%3" :session-id "$1" :server-pid "442"})
+      (mailbox/write-companion! root {:cwd root :backend :psmux :session "mine" :pane "%3" :session-id "$1" :server-pid "442" :owner-start "123"})
       (with-redefs [sketch/windows? (fn [] true)
                     companion/process! (fn [args] {:exit 0 :out (case (second args)
                                                                  "-V" "tmux 3.3.8\npsmux 3.3.8"
@@ -256,7 +256,7 @@
           (should-not (some #(some #{"display-message"} %) @calls))))))
   (it "rejects Windows restart when the recorded server identity changed"
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-win-restart-" (System/nanoTime))]
-      (mailbox/write-companion! root {:backend :psmux :session "mine" :pane "%3" :session-id "$1" :server-pid "442"})
+      (mailbox/write-companion! root {:cwd root :backend :psmux :session "mine" :pane "%3" :session-id "$1" :server-pid "442" :owner-start "123"})
       (with-redefs [sketch/windows? (fn [] true)
                     companion/process! (fn [args] {:exit 0 :out (if (= "-V" (second args))
                                                                  "tmux 3.3.8\npsmux 3.3.8"
@@ -266,7 +266,7 @@
   (it "releases a normally closed Windows owner so the next fresh launch is possible"
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-win-close-" (System/nanoTime))
           dead (atom false) calls (atom [])]
-      (mailbox/write-companion! root {:backend :psmux :session "mine" :pane "%3" :session-id "$1" :server-pid "442" :owner-start "123"})
+      (mailbox/write-companion! root {:cwd root :backend :psmux :session "mine" :pane "%3" :session-id "$1" :server-pid "442" :owner-start "123"})
       (with-redefs [sketch/windows? (fn [] true)
                     companion/process! (fn [args]
                       (swap! calls conj args)

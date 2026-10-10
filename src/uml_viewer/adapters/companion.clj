@@ -42,9 +42,22 @@
   (bind! [backend session pane])
   (wake! [backend pane keys] [backend pane keys opts])
   (recovery! [backend session pane cwd command enabled?])
-  (cleanup! [backend session]))
+  (cleanup! [backend session])
+  (identity! [backend session pane]))
 
-(defrecord Tmux [run]
+(defn- tmux-identity! [run session pane expected]
+  (let [r (checked! run ["display-message" "-p" "-t" (or pane (str "=" session ":0.0"))
+                        "UML|#{session_name}|#{session_id}|#{pid}|#{pane_id}"])
+        [_ name sid pid seen] (re-matches #"UML\|([^|\r\n]+)\|(\$\d+)\|(\d+)\|(%\d+)" (:out r))
+        observed {:session name :session-id sid :server-pid pid :pane seen}]
+    (when-not (and (= session name) (or (nil? pane) (= pane seen))
+                   (every? (fn [[k v]] (= v (get observed k)))
+                           (select-keys expected [:session :session-id :server-pid :pane])))
+      (throw (ex-info "tmux companion identity conflict; ownership retained"
+                      {:status :failure :expected expected :observed observed})))
+    observed))
+
+(defrecord Tmux [run identity]
   SessionBackend
   (create! [_ session cwd command]
     (checked! run (into ["new-session" "-d" "-s" session "-c" cwd "-e" "COLORTERM=truecolor"] command)))
@@ -57,14 +70,16 @@
         0 true
         1 false
         (throw (ex-info "Could not probe companion session" r)))))
-  (bind! [_ session pane]
-    (let [out (:out (checked! run ["display-message" "-p" "-t" (or pane (str session ":0.0")) "#{pane_id}"]))]
-      (if (seq out) out (or pane (str session ":0.0")))))
-  (wake! [_ pane keys]
+  (identity! [_ session pane] (tmux-identity! run session pane identity))
+  (bind! [this session pane] (:pane (identity! this session pane)))
+  (wake! [this pane keys]
+    (when-not identity (throw (ex-info "Wake requires recorded ownership" {:status :failure})))
+    (identity! this (:session identity) pane)
     (checked! run (into ["send-keys" "-t" pane] keys)))
   (wake! [this pane keys _opts]
     (wake! this pane keys))
-  (recovery! [_ session pane cwd command enabled?]
+  (recovery! [this session pane cwd command enabled?]
+    (when identity (identity! this session (or pane (:pane identity))))
     (if enabled?
       (do
         (checked! run ["set-option" "-p" "-t" pane "remain-on-exit" "on"])
@@ -75,10 +90,16 @@
         (checked! run ["set-option" "-t" session "status" "off"]))
       (checked! run ["set-hook" "-t" session "-u" "pane-died"])))
   (cleanup! [this session]
+    (when-not identity (throw (ex-info "Cleanup requires recorded ownership" {:status :failure})))
+    (identity! this session (:pane identity))
     (recovery! this session nil nil nil false)
-    (checked! run ["kill-session" "-t" session])))
+    (checked! run ["kill-session" "-t" (str "=" session)])
+    (when (probe! this session)
+      (throw (ex-info "tmux companion remains after cleanup" {:status :failure :session session})))))
 
-(defn tmux [run] (->Tmux run))
+(defn tmux
+  ([run] (->Tmux run nil))
+  ([run identity] (->Tmux run identity)))
 
 (defn encoded [text]
   (.encodeToString (java.util.Base64/getEncoder) (.getBytes (str text) "UTF-16LE")))
@@ -261,6 +282,7 @@
 (defrecord Psmux [run identity]
   SessionBackend
   (create! [_ session cwd command] (checked! run (into ["new-session" "-d" "-s" session "--"] command)))
+  (identity! [_ session pane] (windows-identity! run session pane identity))
   (probe! [_ session] (windows-identity! run session (:pane identity) identity) true)
   (bind! [_ session pane] (:pane (windows-identity! run session pane identity)))
   (wake! [this pane keys] (wake! this pane keys {}))

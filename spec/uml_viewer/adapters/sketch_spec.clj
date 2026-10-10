@@ -652,6 +652,15 @@
       (should-be-nil (:exit missing))
       (should (seq (:err missing))))))
 
+(defn fresh-tmux-runner [root]
+  (let [live (atom false)]
+    (fn [& args]
+      (case (first args)
+        "has-session" {:exit (if @live 0 1)}
+        "new-session" (do (reset! live true) {:exit 0})
+        "display-message" {:exit 0 :out (str "UML|" (sketch/session-id root) "|$1|100|%42")}
+        {:exit 0}))))
+
 (describe "claude session"
   ;; Platform mutants may bypass platform stubs; the process boundary stays sealed.
   (around [run-spec]
@@ -707,7 +716,7 @@
 
   (it "falls back to Terminal when Ghostty fails without discarding the session"
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-fallback-" (System/nanoTime))]
-      (with-redefs [sketch/tmux! (fn [& _] 0)
+      (with-redefs [sketch/tmux! (fresh-tmux-runner root)
                     sketch/windows? (fn [] false)
                     sketch/ghostty-path (fn [] "/Applications/Ghostty.app")
                     sketch/mac? (fn [] true)
@@ -719,10 +728,13 @@
   (it "retains queued mail and diagnoses a failed pane wake"
     (let [root (str (System/getProperty "java.io.tmpdir") "/uv-wake-fail-" (System/nanoTime))
           calls (atom [])]
-      (mailbox/write-companion! root {:session (sketch/session-id root) :pane "%42"})
+      (mailbox/write-companion! root {:cwd (str root) :session (sketch/session-id root) :pane "%42"})
       (with-redefs [sketch/tmux! (fn [& args]
                                  (swap! calls conj (vec args))
-                                 (if (= "send-keys" (first args)) 9 0))
+                                 (case (first args)
+                                   "send-keys" 9
+                                   "display-message" {:exit 0 :out (str "UML|" (sketch/session-id root) "|$1|100|%42")}
+                                   0))
                     sketch/windows? (fn [] false)]
         (should-not (:woke? (sketch/request-agent! root :regen {})))
         (should= :regen (:op (first (:queue (clojure.edn/read-string (slurp (mailbox/to-agent root)))))))
@@ -830,7 +842,7 @@
                     "/uv-ghostty-" (System/nanoTime))
           calls (atom [])]
       (.mkdirs (java.io.File. root))
-      (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& _] 0)
+      (with-redefs [uml-viewer.adapters.sketch/tmux! (fresh-tmux-runner root)
                     uml-viewer.adapters.sketch/windows? (fn [] false)
                     uml-viewer.adapters.sketch/ghostty-path (fn [] "/Applications/Ghostty.app")
                     uml-viewer.adapters.sketch/run-command (fn [argv] (swap! calls conj (vec argv)) "")
@@ -864,7 +876,7 @@
                     "/uv-ghostty-app-" (System/nanoTime))
           calls (atom [])]
       (.mkdirs (java.io.File. root))
-      (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& _] 0)
+      (with-redefs [uml-viewer.adapters.sketch/tmux! (fresh-tmux-runner root)
                     uml-viewer.adapters.sketch/windows? (fn [] false)
                     uml-viewer.adapters.sketch/ghostty-path (fn [] "/Applications/Ghostty-Nightly.app")
                     uml-viewer.adapters.sketch/run-command (fn [argv] (swap! calls conj (vec argv)) "")]
@@ -877,7 +889,7 @@
                     "/uv-noterm-" (System/nanoTime))
           opened (atom [])]
       (.mkdirs (java.io.File. root))
-      (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& _] 0)
+      (with-redefs [uml-viewer.adapters.sketch/tmux! (fresh-tmux-runner root)
                     uml-viewer.adapters.sketch/windows? (fn [] false)
                     uml-viewer.adapters.sketch/ghostty-path (fn [] nil)
                     uml-viewer.adapters.sketch/wsl-distro (fn [] nil)
@@ -912,7 +924,7 @@
     (let [root (str (System/getProperty "java.io.tmpdir")
                     "/uv-linux-" (System/nanoTime))]
       (.mkdirs (java.io.File. root))
-      (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& _] 0)
+      (with-redefs [uml-viewer.adapters.sketch/tmux! (fresh-tmux-runner root)
                     uml-viewer.adapters.sketch/windows? (fn [] false)
                     uml-viewer.adapters.sketch/ghostty-path (fn [] nil)
                     uml-viewer.adapters.sketch/wsl-distro (fn [] nil)
@@ -995,18 +1007,19 @@
                     "/uv-wake2-" (System/nanoTime))
           calls (atom [])]
       (.mkdirs (java.io.File. root))
-      (mailbox/write-companion! root {:session "uml-viewer-mine-abc"})
+      (mailbox/write-companion! root {:cwd root :session "uml-viewer-mine-abc" :pane "%42"})
       (reset! sketch/!session-name nil)
       (with-redefs [uml-viewer.adapters.sketch/tmux!
                     (fn [& args]
                       (swap! calls conj (vec args))
                       (cond
+                        (= "display-message" (first args)) {:exit 0 :out "UML|uml-viewer-mine-abc|$1|100|%42"}
                         (not= "has-session" (first args)) 0
                         (= "uml-viewer-mine-abc" (last args)) 0
                         :else 1))
                     uml-viewer.adapters.sketch/windows? (fn [] false)]
         (should (sketch/notify-agent! root))
-        (should (some #(= ["send-keys" "-t" "uml-viewer-mine-abc:0.0" "-l" sketch/wake-message] %)
+        (should (some #(= ["send-keys" "-t" "%42" "-l" sketch/wake-message] %)
                       @calls))
         (should-not (some #(and (= "send-keys" (first %))
                                 (some #{"uml-viewer-other-zzz"} %))
@@ -1032,13 +1045,13 @@
     (let [root (str (System/getProperty "java.io.tmpdir")
                     "/uv-remember-" (System/nanoTime))]
       (.mkdirs (java.io.File. root))
-      (mailbox/write-companion! root {:session (sketch/session-id root) :pane "%42"})
+      (mailbox/write-companion! root {:cwd (str root) :session (sketch/session-id root) :pane "%42"})
       (reset! sketch/!session-name nil)
       (reset! sketch/!terminal-window-id nil)
       (with-redefs [uml-viewer.adapters.sketch/tmux!
                     (fn [& args]
                       (if (= "display-message" (first args))
-                        0
+                        {:exit 0 :out (str "UML|" (sketch/session-id root) "|$1|100|%42")}
                         (if (= (sketch/session-id root) (last args)) 0 1)))
                     uml-viewer.adapters.sketch/windows? (fn [] false)]
         (should= (sketch/session-id root) (call 'remember-companion! root))
@@ -1051,16 +1064,21 @@
                     "/uv-comp-" (System/nanoTime))
           tmux-calls (atom [])
           scripts (atom [])]
-      (mailbox/write-companion! root {:session "uml-viewer-mine-abc" :window-id "99"})
+      (mailbox/write-companion! root {:cwd root :session "uml-viewer-mine-abc" :pane "%42" :window-id "99"})
       (reset! sketch/!terminal-window-id "88")
       (reset! sketch/!session-name "other-session")
-      (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& args] (swap! tmux-calls conj (vec args)) 0)
+      (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& args]
+                                                              (swap! tmux-calls conj (vec args))
+                                                              (case (first args)
+                                                                "display-message" {:exit 0 :out "UML|uml-viewer-mine-abc|$1|100|%42"}
+                                                                "has-session" 1
+                                                                0))
                     uml-viewer.adapters.sketch/windows? (fn [] false)
                     uml-viewer.adapters.sketch/run-osascript (fn [s] (swap! scripts conj s) "")]
         (sketch/shutdown-children! root)
-        (should (some #(= ["kill-session" "-t" "uml-viewer-mine-abc"] %) @tmux-calls))
+        (should (some #(= ["kill-session" "-t" "=uml-viewer-mine-abc"] %) @tmux-calls))
         (should (< (.indexOf @tmux-calls ["set-hook" "-t" "uml-viewer-mine-abc" "-u" "pane-died"])
-                   (.indexOf @tmux-calls ["kill-session" "-t" "uml-viewer-mine-abc"])))
+                   (.indexOf @tmux-calls ["kill-session" "-t" "=uml-viewer-mine-abc"])))
         (should-not (some #(some #{"uml-viewer-grok"} %) @tmux-calls))
         (should-not (some #(and (string? %) (re-find #"(?i)grok" %)) (mapcat identity @tmux-calls)))
         (should-not (some #(some #{"other-session"} %) @tmux-calls))
@@ -1075,8 +1093,8 @@
                     "/uv-open-" (System/nanoTime))
           calls (atom [])]
       (.mkdirs (java.io.File. root))
-      (mailbox/write-companion! root {:session "uml-viewer-old-ffff" :window-id "1"})
-      (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& args] (swap! calls conj (vec args)) 0)
+      (with-redefs [uml-viewer.adapters.sketch/tmux! (let [run (fresh-tmux-runner root)]
+                                                        (fn [& args] (swap! calls conj (vec args)) (apply run args)))
                     uml-viewer.adapters.sketch/windows? (fn [] false)
                     uml-viewer.adapters.sketch/ghostty-path (fn [] nil)
                     uml-viewer.adapters.sketch/wsl-distro (fn [] nil)
@@ -1090,13 +1108,13 @@
           (should= sid (:session (mailbox/read-companion root)))
           (should= "1234" (:window-id (mailbox/read-companion root)))
           (should-not (some #(= ["kill-session" "-t" "uml-viewer-old-ffff"] %) @calls))
-          (should (some #(= ["kill-session" "-t" sid] %) @calls))
+          (should-not (some #(= "kill-session" (first %)) @calls))
           (should (some #(= "new-session" (first %)) @calls))
-          (should (some #(= ["set-option" "-p" "-t" (str sid ":0.0") "remain-on-exit" "on"] %) @calls))
+          (should (some #(= ["set-option" "-p" "-t" "%42" "remain-on-exit" "on"] %) @calls))
           (let [hook (last (first (filter #(= "set-hook" (first %))
                                            (filter #(= "pane-died" (nth % 3 nil)) @calls))))]
             (should (str/includes? hook "respawn-pane -k -t"))
-            (should (str/includes? hook (str sid ":0.0")))
+            (should (str/includes? hook "%42"))
             (should (str/includes? hook "--append-system-prompt"))
             (should (str/includes? hook "--dangerously-skip-permissions")))
           (should-not (some #(and (string? %) (re-find #"(?i)grok" %)) flat))))))))

@@ -155,12 +155,34 @@
 (defn tmux! [& args]
   (companion/process! (into ["tmux"] args)))
 
+(defonce !project-root (atom nil))
+
 (defn- backend
-  ([] (backend nil))
+  ([] (backend {:backend (if (windows?) :psmux :tmux)}))
   ([info]
-   (if (windows?)
-     (companion/psmux #(companion/process! (into ["psmux.exe"] %)) info)
-     (companion/tmux #(apply tmux! %)))))
+   (case (:backend info)
+     :psmux (companion/psmux #(companion/process! (into ["psmux.exe"] %)) info)
+     :tmux (companion/tmux #(apply tmux! %) info)
+     (throw (ex-info "Unknown companion backend" {:status :failure :record info})))))
+
+(defn- owned-record! [root]
+  (let [info (mailbox/read-companion root)
+        canonical #(.getCanonicalPath (io/file %))
+        kind (or (:backend info)
+                 ;; Pre-marker records are interpreted from their persisted
+                 ;; provenance, never from the current OS.
+                 (cond
+                   (and (:session-id info) (:server-pid info) (:owner-start info)) :psmux
+                   (and (:cwd info) (:pane info)
+                        (not (:server-pid info)) (not (:session-id info))) :tmux))]
+    (when-not (and (seq (:session info)) (seq (:pane info))
+                   (:cwd info) (= (canonical root) (canonical (:cwd info)))
+                   (#{:tmux :psmux} kind) (not (:provisional info))
+                   (or (= :tmux kind)
+                       (and (:session-id info) (:server-pid info) (:owner-start info))))
+      (throw (ex-info "Companion ownership is missing, ambiguous or belongs to another project"
+                      {:status :failure :root (str root) :pane (:pane info) :record info})))
+    (assoc info :backend kind)))
 
 (defn session-candidates
   "Names to try, unique first, then the pre-isolation session."
@@ -172,18 +194,12 @@
        vec))
 
 (defn live-session
-  "First candidate that tmux currently has, or nil."
+  "Probe only the persisted project's companion; never try replacement targets."
   [root]
-  (if (windows?)
-    (let [info (mailbox/read-companion root)]
-      (when-not (and (= :psmux (:backend info)) (:pane info) (:session-id info) (:server-pid info))
-        (throw (ex-info "Windows companion has no verified ownership record" {:status :failure :root root})))
-      (when (re-matches #"=[^:]+:%\d+" (:pane info))
-        (throw (ex-info "Windows companion uses legacy session-prefixed pane target; recreate or explicitly clear companion.edn before continuing"
-                        {:status :failure :root root :pane (:pane info)})))
-      (when (companion/probe! (backend info) (:session info)) (:session info)))
-    (first (filter #(companion/probe! (backend) %)
-                   (session-candidates root)))))
+  (let [info (owned-record! root)]
+    (when (companion/probe! (backend info) (:session info))
+      (companion/bind! (backend info) (:session info) (:pane info))
+      (:session info))))
 
 (defn rgb-16
   "Terminal.app AppleScript colors are 16-bit (0–65535)."
@@ -223,7 +239,7 @@
 
 (defn notify-agent!
   "Wake the companion Claude session. Returns false if tmux/session is missing."
-  ([] (notify-agent! (System/getProperty "user.dir")))
+  ([] (notify-agent! (or @!project-root (System/getProperty "user.dir"))))
   ([root]
    (try
      (if-let [session (live-session root)]
@@ -234,9 +250,7 @@
              true
              (if (= :sleep (first step))
                (do (Thread/sleep (long (second step))) (recur more))
-               (let [result (if (windows?)
-                              (companion/wake! (backend (mailbox/read-companion root)) pane (vec (drop 3 step)))
-                              (apply tmux! step))
+               (let [result (companion/wake! (backend (owned-record! root)) pane (vec (drop 3 step)))
                      code (if (map? result) (:exit result) result)]
                  (if (= 0 code)
                    (recur more)
@@ -385,15 +399,6 @@
   (run-osascript (close-terminal-script @!terminal-window-id))
   (reset! !terminal-window-id nil))
 
-(defn- kill-companion-session!
-  "Drop this project's tmux session only. Unhook respawn so the pane stays dead."
-  [session]
-  (when (seq session)
-    (when (companion/probe! (backend) session)
-      (companion/cleanup! (backend) session))))
-
-(defn- arm-respawn! [session pane cwd command]
-  (companion/recovery! (backend) session pane cwd command true))
 
 (defn wsl-distro
   "WSL distribution this JVM runs in, or nil outside WSL."
@@ -453,16 +458,18 @@
 (defn- open-windows-companion! [cwd]
   (let [info (mailbox/read-companion cwd)]
     (when (seq info)
-      (when-not (and (:owner-start info) (= :missing (:status (companion/windows-owner! info))))
-        (throw (ex-info "Windows companion owner already recorded; use --restart or resolve its identity before fresh start" {:status :failure :root cwd})))
-      (mailbox/write-companion! cwd {})))
+      (let [kind (:backend (owned-record! cwd))]
+        (when-not (and (= :psmux kind) (:owner-start info)
+                       (= :missing (:status (companion/windows-owner! info))))
+          (throw (ex-info "Windows companion owner already recorded; use --restart or resolve its identity before fresh start" {:status :failure :root cwd})))
+        (mailbox/write-companion! cwd {}))))
   (let [session (str (session-id cwd) "-" (str/replace (str (java.util.UUID/randomUUID)) "-" ""))
         run #(companion/process! (into ["psmux.exe"] %))
         backend (companion/psmux run nil)
         command (companion/windows-command! cwd [(claude-executable) "--dangerously-skip-permissions"
                                                 "--append-system-prompt" standing-rules launch-prompt])]
     ;; Provisional ownership survives errors/timeouts; never create a replacement automatically.
-    (mailbox/write-companion! cwd {:backend :psmux :session session :cwd cwd :command command :provisional true})
+    (mailbox/write-companion! cwd {:backend :psmux :owner-role :companion :session session :cwd cwd :command command :provisional true})
     (companion/create! backend session cwd command)
     (let [observed (companion/windows-identity! run session nil nil)
           owner (companion/windows-owner! observed)
@@ -470,48 +477,56 @@
           identity (assoc observed :owner-start (:owner-start owner))
           _ (companion/windows-identity! run session (:pane identity) identity)
           backend (companion/psmux run identity)]
-      (mailbox/write-companion! cwd (merge identity {:backend :psmux :cwd cwd :command command}))
+      (mailbox/write-companion! cwd (merge identity {:backend :psmux :owner-role :companion :cwd cwd :command command}))
       (companion/recovery! backend session (:pane identity) cwd command true)
       (reset! !session-name session)
       (open-window! session))))
 
 (defn open-in-terminal!
-  "Start this project's companion Claude in its own tmux session."
+  "Create a companion once; provisional ownership survives partial failure."
   ([] (open-in-terminal! (System/getProperty "user.dir")))
   ([cwd]
-   (if (windows?) (open-windows-companion! cwd)
-   (let [session (session-id cwd)]
-     (reset! !session-name session)
-     (kill-companion-session! session)
-     (let [command (vec (drop 8 (new-session-args cwd session)))
-           _ (companion/create! (backend) session cwd command)
-           pane (companion/bind! (backend) session nil)]
-       (try
-         (arm-respawn! session pane cwd command)
-         (catch Exception e
-           (kill-companion-session! session)
-           (throw e)))
-       (let [{:keys [window-id] :as opened} (open-window! session)]
-         (reset! !terminal-window-id window-id)
-         (mailbox/write-companion! cwd {:session session :pane pane :cwd cwd :command command :window-id window-id})
-         opened))))))
+   (let [cwd (.getCanonicalPath (io/file cwd))]
+     (reset! !project-root cwd)
+     (if (windows?) (open-windows-companion! cwd)
+       (do
+         (when (seq (mailbox/read-companion cwd))
+           (throw (ex-info "Companion ownership already recorded; use --restart or resolve it before fresh start"
+                           {:status :failure :root cwd})))
+         (let [session (session-id cwd)
+               command (vec (drop 8 (new-session-args cwd session)))
+               adapter (backend {:backend :tmux})
+               provisional {:backend :tmux :session session :cwd cwd :command command
+                            :owner-role :companion :provisional true}]
+           (when (companion/probe! adapter session)
+             (throw (ex-info "Unrecorded companion session exists; refusing replacement" {:status :failure :session session})))
+           (mailbox/write-companion! cwd provisional)
+           (companion/create! adapter session cwd command)
+           (let [identity (companion/identity! adapter session nil)
+                 info (merge (dissoc provisional :provisional) identity)
+                 adapter (backend info)]
+             (mailbox/write-companion! cwd info)
+             (companion/recovery! adapter session (:pane identity) cwd command true)
+             (reset! !session-name session)
+             (let [{:keys [window-id] :as opened} (open-window! session)]
+               (reset! !terminal-window-id window-id)
+               (mailbox/write-companion! cwd (assoc info :window-id window-id))
+               opened))))))))
 
 (defn shutdown-children!
-  "Kill only this viewer's tmux session and its terminal window."
-  ([] (shutdown-children! (System/getProperty "user.dir")))
+  "Release only verified companion ownership; retain records on any failure."
+  ([] (shutdown-children! (or @!project-root (System/getProperty "user.dir"))))
   ([root]
-   (let [info (mailbox/read-companion root)
-         session (or (:session info) (session-id root))
-         win (or (:window-id info) @!terminal-window-id)]
-     (if (windows?)
-       (try (companion/cleanup! (backend info) session)
-            (mailbox/write-companion! root {})
-            (catch Exception e (binding [*out* *err*] (println "UML viewer: companion cleanup:" (.getMessage e)))))
-       (kill-companion-session! session))
-     (when win
-       (run-osascript (close-terminal-script win)))
-     (reset! !terminal-window-id nil)
-     (reset! !session-name nil))))
+   (try
+     (let [info (owned-record! root)]
+       (companion/cleanup! (backend info) (:session info))
+       (mailbox/write-companion! root {})
+       (when-let [win (:window-id info)]
+         (run-osascript (close-terminal-script win)))
+       (reset! !terminal-window-id nil)
+       (reset! !session-name nil))
+     (catch Exception e
+       (binding [*out* *err*] (println "UML viewer: companion cleanup:" (.getMessage e)))))))
 
 (defn- live? [applet]
   (boolean
@@ -996,15 +1011,17 @@
 (defn- remember-companion!
   "绑定已有 companion；探测失败时禁止继续打开 viewer。"
   [root]
-  (let [info (mailbox/read-companion root)
+  (let [info (owned-record! root)
         session (:session info)]
     (when-not (and (seq session) (companion/probe! (backend info) session))
       (throw (ex-info "UML viewer: recorded companion is missing; restart cannot replace it"
                       {:root root :session session :status :missing})))
-    (let [pane (companion/bind! (backend info) session (:pane info))]
+    (let [pane (companion/bind! (backend info) session (:pane info))
+          identity (companion/identity! (backend info) session pane)]
+      (reset! !project-root (.getCanonicalPath (io/file root)))
       (reset! !session-name session)
       (reset! !terminal-window-id (:window-id info))
-      (mailbox/write-companion! root (merge info {:session session :pane pane}))
+      (mailbox/write-companion! root (merge info identity {:owner-role :companion}))
       session)))
 
 (defn start!
