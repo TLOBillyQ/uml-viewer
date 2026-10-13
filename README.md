@@ -62,33 +62,253 @@ needed):
 
 ```bash
 cd /path/to/the-project
-curl -fsSL https://raw.githubusercontent.com/unclebob/uml-viewer/master/scripts/get-uml-viewer -o get-uml-viewer
+curl -fsSL https://raw.githubusercontent.com/qinyuanj/uml-viewer/lua/scripts/get-uml-viewer -o get-uml-viewer
 chmod +x get-uml-viewer
 ./get-uml-viewer               # fetch, write ./uml, start
 ./uml                          # later fresh starts (returns immediately)
 ./uml --restart                # companion only: new JVM, restore last view
+./uml ir                       # policy → IR
+./uml crap                     # .metrics/crap.edn for the whole tree
+./uml mutate src/a/b.lua       # differential mutation of these files
 ```
 
 `scripts/get-uml-viewer` is in this repo. It clones uml-viewer into
 **gitignored** `.uml-viewer/uml-viewer/` (a nested `.git` there is invisible
 to the project's repo), writes `./uml`, and starts the viewer. `--install-only`
 skips the start. `UML_VIEWER_REPO_URL` and `UML_VIEWER_REF` override the clone
-source (default `master`).
+source (default `qinyuanj/uml-viewer`, branch `lua`). Installation and analysis
+use **PowerShell 7** (`pwsh`), including on Unix. Install it yourself from
+https://aka.ms/powershell-install; Windows PowerShell 5.1 is unsupported.
+Git and Clojure CLI are also user-installed dependencies:
+https://git-scm.com/downloads and https://clojure.org/guides/install_clojure.
+The installer preserves existing policies and proposals and does not create a
+policy or generate a diagram during `--install-only`.
+
+For native Windows, download `scripts/get-uml-viewer.ps1` from the same ref,
+then run from the project:
+
+```powershell
+pwsh -NoProfile -File .\get-uml-viewer.ps1 --install-only
+.\uml.ps1 ir
+.\uml.ps1 crap
+.\uml.ps1 mutate 'src/file with spaces.lua'
+```
+
+The installer writes `uml` and `uml.ps1`; both forward to the installed
+PowerShell runtime, and Windows uses `.\uml.ps1` (or `pwsh -File .\uml.ps1 ...`)
+directly. No `.cmd` shim is installed: a batch wrapper hands arguments to
+`cmd.exe`, which re-quotes them and cannot carry literal shell characters.
+Viewer startup also uses PowerShell 7: a detached launcher starts the Clojure
+process with individual arguments and writes its output to the project log.
+Fresh startup uses **Herdr as the sole companion backend** on native Windows
+and macOS. `--backend herdr` remains accepted; `--backend tmux` and
+`--backend psmux` are rejected before creating resources. Restart, wake and
+close require explicit Herdr ownership and verify its recorded identities.
+Legacy or unmarked ownership is retained and refused; see
+[legacy migration](docs/herdr-backend-contract.md#9-旧后端退役与迁移).
+Startup checks the preinstalled **0.9.3** CLI and bundled protocol **22**
+without starting a server, terminal, companion or detached Viewer. Install from
+[the official release](https://github.com/herdrdev/herdr/releases/tag/v0.9.3)
+or [herdr.dev](https://herdr.dev) (macOS: Homebrew `herdr`, then verify the version).
+There is no download, upgrade or fallback. `--backend herdr` creates an isolated
+named session and records its server, shell, pane and process creation identities.
+Windows opens the full `herdr session attach` client in Windows Terminal;
+`herdr terminal attach` is not supported on Windows. The attach child clears
+`HERDR_ENV` so launching from an existing Herdr pane does not trigger its nesting guard.
+If the terminal cannot open, the companion and its ownership remain intact and
+the log prints an attach command to run in a separate terminal. Do not start a
+second companion to retry attachment. Herdr starts a detached project recovery
+controller. A verified abnormal Claude exit is retried at most three times,
+after 1, 2 and 4 seconds; the count resets only after 60 seconds of verified
+continuous child uptime. A normal exit, unknown exit evidence, or lost pane
+ownership stops recovery and retains mail with a diagnostic. Closing the
+diagram revokes recovery and waits for the controller to exit before removing
+only this project's Herdr resources. Recovery needs direct native `claude.exe`
+(or `node.exe` plus the official `cli.js`); shell adapters cannot prove the
+child identity. Windows native acceptance is **partial**: real Claude recovery,
+namespace restart continuity and project isolation were recorded, with seven
+remaining native checks tracked by the
+[Windows Herdr #30 record](docs/windows-herdr-30-observations.md)
+([baseline](docs/windows-herdr-30-baseline.md)).
+The maintainer cancelled macOS end-to-end acceptance and authorized legacy
+backend retirement; macOS is not claimed to have passed that acceptance.
+Linux/WSL companion launch is unsupported after tmux retirement; use native
+Windows or macOS for the integrated viewer/companion workflow. Historical
+backend evidence remains in [platform acceptance](docs/platform-acceptance.md).
+A standalone downloaded
+Unix installer fetches its PS1 sibling from `UML_VIEWER_REF`; for custom hosts,
+put both files together or set `UML_VIEWER_INSTALLER_URL` explicitly.
+
+Native Windows requires `clojure.exe`, a `.ps1` Clojure entry, or the exported
+`clojure` command from `ClojureTools`. A `.cmd`/`.bat` Clojure wrapper is rejected
+before launching; install the [Windows Clojure CLI](https://clojure.org/guides/install_clojure)
+and remove a batch wrapper that shadows the native or PowerShell entry.
+
+`CLAUDE_BIN` continues to select the companion program. On Windows use the
+[native Claude installation](https://code.claude.com/docs/en/setup) (`claude.exe`)
+or a `.ps1` adapter. Claude `.cmd`/`.bat` wrappers are rejected because they cannot
+preserve arbitrary prompts and argv. If retaining the npm package, point
+`CLAUDE_BIN` to a PS1 adapter like the following, replacing the two paths with
+your actual `node.exe` and the official installed package's `cli.js` paths:
+
+```powershell
+$PSNativeCommandArgumentPassing = 'Standard'
+& 'C:\Program Files\nodejs\node.exe' 'C:\Users\you\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\cli.js' @args
+exit $LASTEXITCODE
+```
+
+This invokes Node with individual arguments; it does not forward through the npm
+batch wrapper. Set `$env:CLAUDE_BIN = 'C:\path\Claude adapter.ps1'` before launching.
+The adapter must preserve argv and the child exit status.
+
+A project without `deps.edn` also gets
+[crapper](https://github.com/qinyuanj/crapper) and
+[mutator](https://github.com/qinyuanj/mutator) cloned side by side into
+`.uml-viewer/` (branch `lua`; override with `CRAPPER_REPO_URL`,
+`CRAPPER_REF`, `MUTATOR_REPO_URL`, `MUTATOR_REF`). They need Python 3.11+.
+Re-run `get-uml-viewer --install-only` to fetch updates to these tool checkouts;
+existing editable installations use the updated source. A failed clone warns
+and installation continues. On Unix the existing tool wrapper creates its own
+virtualenv on first use; the UML installer does not install Python or the tools'
+dependencies. Native Windows entries use each tool's preinstalled
+`.venv/Scripts/python.exe -m crapper` (or `-m mutator`), since the upstream shell
+wrappers cannot run natively. Prepare these environments yourself:
+
+```powershell
+py -3 -m venv .uml-viewer/crapper/.venv
+& .uml-viewer/crapper/.venv/Scripts/python.exe -m pip install -e .uml-viewer/crapper
+py -3 -m venv .uml-viewer/mutator/.venv
+& .uml-viewer/mutator/.venv/Scripts/python.exe -m pip install -e .uml-viewer/mutator
+```
+
+A missing native entry reports these steps. The mutator `lua` branch includes
+argument-vector test commands and Windows process-tree timeout cleanup. For the
+standalone mutator, WSL2 with Ubuntu remains its recommended Windows setup;
+this recommendation does not apply to companion launch. Keep a WSL project in the
+Linux home directory, rather than `/mnt/c`, and install Lua/coverage
+prerequisites with mutator's `scripts/setup-ubuntu.sh`. Native Lua validation
+is recorded in
+[platform acceptance](docs/platform-acceptance.md#mutator-lua-接入复验--2026-10-10).
+The local default-runner fix loads `busted.runner` directly in the selected Lua
+interpreter; it does not require a native Busted executable or a custom
+`--test-command`. Use it with the matching crapper `lua` checkout for LuaRocks
+module-path setup. It needs a real `lua5.4` or `lua` executable; interpreter
+`.cmd` / `.bat` shims are resolved by crapper when possible. LuaRocks
+installations also need their `bin` directory on PATH and their Lua module
+directories in `LUA_PATH` / `LUA_CPATH`; a terminal
+opened before these variables were set may need to be reopened. See
+[mutator's setup and limitations](https://github.com/qinyuanj/mutator/tree/lua#windows).
+
+Analysis always runs from the examined project, forwards individual arguments,
+and preserves the tool's exit status. Standard crapper/mutator invocation is the
+primary quality route; a repository command override is an optional extension.
+The installed standard tools accept CLI options rather than loading persistent
+business-scope settings. `uml-quality.json` can persist these options through
+`standardTools`, independently of optional executable overrides in `operations`:
+
+```json
+{"version":1,"standardTools":{
+  "sourceRoots":["business tree","common"],
+  "exclude":["business tree/generated","**/vendor"],
+  "crapperOptions":[],
+  "mutatorOptions":["--busted-task","fast","--max-workers","3"]
+}}
+```
+
+Every field is an optional array of nonempty strings. Unknown fields fail.
+`standardTools` selects the installed crapper/mutator even when `deps.edn` exists;
+without it, existing aliases/defaults remain. Explicit `operations` take priority
+and still require complete valid command declarations. Roots resolve from the
+project root and must be existing directories inside it. Exclusions are anchored
+at the project root, use either separator, and forbid absolute paths or `..`.
+`*` and `?` match within one segment; `**` matches whole directory segments,
+including zero segments; matching a directory excludes descendants. Matching is
+case-sensitive. Tool option arrays cannot declare owned routing flags (`--root`,
+`--source-root`, `-s`, `--exclude`, `--full-tree`, `--changed`, `--mutate-all`).
+Scope fields own roots/exclusions; only explicit refresh arguments request full
+mutation. Refresh arguments cannot override configured roots/exclusions.
+
+With standard scope configured, mutation expands supplied files/directories (or
+`--changed` Git additions/modifications/untracked files) and filters to business
+sources before calling Mutator. Without targets it selects the configured trees.
+An empty filtered selection fails explicitly without launching a tool. Missing
+paths fail; scoped refresh does not accept textual path filters. Omitted targets
+are diagnosed on stderr. Mutation retains differential behavior and snapshots.
+
+Without persistent configuration, supply scope flags per invocation:
+
+```powershell
+.\uml.ps1 crap --source-root 'business tree' --source-root common --exclude 'business tree/generated'
+.\uml.ps1 mutate 'business tree/file with spaces.lua' --busted-task fast --max-workers 3
+```
+
+External `crap` adds `--full-tree`: crapper publishes every class under the
+specified roots in one `.metrics/crap.edn` snapshot. Roots default to the project
+root, must exist inside it, and exclusions are project-relative paths or globs.
+The tool rejects positional class paths, `--changed` and existing-coverage reuse
+in a full-tree refresh. A failed refresh preserves the previous snapshot rather
+than replacing other classes' metrics with a partial result. `--no-coverage`
+explicitly requests complexity only; it does not establish fresh coverage.
+
+Mutator currently accepts repeated `--source-root` but **has no `--exclude`
+option**. The standard scope adapter supplies selected business files rather
+than passing unsupported exclusions. Without `standardTools`, supply changed
+business files explicitly and omit excluded files from that list; crapper
+exclusions alone do not apply to mutation. `mutate` stays
+differential; only explicitly passing `--mutate-all` requests all sites. Passing `--max-workers 3`
+to `./uml mutate src/calc/init.lua` caps parallel workers without changing
+differential selection. Mutator writes the same
+`.metrics/mutate/<namespace>.edn` snapshots used by the overlay, including
+private Lua functions as `defn-/…`.
+
+The standard contracts were inspected read-only in local crapper `1417c43`
+and Mutator `844a0d7`. CRAP exit 0 means analysis completed; exit 2 means a
+threshold finding after a valid snapshot was published; exit 1 denotes invalid
+arguments or analysis/coverage/publication failure. Mutation exit 0 includes
+uncovered sites recorded as coverage gaps; exit 3 means survivors with published
+snapshots; exit 2 means baseline failure; usage and infrastructure errors are
+failures. Findings retain snapshots and never request an automatic rerun or
+`--mutate-all`. Snapshot joins remain by class namespace, then class id; missing
+CRAP or mutation remains red.
+
+Run `python -I scripts/test_standard_quality.py` for native public-entry checks.
+The optional read-only sibling crapper check uses its installed dependencies to
+verify actual roots, exclusions, complete-tree publication and preservation on
+invalid partial refresh. These checks ran on Windows; macOS remains unverified.
+They do not establish real Lua coverage/Busted or companion mailbox acceptance,
+which remains part of consumer integration.
+
+To run the isolated entry acceptance suite (Python 3 + PowerShell 7 + Git +
+Clojure CLI): `python3 -I scripts/test_entries.py`.
+Set `UML_ENTRY_TEST_TMP` to choose a scratch root. This suite never launches the
+viewer; Windows process-boundary simulations do not constitute native Windows
+acceptance.
+
+`./uml ir` runs the IR generator on `examples/<dir>.policy.edn` (else the
+first `examples/*.policy.edn`, else `policy.edn`). `./uml crap` and
+`./uml mutate` run the project's `:crap` / `:mutate` aliases when it has
+`deps.edn`, otherwise crapper and mutator. Run `./uml crap` on the whole
+tree: `.metrics/crap.edn` is replaced every run. The companion uses these
+three commands for every language.
 
 `./uml` returns immediately (`clojure` in the background, not `clj`/`rlwrap`).
 The diagram is its own JVM. Exceptions and JVM output append to
 **`uml-viewer-log.txt`** in the project directory (gitignored). `clj -M:run`
 still holds the terminal; prefer `./uml`.
 
-A **tmux** session unique to the examined project starts interactive Grok in
-that directory (`--yolo --trust --rules …` plus a launch prompt). The name is
+A **Herdr** session unique to the examined project starts interactive Claude
+Code in
+that directory (`--dangerously-skip-permissions --append-system-prompt …`
+plus a launch prompt). The name is
 `uml-viewer-<project>-<hash>`, stored in `.uml-viewer/companion.edn`. On start
 it writes a hierarchical policy from that project's namespaces and regenerates
 the IR. Type there; Esc is the real TUI interrupt. Closing the diagram kills
-**only that** tmux session and its Terminal window — other Grok agents stay
-up. If that Grok process dies, tmux respawns it in the same pane. That
-instance also runs `clj -M:crap`, `clj -M:mutate`, and IR generate after later
-changes. Project-wide rules live in `.grok/rules/uml-viewer.md`.
+**only that** companion session and its terminal window — other Claude sessions
+stay
+up. Verified abnormal Claude exits use the bounded recovery policy described
+above; normal or unknown exits stop recovery. That
+instance also runs `./uml crap`, `./uml mutate`, and `./uml ir` after later
+changes. Project-wide rules live in `AGENTS.md`.
 
 Prefer `./uml` in the examined project (from `get-uml-viewer`). Aliases
 `:uml-viewer` / `:uml-viewer-restart` still work if present.
@@ -99,18 +319,34 @@ Prefer `./uml` in the examined project (from `get-uml-viewer`). Aliases
 | `./uml --restart` | **associated agent only** | New JVM, same companion. Restores the last view. |
 
 Do **not** pass `--restart` unless you are that companion recycling the
-window after source changes. A stray `--restart` skips spawning Grok and
-leaves a diagram with no agent. The companion recycles the window by
-writing `:quit-for-restart` to `.uml-viewer/to-viewer.edn`, waiting for
-the JVM to exit, then `./uml --restart`. The new JVM restores depth, pan,
-zoom, and which proposal was showing (`.uml-viewer/session.edn`). Do not
-SIGKILL. Closing the window kills only that project's companion, not other
-Grok agents.
+window after source changes. The wrapper requires the existing launcher/JVM
+records and recorded companion ownership, and refuses restart rather than
+leaving a diagram with no agent or replacing a missing companion. The
+companion recycles the window by writing `:quit-for-restart` to
+`.uml-viewer/to-viewer.edn`, waiting for the JVM to exit, then running
+`./uml --restart`. The new JVM restores the saved diagram path, discussion
+context, depth, pan, zoom, and which proposal was showing
+(`.uml-viewer/session.edn`). An explicit path after `--restart` opens that
+diagram instead; omit the path to reuse the saved one. Only a legacy session
+without a saved path falls back to the policy output. Policy selection matches
+`./uml ir`: `examples/<project-directory>.policy.edn`, otherwise the first
+`examples/*.policy.edn` sorted by filename, otherwise root `policy.edn`.
+Relative `:out` paths resolve from the project root; absent `:out` uses the IR
+default `examples/uml-viewer.edn`. Missing or malformed policy, invalid output,
+and unreadable diagrams fail explicitly. A saved or explicit path that fails
+to load does not trigger fallback. This compatibility rule does not migrate
+legacy ownership or relax Herdr verification. Do not SIGKILL.
+Closing the window kills only that project's companion, not other Claude
+sessions.
 
 On a fresh start the canvas stays blank until the companion sends `:display`,
 with **Waiting for agent to create diagram.** `R` reloads the current EDN
 immediately and does not wait. A missing or unreadable file prints
 `UML viewer: file not found: …` in the inspector instead of throwing.
+
+`lua-fixture/` is a Lua project with `.metrics/` snapshots written by
+crapper and mutator. The Lua specs scan it and check the overlay joins
+those snapshots.
 
 ```bash
 clj -M:spec
@@ -120,11 +356,37 @@ clj -M:crap                          # writes .metrics/crap.edn
 clj -M:mutate src/uml_viewer/engine/layout.clj
 ```
 
-This project's `:crap` alias uses `../clojure/crap4clj`. `:mutate` pins
-[clj-mutate](https://github.com/unclebob/clj-mutate) by git SHA. Commit
-`.metrics/` so a clone has numbers without re-running those tools.
+This project's `:crap` alias pins
+[crap4clj](https://github.com/unclebob/crap4clj) and `:mutate` pins
+[clj-mutate](https://github.com/unclebob/clj-mutate), both by git SHA.
+Both tools spawn `clj` as a child process: crap4clj runs
+`sh -c "clj -M:cov --lcov"` and clj-mutate launches `clj -M:spec` /
+`clj -M:cov` directly. On macOS/Linux the standard Clojure CLI install
+covers both. On native Windows the official Clojure CLI is only a
+PowerShell module, so neither `sh` nor a bare process launch can
+resolve `clj`; put a `clj` shell script (for `sh`) and a `clj.exe`
+(for direct launches) that forward to the module on `PATH` first.
+clj-mutate also creates per-worker directory symbolic links, which on
+Windows requires either an elevated (administrator) shell or Developer
+Mode enabled — one of the two, not both. The links are created under
+`target/mutation-workers`, so the checkout must sit on a filesystem that
+supports symlinks (local NTFS); a network or UNC share fails there even
+from an elevated shell. Specs that
+need a real Unix shell or a real Node.js process report pending with
+the missing prerequisite instead of failing. Commit `.metrics/` so a
+clone has numbers without re-running those tools.
 
 Rename or move of a function is a new form: overlay does not match old names.
+
+### Linux / WSL2
+
+The integrated companion workflow now rejects Linux/WSL before creating
+resources. The former tmux/WSLg and Windows Terminal bridge have been retired.
+Run `./uml` and Herdr from native Windows or macOS instead; Linux/WSL has no
+validated Herdr companion path in this release. Source scanning and standalone
+`ir`/`crap`/`mutate` tools are separate from companion launch, and their own
+platform requirements still apply. Existing legacy resources and queues are
+retained; follow the migration instructions before starting fresh.
 
 ## Navigation
 
@@ -191,7 +453,7 @@ namespace is a `:dependency`. `requiring-resolve` of a quoted var is a
 `:stereotype :interface`. `defrecord` or `deftype` of a protocol is
 `:implements`. External `:require`s and `:import`s become **foreign**
 classes. The overlay fills Clojure members from `.metrics/`. TypeScript,
-Rust, and Python are separate scanners (see
+Rust, Python, and Lua are separate scanners (see
 [Language graphs](#language-graphs)): one class per module, with exported
 members as `:ops`. The overlay joins each snapshot by `:ns`, then by
 the class id.
@@ -252,9 +514,9 @@ Right (the ns tree):
  :foreign [quil]
  :order [main adapters application engine source graph
          clojure-language typescript-language rust-language python-language
-         domain]
+         lua-language domain]
  :levels [[domain source graph clojure-language typescript-language
-           rust-language python-language]
+           rust-language python-language lua-language]
           [engine]
           [application]
           [adapters]
@@ -292,7 +554,8 @@ tree's namespace root. `src/model.ts` becomes `bookwriter.model`
 | `:sources` | One scan per `{:lang :root :prefix?}`. The entry `:prefix` is that tree's namespace root |
 | `:foreign` | External libs as ovals. A listed prefix collapses `quil.core` to `quil`. Unlisted externals are dropped |
 
-**Viewer Grok loop** (passed with `--rules` to the companion session only)
+**Viewer Claude loop** (passed with `--append-system-prompt` to the
+companion session only)
 
 On launch: from the examined directory, write or update the hierarchical
 policy and regenerate the IR, then wait.
@@ -392,7 +655,7 @@ and C/M dots; double-click still opens a component.
              :omit [cli]}]
 ```
 
-Companion Grok must not invent `:proposals` on launch and must keep them when
+The companion must not invent `:proposals` on launch and must keep them when
 updating `:order`. If instructed, add a named proposal and regenerate the IR.
 
 The viewer draws a violating arrow **red**, and **bold red** when a selected
@@ -400,13 +663,13 @@ element highlights it. Hand-written IR may set `:violating true` directly.
 
 ## Companion mailbox
 
-The viewer and the companion Grok talk through `.uml-viewer/` in the examined
-project (gitignored). The file is the mail; tmux is only a doorbell.
+The viewer and the companion Claude talk through `.uml-viewer/` in the examined
+project (gitignored). The file is the mail; Herdr delivers the wake-up.
 
 | File | Direction |
 |------|-----------|
-| `.uml-viewer/to-viewer.edn` | Grok → viewer |
-| `.uml-viewer/to-agent.edn` | viewer → Grok |
+| `.uml-viewer/to-viewer.edn` | Claude → viewer |
+| `.uml-viewer/to-agent.edn` | viewer → Claude |
 
 Each mailbox file is a small queue `{:next-id n :queue [cmd …]}` (tmp-then-rename).
 Commands have a rising `:id`. Append; do not overwrite. Handling a command
@@ -414,35 +677,82 @@ Commands have a rising `:id`. Append; do not overwrite. Handling a command
 does this itself on `to-viewer.edn`. The companion must pop each
 `to-agent.edn` command as it handles it.
 
-`.uml-viewer/session.edn` is the last view (depth, pan, zoom, proposal) written
-on `:quit-for-restart` and restored by `--restart`. `.uml-viewer/companion.edn`
-records this viewer's tmux session and Terminal window id so close/kill never
-touches another project's agent.
+`.uml-viewer/session.edn` is the last view (diagram path, discussion context,
+depth, pan, zoom, proposal, and mail cursor) written on `:quit-for-restart`
+and restored by `--restart`. `.uml-viewer/viewer-process.json` records the
+launcher identity, and `.uml-viewer/viewer-jvm.json` records the exact JVM
+PID/start; the public wrapper verifies and waits for those identities before
+starting a replacement. `.uml-viewer/companion.edn`
+records the Herdr session, socket, workspace, pane, server/shell process
+identities and recovery-controller reference. Each operation verifies this
+project's resources before acting; other projects and the shared Herdr service
+remain untouched. Terminal attachment failure retains the companion and prints
+an attach command to the project log.
 
 | `:op` | Meaning |
 |-------|---------|
-| `:display` | Viewer loads `:path` (relative to the project root) |
-| `:regen` | Grok rewrites hierarchical policy, regenerates IR, then `:display` |
-| `:quit-for-restart` | Viewer exits the JVM without killing Grok. The associated agent then runs `clj -M:uml-viewer-restart`. |
-| `:refresh-crap` | Run CRAP on `:target` (class or component), then IR |
-| `:refresh-mutate` | Differential mutate `:target`'s src files, then IR |
-| `:refresh-mutate-all` | `clj -M:mutate --mutate-all` on `:target`'s src files, then IR |
+| `:display` | Viewer loads `:path` (relative to the project root). Canonical paths identifying the current diagram reload IR/metrics and retain its valid view; a different diagram starts at its own root. |
+| `:regen` | Claude rewrites hierarchical policy, regenerates IR, then `:display` |
+| `:quit-for-restart` | Viewer saves the diagram path, discussion context, view, and mail cursor, then exits the JVM without killing Claude. The associated agent waits for exit and runs `./uml --restart`. |
+| `:refresh-crap` | Public `./uml crap` with declared scope (standard tools: whole business tree; operation override: targets or whole tree); valid result → successful IR → display |
+| `:refresh-mutate` | Public `./uml mutate` on target files, differential; valid results → successful IR → display |
+| `:refresh-mutate-all` | Public `./uml mutate --mutate-all` on target files only; valid results → successful IR → display |
 | `:omit` | Add `:target` `:id` to proposal or policy `:omit`, then IR |
 | `:context` | Inspector selection is the discussion context: `{:context :real}` or `{:context :proposal :proposal-id id :name "…"}` |
 
+Quality refreshes share CLI dispatch and its configured scope/exclusions. Install
+an absent public entry with `get-uml-viewer --install-only`. Process mail oldest
+first, popping and rewriting the queue; keep real/proposal discussion context
+until later context mail, and preserve proposal definitions and omit semantics.
+For a Clojure component, run mutation once per selected source file. Scoped
+mutation passes selected files without adding source-root flags.
+
+Before each serialized quality invocation remove the previous
+`.uml-viewer/quality-result.json`, await completion and capture the actual exit.
+The newly published record must have version 1, the requested operation, this
+canonical project root, the actual exit code and `validResult: true`. Require
+all component results to pass before IR. Missing, stale, malformed or mismatched
+records and invalid results stop that request's IR/display and report the cause.
+IR must itself exit 0 before display. Continue later FIFO requests after a
+failure. Recovery follows the same gate and never displays a failed refresh.
+Survivors and uncovered mutants retain their snapshots; they do not trigger
+retries or implicit full mutation.
+
+Generic Clojure aliases accept exit 0 only. An optional version-1
+`uml-quality.json` field `aliasResultExitCodes` declares `crap` and/or `mutate`
+arrays of valid integer exit codes (0–255), without changing alias argv or tool
+selection. `operations` overrides still take precedence, then `standardTools`,
+then aliases for projects with `deps.edn`. Alias declarations apply only to the
+alias route. This repository declares mutation `[0, 3]` for
+[the pinned clj-mutate contract](https://github.com/unclebob/clj-mutate/blob/c8c0eedf34dafec270e13e74a106ff1703578d28/src/clj_mutate/core.cljc):
+passed/no-changes 0, configuration error 1, baseline failure 2,
+survivors/uncovered 3, engine error 4. Standard Mutator also declares 0/3;
+exit 3 is never universally accepted. Direct `clj` commands publish no wrapper
+result record. Noninteractive wrapper and application tests establish these
+boundaries; actual Windows Herdr right-click/FIFO/display acceptance remains
+pending manual validation. Native macOS acceptance remains unverified.
+
+Same-diagram display keeps focus, pan, zoom, proposal/open layer, declutter,
+and valid selection/detail cards. A missing focus falls back to the nearest
+remaining namespace ancestor; a missing layer returns to proposal root; a
+missing proposal returns to the namespace tree. Missing selection/card targets
+are cleared. Display preserves discussion context until another `:context`
+arrives. Automated application specs cover this refresh contract; combined
+Windows companion right-click acceptance is pending, and native macOS acceptance
+has not been run.
+
 Clicking **Real diagram** or a proposal (including **New Proposal**) writes
-`:context` and wakes Grok. Stay on that architecture until the next
+`:context` and wakes Claude. Stay on that architecture until the next
 `:context`.
 
 Right-click ops include `:target {:id :ns :kind :class|:component :proposal-id?}`.
 `:kind` is `:component` for a layer box (and its nested nses) and `:class`
 for a module.
 
-**Regen** in the inspector queues `:regen` and wakes Grok with literal text, a
-150ms pause, `C-m`, 50ms, then `C-j` (same timing as SwarmForge). The wake-up
-does not contain the command. If Grok is busy, it finishes first, then reads
-the mailbox. If tmux is missing, the button still writes the file and the
-inspector says the session is not attached.
+**Regen** in the inspector queues `:regen` before asking Herdr to wake the
+verified companion. The wake-up tells Claude to consume the FIFO mailbox; if
+Claude is busy, it finishes first. A failed wake keeps the queued request and
+the inspector reports that the session is not attached.
 
 ## Language graphs
 
@@ -515,12 +825,31 @@ project name. `list[Animal]` is not. Public module-level functions and
 classes are `:ops`. A module whose public classes are only `Protocol` or
 `ABC` bases, with no public functions, is `:stereotype :interface`.
 
+**Lua** (`uml-viewer.lua-language.graph-lua`) emits one class per `.lua`
+module. The module name is the `require` path: strip the longest of
+`src/lua/`, `src/`, `lua/`, drop `.lua`, collapse a trailing `/init`,
+then `/` becomes `.`, so `src/calc/init.lua` and `src/calc/util.lua`
+become `calc` (`:calc`) and `calc.util` (`:calc.util`). It skips
+`*_spec.lua` and paths under `spec`, `lua_modules`, `dist`, `build`,
+`target`, and `.metrics`. `require "a.b"`, `require("a.b")`, and
+`require 'a.b'` are dependencies; a name that is not a project module is
+foreign (`lfs` stays `:lfs`). Comments, strings, and long brackets are
+masked, so a `require` inside them is ignored. Top-level functions that
+are not `local` are `:ops`, named as written in the source (`M.clamp`,
+`Account:deposit`). A function declared inside another is not an op.
+A top-level `setmetatable(t, {__index = Base})` or
+`setmetatable(t, Base)`, where `local Base = require("app.base")` names a
+project module, is `:inheritance` on that module. This is a pattern match,
+not an evaluation: a `setmetatable` inside a function makes an instance and
+draws nothing, and a base that is not a local bound by `require` is not
+followed. There are no `:implements` edges and no interface stereotype.
+
 `merge-scans` links a TypeScript `invoke("read_text")` to the Rust class
 that owns `#[tauri::command] fn read_text`, as a `:dependency`. Two
 project classes with the same id are an error. When a dependency and an
 `:implements` edge join the same pair, the IR keeps `:implements`.
 
-CRAP and mutation for TypeScript, Rust, and Python come from separate
+CRAP and mutation for TypeScript, Rust, Python, and Lua come from separate
 tools. The overlay joins a snapshot to the class whose `:ns` equals that
 namespace. Otherwise the class id owns that name (`bookwriter.model`
 owns `model`), a dotted child rolls up (`pdf` owns `pdf.Layout`), and
@@ -651,9 +980,10 @@ extractor must satisfy `LanguageSource`:
 `:file`.
 
 **TypeScript** (`uml-viewer.typescript-language.source-typescript`),
-**Rust** (`uml-viewer.rust-language.source-rust`), and **Python**
-(`uml-viewer.python-language.source-python`) open `:file` and find the
-exported declaration, the `fn`, or the `def`. The class card passes
+**Rust** (`uml-viewer.rust-language.source-rust`), **Python**
+(`uml-viewer.python-language.source-python`), and **Lua**
+(`uml-viewer.lua-language.source-lua`) open `:file` and find the
+exported declaration, the `fn`, the `def`, or the `function`. The class card passes
 `:lang` and `:file` from the class. A class with no `:lang` still uses
 the Clojure extractor that Main passes in. The protocol is the seam; do
 not special-case languages in the class card.

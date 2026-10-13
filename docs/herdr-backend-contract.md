@@ -1,0 +1,234 @@
+# Herdr SessionBackend 契约 — spec #13 / issue #14 产出
+
+本文档记录 Herdr 的能力证据和当前生命周期契约。#23 退役后 Herdr 是原生
+Windows/macOS 唯一 companion 后端；`--backend herdr` 保留为兼容选项。
+Windows 完整生命周期仅部分原生验收，macOS 端到端验收按维护者决定取消，
+两者均不宣称全部通过。能力实验与端到端验收分开记录；未验证项不按官网
+声明或命令退出码 0 推断。旧 ownership 迁移见 §9。
+
+证据来源：
+- Windows checkpoint：#14 评论（2026-10-10，Herdr 0.9.3 / protocol 22）
+- macOS checkpoint：#14 评论（2026-10-10，Darwin 27.0.0 arm64，同上版本）
+
+## 1. 版本预检契约
+
+**唯一有证据的版本是 Herdr 0.9.3（socket protocol 22）。** 不虚构范围：
+
+- wrapper 与 JVM 共用只读预检，创建 detached Viewer、终端或 companion 前执行
+  `herdr --version`（必须为 `herdr 0.9.3`）及 `herdr api schema --json`
+  （bundled schema 的顶层 `protocol` 必须为 22），且平台为 macOS 或 Windows。
+  schema 是随 CLI 分发的本地数据；预检禁止为了协议核对创建 server。
+  #17 创建已拥有的 server 后还须核对实际 endpoint 兼容性。
+- 官方来源：[Herdr 0.9.3 release](https://github.com/herdrdev/herdr/releases/tag/v0.9.3)
+  与 https://herdr.dev；macOS 可使用 Homebrew `herdr`，但安装后仍必须核对版本。
+  其他版本（包括更高版本）、缺失依赖或协议不匹配均失败，给出安装指引；
+  不自动下载、升级或静默回退。
+- fresh 默认 Herdr；`--backend herdr` 兼容，tmux/psmux 明确拒绝。
+  restart、wake、close 必须具有显式 `:backend :herdr` ownership，身份核实后
+  才操作；legacy、无 backend、未知或不完整记录保留并拒绝接管。
+  Linux/WSL companion 启动在创建资源前拒绝，旧 tmux 路径已退役。
+  Herdr 创建项目独占的命名 server；预检本身仍不创建任何资源。
+
+## 2. 身份与 ownership 契约
+
+Herdr 的 pane ID 是 **session 局部** 的：两个命名 session 各自都有
+`w1:p1`。因此持久化记录必须包含完整寻址链，后续操作按记录路由，
+禁止按当前 OS 或默认后端重新猜测：
+
+```clojure
+{:backend :herdr
+ :owner-role :companion
+ :session <命名 session，如 uml-viewer-<project-hash>-<uuid>>
+ :socket <session socket 绝对路径>
+ :workspace <如 "w1">
+ :pane <如 "w1:p1">
+ :terminal-id <"term_...">
+ :server-pid <独占 server 的进程 id>
+ :server-start <server 进程启动时间>
+ :shell-pid <pane shell pid>
+ :owner-start <shell 进程启动时间，防 PID 复用>
+ :cwd <规范化项目根目录>
+ :command <原始命令向量>}
+```
+
+- 创建前写 provisional 记录；部分失败后保留，禁止自动再建。
+- 每次 `probe!`/`bind!`/`wake!`/`cleanup!` 之前核对：session socket 可达、
+  snapshot 中存在该 workspace/pane、`pane process-info` 的 shell_pid 与
+  cwd 匹配、owner-start 一致。任一不符或含糊：失败并给诊断，不创建
+  替代会话、不关闭猜测目标。
+- macOS owner-start 可用 `ps -o lstart=`；Windows 沿用 #15 的进程创建
+  时间方案。
+- 双项目隔离已验证：A 的 workspace 关闭与 server 停止不影响 B。
+  `cleanup!` 只作用于记录中的 session，绝不停共享/其他 session。
+
+## 3. SessionBackend 接口映射
+
+对现有协议（`companion.clj` 的 `SessionBackend`）逐项给出 Herdr 实现
+边界：
+
+| 接口 | Herdr 机制 | 契约与已验证语义 |
+|---|---|---|
+| `create!` | `herdr --session <s> server`（隔离 server）+ `workspace create --cwd <root> --no-focus` | cwd 原样保留（含空格、`&`、中文已验证）。pane 内命令经 **argv 桥接** 投递（见 §4）。 |
+| `probe!` | `status server` + `api snapshot` | session 存在且 socket 可达、记录中的 pane 存在于 snapshot 才算存活；超时/含糊不得视为"已不存在"。 |
+| `identity!` | snapshot + `pane process-info --pane <id>` | 返回并核对上节全部字段；`terminal_id` 在 pane 存续期稳定。 |
+| `bind!` | 同上，纯核对，无副作用 | Viewer 新 JVM 重启后只重新绑定记录的 pane；缺失或身份变化则拒绝启动，不创建替代。 |
+| `wake!` | `agent prompt <pane> <text>` | 投递前核对 owned pane 的 Claude occupancy；Herdr 再次校验 agent 并提交字面文本及 Enter。wake 效果按 §5 的邮件消费确认，不能以 CLI 成功代替。 |
+| `recovery!` | Herdr 不提供，由项目自有 runner + 监督层实现 | 见 §6。开启/关闭恢复即注册/注销项目监督。 |
+| `cleanup!` | 先注销监督，再 `workspace close <w>`，最后 `session stop` + `session delete` | 顺序固定：先撤恢复再销毁。只清理记录拥有的资源。 |
+
+错误语义（已验证，adapter 必须原样透出）：
+
+- pane 缺失：`pane_not_found`，exit 1；
+- 输出等待超时：`timeout`，exit 1，邮件保留在队列；
+- 非法按键：`invalid_key`，exit 1；
+- CLI 语法错误：exit 2。
+
+## 4. argv 与终端连接契约
+
+- `pane run` 的命令字符串**经 shell 解析**：裸 `$HOME` 会展开。字面 argv
+  必须由项目桥接（对每个参数做 POSIX shell 引号转义后拼接；Windows 用
+  已验证的 PowerShell ArgumentList 桥）。已验证可字面保留：空格、单引号、
+  反引号、`$`、`&`、`;`、Unicode/中文、空串、尾部反斜杠。
+- 退出码不由 Herdr 上报，桥接器负责显式捕获（`echo EXIT=$?` 模式或
+  runner 写状态文件）。已验证 exit 37/0 均可捕获。
+- 终端可见 attach：macOS 有原生 TUI（`herdr session attach <name>`；
+  已人工确认 TUI 打开、中文渲染、`Ctrl+B q` detach；输入回显尚未人工确认，
+  且 detach 后 pane 与会话存活；无 TTY 时干净失败 exit 1）。
+  Windows 直连终端 attach 不支持；完整 `session attach` 已输出实际 TUI 渲染流。
+  adapter 使用 Windows Terminal 打开完整客户端，只在客户端子进程清除
+  `HERDR_ENV`；人工输入、detach 与完整 Viewer 验收仍需单独记录。
+- companion 的 EDN 邮箱联动不依赖 TUI：socket/CLI 控制与面板输入在
+  无 TTY 下全部可用（已验证）。
+
+## 5. wake 效果确认
+
+wake 投递成功或 `pane wait-output`（socket `pane.wait_for_output`）匹配输出
+不能单独证明 Claude 消费输入：匹配可能来自旧快照或终端回显。#17 须使用
+本次投递的唯一 token 与应用确认/邮件队列推进等消费证据，在有限窗口内核对。
+已验证 `wait-output` 会立即搜索已有快照再轮询，超时 exit 1。唤醒失败
+不丢邮件（队列保留由现有 mailbox 语义保证）。
+
+## 6. 退出检测与恢复契约（项目自有）
+
+#19 实现采用以下有界政策，而不是无限重启：
+
+- **runner**：pane 内启动项目拥有的 Java runner。runner 使用 `ProcessBuilder`
+  直接启动精确 argv/cwd 并保留实际 Claude 子进程 handle；交互 stdin/stdout/
+  stderr 继承 pane（`inheritIO`），状态文件原子替换记录唯一 generation token、
+  实际 child PID/start、退出码与时间。Windows 只接受直接 native `claude.exe`
+  或 `node.exe` + 官方 `cli.js`；`.ps1`/`.cmd` wrapper 会在创建资源前拒绝，
+  因为无法证明实际 child 身份。runner 被杀死且没有匹配的最终 exit 记录时，
+  原因未知，不恢复。
+- **controller**：项目独占 detached JVM，经 OS `FileChannel` 单例 lock 注册
+  UUID/PID/start。Viewer 只持久化 immutable supervisor 引用；mutable phase、
+  generation、child、budget、deadline、diagnostic 位于单独 `recovery.edn`，
+  controller 是唯一 writer，绝不重写 companion ownership。Viewer JVM 重启
+  只核对既有 controller，不重置 budget/generation，不自动采用死亡 controller。
+- **政策**：初始运行之外最多 3 次重试；deadline 为 1/2/4 秒。重试计数在
+  提交前增加；只有实际 child PID/start 连续存活 60 秒才重置，与邮件 ack
+  无关。时钟为单调 clock；Viewer 重启不影响政策。
+- **区分**：当前 generation 的匹配 exit 0 → 正常退出，不恢复；匹配非零 →
+  退避；unknown token、缺失/矛盾状态、child PID/start 消失、pane/server
+  死亡或提交确认丢失均 fail closed，队列保留，不猜测替代会话。
+- **提交**：启动与取消共用 OS lock；提交前重核 session/socket/workspace/
+  pane/shell PID/start、pane foreground 只含 shell，并先 journal 唯一
+  generation。提交 ack 不确定时不得重复提交；runner generation lock 阻止
+  重复 child。恢复命令显式 `--resume <原始 Claude session id>`，提示只消费
+  FIFO 并返回 display，不重新扫描或发明 proposal。
+- **关闭**：先写 durable cancel，经同 lock 与 controller 同步；controller
+  必须确认取消且退出后才销毁 workspace/server。close 阶段在每次破坏性
+  操作之前落盘，可核对并续接已关闭 workspace、已停止 server 与已删除 session；
+  身份变化或含糊时失败，不影响其他项目或共享 Herdr 服务。
+
+Windows 已记录真实 Claude 异常恢复、namespace JVM 重启与身份连续性等部分
+原生结果，详见 `windows-herdr-21-acceptance.md`。预算耗尽、正常退出不恢复、
+待重试取消和部分 GUI 恢复仍未原生验证；macOS 端到端验收已取消，不声明通过。
+
+### Herdr 原生证据边界（#14）
+
+- pane 内子进程正常退出与被 SIGKILL，pane shell 均存活且 shell_pid 不变，
+  Herdr **不提供任何区分信号**；Claude 死亡后 agent 从列表消失
+  （`agent_not_found`），无原因字段。
+- socket `events.subscribe` 的 `pane.exited` 仅在 **pane 进程本身死亡**
+  时推送，载荷仅 `{pane_id, workspace_id}`，无退出码；API 主动 close
+  不触发；末 pane 死亡自动关闭整个 workspace。
+- 同 pane 重启已验证可行：Claude 被 SIGKILL 后在原 pane 重新
+  `agent start`/`pane run` 可正常交互。
+
+因此契约如下：
+
+- **runner**：companion 不由 shell 直接跑 Claude，而是跑项目拥有的
+  runner（脚本/manifest 进程），runner supervise Claude 子进程，等待并把退出码、退出
+  时间、信号信息写到项目 `.uml-viewer/` 下的状态文件。这是区分
+  正常/异常退出的唯一可靠来源。
+- **监督层**：项目实现有限退避重试（次数上限、退避序列、计数重置规则
+  在实现时明确记录并确定性测试）。监督通过轮询 `pane process-info`
+  的 foreground + 读 runner 状态文件判断退出；`pane.exited` 仅用于
+  pane 整体死亡（此时 runner 也死了，视为恢复失败；重建的 ownership
+  规则须由 #19 单独定义，不能猜测或自动替代身份缺失的资源）。
+- **区分语义**：runner 状态文件退出码 0 → 正常退出，不恢复；主动关闭
+  标记也独立禁止恢复。非零退出且未主动关闭 → 异常，进入退避重试；
+  Viewer 关闭 → 先注销监督取消待重试。
+- **恢复动作**：在原 pane 重新投递 runner 命令（同 pane 重启已验证）。
+- 若未来 Herdr 版本提供带子进程退出码的事件，可简化 runner，但
+  0.9.3 必须按上述实现。
+
+## 7. Viewer 重启连续性
+
+- `:quit-for-restart` 流程不变：保存图路径、讨论 context、视图与 mailbox
+  cursor → JVM 退出 → public wrapper 核实 launcher/JVM 记录并等待旧 JVM
+  退出后启动新 JVM。
+- 省略重启路径时，新 JVM 恢复上次保存的图；显式路径是明确 override。讨论
+  context 独立于当前 selection；不会由 proposal 推测或发明。
+- 新 JVM 用 §2 的持久化记录 `bind!` 原 pane（核对 socket/workspace/
+  pane/shell_pid/owner-start），不创建新 companion。记录缺失或身份
+  含糊 → 明确报错，不开 viewer、不建替代会话。
+- Herdr server 独立于 Viewer JVM 存活（headless server 模型已验证），
+  companion 跨 JVM 更换存活是设计预期；restart 绑定后调用 `recovery! true`
+  核实既有 controller，不重置 generation/budget、不重建 ownership。
+  Windows namespace 重启已部分原生通过，proposal/detail 等缺口见验收记录；
+  macOS 端到端连续性未完成原生验收。
+
+## 8. 原生验收边界
+
+Windows #21 已部分验收收尾；未验证的七项转由 [#30](https://github.com/qinyuanj/uml-viewer/issues/30) 跟踪：命名 proposal
+恢复、f5ceb0b detail 窗口复验、恢复预算耗尽、正常退出不恢复、待重试关闭取消、
+手动 terminal attach、focus/open-layer 与 metrics overlay 重启复验。
+完整结果及证据见 `windows-herdr-21-acceptance.md`，历史结果不视为本次重跑。
+
+macOS #22 已取消，未完成端到端原生验收。0.9.3 以外版本不接受。
+Linux/WSL companion 不受支持；独立扫描/质量命令保持各自平台要求。
+
+### 本地收尾记录 — 2026-10-12（#13 / #23）
+
+Herdr 迁移及旧后端退役实现（604aadb）已通过 cc57110 合入本地 `lua`。
+本轮静态检查确认 public wrapper/preflight、JVM fresh/restart、wake、recovery
+及 close 路径均使用 Herdr；旧名称仅用于拒绝 legacy ownership/参数、对应
+验证及历史证据。未发现需要补改的活跃源码，本轮仅补齐交付与历史说明。
+
+截至本次记录，本地 `lua` 尚未同步远端，本轮文档修改尚未提交；发布未完成。
+#13 / #23 的实现已在本地合入，不代表其交付、最终回归或原生验收已完成，
+本轮未修改或关闭 GitHub issue。
+
+按维护者要求，本轮不运行测试（含入口及生命周期回归）、CRAP、差分 mutation、
+IR 或原生验收。合并后的最终运行验证仍待安排，历史通过结果不作为本轮结果；
+仅执行 `git diff --check` 检查文档差异格式，不能据此宣称运行行为通过。
+Windows #21 仍为部分验收，上述七项欠项继续由 #13 跟踪；macOS #22 是取消，
+不是通过。本轮不启动或重启 Viewer，也不处理所有权未知的遗留 fixture/进程。
+
+## 9. 旧后端退役与迁移
+
+Herdr 是唯一后端；tmux/psmux adapter、pane 恢复 hook 和旧终端桥接均退役。
+旧或未标记 backend 的 `.uml-viewer/companion.edn` 保留并拒绝使用，避免
+猜测接管、误关闭或以 fresh 启动覆盖活动资源。
+
+迁移按以下顺序进行：
+
+1. 用旧版本正常结束该项目的旧 Viewer/session；确认该项目的 legacy 资源已退出。
+2. 归档该项目的 `.uml-viewer/companion.edn`。保留 `session.edn`、policy/proposal
+   和两个 mailbox 队列；不要把旧记录改标为 Herdr。
+3. 在原生 Windows/macOS 安装 Herdr 0.9.3，并通过 `./uml` fresh 创建新 companion。
+   `--restart` 用于复用已验证的 Herdr 身份，不用于跨后端迁移。
+
+新版本不会自动清理活动 legacy 资源，也不会影响其他项目或共享 Herdr 服务。
+维护者已明确取消双平台完整验收作为退役前置条件；这项决策不改变未验证状态。
