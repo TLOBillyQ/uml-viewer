@@ -41,6 +41,16 @@
       (should= :regen (:op (last (:queue (mailbox/read-mailbox f)))))
       (should-not (.exists (io/file (str (.getPath f) ".tmp"))))))
 
+  (it "retries the atomic replacement while a reader holds the target"
+    (let [root (tmp-root)
+          f (mailbox/to-agent root)]
+      (mailbox/write-command! f :regen {})
+      (with-open [reader (io/input-stream f)]
+        (let [closer (future (Thread/sleep 300) (.close reader))]
+          (mailbox/write-command! f :context {:context :real})
+          @closer))
+      (should= [:regen :context] (mapv :op (:queue (mailbox/read-mailbox f))))))
+
   (it "queues later commands instead of overwriting"
     (let [root (tmp-root)
           f (mailbox/to-agent root)]
@@ -50,6 +60,13 @@
         (should= [:context :omit] (mapv :op q))
         (should= :context (:op (mailbox/unread f 0)))
         (should= :omit (:op (mailbox/unread f 1))))))
+
+  (it "retains every pending request while a companion is unavailable"
+    (let [f (mailbox/to-agent (tmp-root))]
+      (dotimes [_ 40] (mailbox/write-command! f :regen {}))
+      (should= (vec (range 1 41)) (mapv :id (mailbox/pending f 0)))
+      (should= 1 (:id (mailbox/take-command! f)))
+      (should= (vec (range 2 41)) (mapv :id (mailbox/pending f 0)))))
 
   (it "returns unread commands only once past seen-id"
     (let [root (tmp-root)
@@ -86,7 +103,7 @@
     (let [s {:path "examples/library.edn" :mail-seen 0 :waiting true}
           next (document/apply-mail s {:id 3 :op :display :path "examples/library.edn"})]
       (should= 3 (:mail-seen next))
-      (should (.endsWith (:path next) "examples/library.edn"))
+      (should= (.getCanonicalPath (io/file "examples/library.edn")) (:path next))
       (should (seq (get-in next [:scene :classes])))
       (should-not (:waiting next))))
 

@@ -1,5 +1,6 @@
 (ns uml-viewer.python-language.source-python-spec
   (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [speclj.core :refer :all]
             [uml-viewer.python-language.source-python]
             [uml-viewer.source :as source]))
@@ -39,5 +40,5 @@
       (let [found (source/member-source {:lang :python
                                          :file (.getPath file)
                                          :ns "app.model"})]
-        (should= (.getPath file) (:file found))
+        (should= (str/replace (.getPath file) #"\\" "/") (:file found))
         (should-be-nil (:line found))))))

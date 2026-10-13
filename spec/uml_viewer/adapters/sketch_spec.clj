@@ -1,5 +1,6 @@
 (ns uml-viewer.adapters.sketch-spec
-  (:require [quil.applet :as applet]
+  (:require [clojure.string :as str]
+            [quil.applet :as applet]
             [quil.core :as q]
             [speclj.core :refer :all]
             [uml-viewer.application.detail :as detail]
@@ -11,9 +12,10 @@
             [uml-viewer.engine.layout :as layout]
             [uml-viewer.domain.ir :as ir]
             [uml-viewer.adapters.sketch :as sketch]
+            [uml-viewer.adapters.companion :as companion]
             [uml-viewer.adapters.source-window :as source-window]
             [uml-viewer.domain.mailbox :as mailbox])
-  (:import [java.awt Frame]
+  (:import [java.awt Canvas Frame]
            [java.util.concurrent CountDownLatch TimeUnit]
            [javax.swing JWindow]
            [processing.event Event MouseEvent]))
@@ -131,6 +133,13 @@
         (should-be-nil (call 'front! :not-a-window))
         (should= [[:extended Frame/NORMAL] [:visible true] :to-front :focus :focus-win]
                  @frame-calls)
+        (reset! frame-calls [])
+        (let [canvas (Canvas.)]
+          (.add frame canvas)
+          (call 'front! canvas)
+          (should= [[:extended Frame/NORMAL] [:visible true] :to-front :focus :focus-win]
+                   @frame-calls))
+        (should-be-nil (call 'front! (Canvas.)))
         (should= [[:visible true] :to-front :focus :focus-win]
                  @window-calls)
         (finally
@@ -170,6 +179,20 @@
         (finally
           (.dispose frame)))))
 
+  (it "titles the class card through the window hosting a canvas surface"
+    (let [titles (atom [])
+          frame (proxy [Frame] []
+                  (setTitle [t] (swap! titles conj t)))
+          canvas (Canvas.)]
+      (try
+        (.add frame canvas)
+        (reset! sketch/!bridge
+                {:applet (->FakeApplet false (->FakeSurface canvas (atom nil)))})
+        (call 'set-card-title! "Draw")
+        (should= ["Draw"] @titles)
+        (finally
+          (.dispose frame)))))
+
   (it "closes the detail applet by disposing its window"
     (let [disposed (atom false)
           frame (proxy [Frame] []
@@ -182,7 +205,21 @@
       (call 'close-detail-window!)
       (should @disposed)
       (should-be-nil (:applet @sketch/!bridge))
-      (should (:exiting @sketch/!bridge)))))
+      (should (:exiting @sketch/!bridge))))
+
+  (it "closes the detail applet through the window hosting a canvas surface"
+    (let [disposed (atom false)
+          canvas (Canvas.)
+          frame (proxy [Frame] []
+                  (dispose [] (reset! disposed true)))]
+      (.add frame canvas)
+      (reset! sketch/!bridge
+              (assoc (empty-bridge)
+                :applet (->FakeApplet false (->FakeSurface canvas (atom nil)))))
+      (call 'close-detail-window!)
+      (should @disposed)
+      (should-be-nil (:applet @sketch/!bridge))
+      (should (:exiting @sketch/!bridge))))
 
   (it "runs a function on the swing thread"
     (let [done (CountDownLatch. 1)
@@ -193,28 +230,28 @@
       (should (.await done 2 TimeUnit/SECONDS))
       (should @ran)))
 
-  (it "shuts down grok children then halts the VM"
+  (it "shuts down claude children then halts the VM"
     (let [order (atom [])]
       (reset! sketch/!bridge (empty-bridge))
-      (with-redefs [uml-viewer.adapters.sketch/shutdown-children! (fn [] (swap! order conj :grok))
+      (with-redefs [uml-viewer.adapters.sketch/shutdown-children! (fn [] (swap! order conj :claude))
                     uml-viewer.adapters.sketch/halt-vm! (fn [] (swap! order conj :halt))]
         (call 'exit-app!)
-        (should= [:grok :halt] @order))))
+        (should= [:claude :halt] @order))))
 
-  (it "keeps grok alive when the bridge says keep-agent"
+  (it "keeps claude alive when the bridge says keep-agent"
     (let [order (atom [])]
       (reset! sketch/!bridge (assoc (empty-bridge) :keep-agent true))
-      (with-redefs [uml-viewer.adapters.sketch/shutdown-children! (fn [] (swap! order conj :grok))
+      (with-redefs [uml-viewer.adapters.sketch/shutdown-children! (fn [] (swap! order conj :claude))
                     uml-viewer.adapters.sketch/halt-vm! (fn [] (swap! order conj :halt))]
         (call 'exit-app!)
         (should= [:halt] @order))))
 
-  (it "exits the JVM without killing grok when quitting for restart"
+  (it "exits the JVM without killing claude when quitting for restart"
     (let [order (atom [])]
       (reset! sketch/!bridge (empty-bridge))
       (with-redefs [uml-viewer.adapters.sketch/close-detail-window! (fn [] (swap! order conj :detail))
                     q/exit (fn [] (swap! order conj :quil))
-                    uml-viewer.adapters.sketch/shutdown-children! (fn [] (swap! order conj :grok))
+                    uml-viewer.adapters.sketch/shutdown-children! (fn [] (swap! order conj :claude))
                     uml-viewer.adapters.sketch/halt-vm! (fn [] (swap! order conj :halt))]
         (call 'quit-for-restart!)
         (should (:keep-agent @sketch/!bridge))
@@ -298,7 +335,7 @@
         (should= (:id rel) (:pick @sketch/!bridge))
         (reset! sketch/!bridge (assoc (empty-bridge) :model model :pick nil))
         (call 'detail-mouse-pressed {:scroll 0} {:y 0})
-        (should-be-nil (:pick @sketch/!bridge)))))
+        (should-be-nil (:pick @sketch/!bridge))))))
 
 (describe "sketch keys and lifecycle"
   (before (reset! sketch/!bridge (empty-bridge)))
@@ -375,8 +412,19 @@
   (it "loads the EDN immediately on restart"
     (quiet-quil
       (fn []
-        (with-redefs [document/restart-state (fn [p] {:path p :loaded true})]
+        (with-redefs [document/restart-state (fn [p & _] {:path p :loaded true})]
           (should= {:path "doc.edn" :loaded true} (sketch/setup "doc.edn" true))))))
+
+  (it "opens the saved detail card when start! restores its id"
+    (let [s (assoc (state) :detail-id :a) opened (atom nil) cfg (atom nil)]
+      (with-redefs [q/sketch (fn [& kwargs] (reset! cfg (apply hash-map kwargs)) {:fake true})
+                    uml-viewer.adapters.sketch/remember-companion! (fn [_] "uml-viewer-A")
+                    document/restart-state (constantly s)
+                    uml-viewer.adapters.sketch/ensure-detail-window! (fn [model] (reset! opened model))]
+        (sketch/start! "doc.edn" :source true "root")
+        (should (fn? (:setup @cfg)))
+        (should= s ((:setup @cfg)))
+        (should= :a (get-in @opened [:class :id])))))
 
   (it "quits for restart when mail says so"
     (let [quit (atom 0)
@@ -620,7 +668,7 @@
                                           state)
                           uml-viewer.adapters.sketch/on-main-close (fn [state] state)
                           uml-viewer.adapters.sketch/exit-app! (fn [])]
-              (should= {:path "doc.edn" :waiting true} ((:setup @opts)))
+              (should= {:path "doc.edn" :waiting true} (select-keys ((:setup @opts)) [:path :waiting]))
               ((:mouse-moved @opts) :s {:x 4 :y 5})
               (should= [:s 4 5] @moved)
               ((:key-pressed @opts) :s {:key :r})
@@ -636,15 +684,47 @@
                        @keyed)
               (should= :s ((:on-close @opts) :s))
               (should (fn? (:key-released @opts)))
-              (should= :s ((:key-released @opts) :s {:key :esc}))))))))
+              (should= :s ((:key-released @opts) :s {:key :esc})))))))))
 
-(describe "grok session"
+(describe "external process integration"
+  (it "exposes process failures and deadlines through the existing process boundary"
+    (when (sketch/windows?)
+      (pending "exercises a real Unix shell"))
+    (let [failure (sketch/run-command ["/bin/sh" "-c" "printf stdout; printf stderr >&2; exit 7"])]
+      (should= 7 (:exit failure))
+      (should= "stdout" (:out failure))
+      (should= "stderr" (:err failure)))
+    (let [missing (sketch/run-command ["/no/such/uml-viewer-command"])]
+      (should-be-nil (:exit missing))
+      (should (seq (:err missing))))))
+
+(describe "claude session"
+  (around [run-spec]
+    (with-redefs [companion/process! (fn [argv] (throw (ex-info "Unexpected external process in unit spec" {:argv argv})))]
+      (run-spec)))
+
+  (it "does not use another project's in-memory session as a wake candidate"
+    (let [root (str (System/getProperty "java.io.tmpdir") "/uv-isolation-" (System/nanoTime))
+          previous-session @sketch/!session-name]
+      (try
+        (reset! sketch/!session-name "uml-viewer-another-project")
+        (should-not (sketch/notify-agent! root))
+        (finally (reset! sketch/!session-name previous-session)))))
+
+  (it "refuses to open the viewer when companion creation fails"
+    (let [opened (atom false)]
+      (with-redefs [sketch/open-in-terminal! (fn [& _] (throw (ex-info "creation failed" {})))
+                    q/sketch (fn [& _] (reset! opened true))]
+        (should-throw clojure.lang.ExceptionInfo "creation failed" (sketch/start! "doc.edn" :source))
+        (should-not @opened))))
+
   (it "mails discussion context for the real diagram and a proposal"
     (let [got (atom nil)]
       (with-redefs [sketch/request-agent! (fn [_ op extra]
                                             (reset! got {:op op :extra extra})
                                             {:cmd extra :woke? true})]
-        (sketch/mail-context! {:path "examples/library.edn" :doc {}})
+        (should= {:context :real}
+                 (:discussion-context (sketch/mail-context! {:path "examples/library.edn" :doc {}})))
         (should= :context (:op @got))
         (should= :real (get-in @got [:extra :context]))
         (sketch/mail-context!
@@ -658,93 +738,23 @@
   (it "queues element mail and wakes the companion"
     (let [root (str (System/getProperty "java.io.tmpdir")
                     "/uv-mail-" (System/nanoTime))
-          woke (atom false)]
-      (with-redefs [sketch/notify-agent! (fn [& _] (reset! woke true) true)]
+          woke (atom nil)]
+      (with-redefs [sketch/notify-agent! (fn [root ids] (reset! woke [root ids]) true)]
         (let [{:keys [cmd woke?]}
               (sketch/request-agent! root :refresh-crap {:target {:id :a}})]
           (should= :refresh-crap (:op cmd))
           (should= {:id :a} (:target cmd))
           (should woke?)
-          (should @woke)))))
+          (should= [root [(:id cmd)]] @woke)))))
 
-  (it "gives each project its own tmux session"
+  (it "gives each project its own companion session"
     (let [a (sketch/session-id "/tmp/proj-a")
           b (sketch/session-id "/tmp/proj-b")]
       (should (re-find #"^uml-viewer-proj-a-" a))
       (should (re-find #"^uml-viewer-proj-b-" b))
       (should-not= a b)
       (should= a (sketch/session-id "/tmp/proj-a"))
-      (should-not (re-find #"uml-viewer-grok" a))))
-
-  (it "names a tmux session and attaches Terminal to it"
-    (let [cwd "/tmp/proj"
-          sid (sketch/session-id cwd)
-          args (sketch/new-session-args cwd)
-          script (sketch/osascript (sketch/attach-command sid) sid)
-          [br bg bb] (sketch/rgb-16 draw/bg)
-          [gr gg gb] (sketch/rgb-16 draw/gold)]
-      (should (some #{sid} args))
-      (should= ["kill-session" "-t" sid] (sketch/kill-session-args sid))
-      (should (some #{"new-session"} args))
-      (should (some #{"--yolo"} args))
-      (should (some #{"--rules"} args))
-      (should (some #{sketch/standing-rules} args))
-      (should (some #{sketch/launch-prompt} args))
-      (should (re-find #"On launch" sketch/standing-rules))
-      (should (re-find #"invent" sketch/standing-rules))
-      (should (re-find #":proposals" sketch/standing-rules))
-      (should (re-find #"to-agent.edn" sketch/standing-rules))
-      (should (re-find #":refresh-crap" sketch/standing-rules))
-      (should (re-find #":refresh-mutate-all" sketch/standing-rules))
-      (should (re-find #":omit" sketch/standing-rules))
-      (should (re-find #":context" sketch/standing-rules))
-      (should (re-find #":queue" sketch/standing-rules))
-      (should (re-find #":quit-for-restart" sketch/standing-rules))
-      (should (re-find #"\./uml --restart" sketch/standing-rules))
-      (should (re-find #"kills only this companion" sketch/standing-rules))
-      (should (re-find #"respawns" sketch/standing-rules))
-      (should-not (re-find #":reload" sketch/standing-rules))
-      (should (some #{"GROK_THEME=terminal"} args))
-      (should-not (some #{"status"} args))
-      (should (re-find (re-pattern (str "tmux attach -t " sid)) (sketch/attach-command sid)))
-      (should (re-find #"tell application \"Terminal\"" script))
-      (should-not (re-find #"activate" script))
-      (should (re-find #"^tell application \"Terminal\"\nlaunch" script))
-      (should (re-find #"AXRaise" script))
-      (should (re-find (re-pattern (str "custom title of grokTab to \"" sid "\"")) script))
-      (should-not (re-find #"custom title of grokTab to \"Grok\"" script))
-      (should (re-find #"return winID" script))
-      (should (re-find (re-pattern (str "background color of grokTab to \\{" br ", " bg ", " bb "\\}"))
-                       script))
-      (should (re-find (re-pattern (str "cursor color of grokTab to \\{" gr ", " gg ", " gb "\\}"))
-                       script))))
-
-  (it "closes only this viewer's Terminal window by id"
-    (let [script (sketch/close-terminal-script "42")]
-      (should (re-find #"exists process \"Terminal\"" script))
-      (should (re-find #"whose id is 42" script))
-      (should-not (re-find #"custom title" script))
-      (should-not (re-find #"Grok" script))
-      (should-not (re-find #"repeat with w" script))))
-
-  (it "does not scan other Terminal windows when id is missing"
-    (let [script (sketch/close-terminal-script)]
-      (should-not (re-find #"close" script))
-      (should-not (re-find #"Grok" script))))
-
-  (it "wakes Grok with text, a pause, then Enter as separate keys"
-    (let [sid "uml-viewer-proj-abc"
-          steps (sketch/notify-steps sid)]
-      (should= ["send-keys" "-t" sid "-l" sketch/wake-message]
-               (first steps))
-      (should= [:sleep 150] (second steps))
-      (should= ["send-keys" "-t" sid "C-m"] (nth steps 2))
-      (should= [:sleep 50] (nth steps 3))
-      (should= ["send-keys" "-t" sid "C-j"] (nth steps 4))))
-
-  (it "scales theme RGB into Terminal's 16-bit colors"
-    (should= [5654 7196 8224] (sketch/rgb-16 [22 28 32]))
-    (should= [0 65535 257] (sketch/rgb-16 [0 255 1])))
+      (should-not (re-find #"grok" a))))
 
   (it "skips a new agent on restart"
     (let [opened (atom 0)
@@ -759,104 +769,28 @@
         (should= 1 @opened)
         (should= 1 @remembered))))
 
-  (it "wakes the legacy grok session when the per-project session is missing"
-    (let [root (str (System/getProperty "java.io.tmpdir")
-                    "/uv-wake-" (System/nanoTime))
-          calls (atom [])]
-      (.mkdirs (java.io.File. root))
-      (reset! sketch/!session-name nil)
-      (with-redefs [uml-viewer.adapters.sketch/tmux!
-                    (fn [& args]
-                      (swap! calls conj (vec args))
-                      (cond
-                        (not= "has-session" (first args)) 0
-                        (= sketch/legacy-session (last args)) 0
-                        :else 1))]
-        (should (sketch/notify-agent! root))
-        (should (some #(= ["send-keys" "-t" sketch/legacy-session "-l" sketch/wake-message] %)
-                      @calls))
-        (should= sketch/legacy-session @sketch/!session-name))))
+  (it "scales theme RGB into Terminal's 16-bit colors"
+    (should= [5654 7196 8224] (sketch/rgb-16 [22 28 32]))
+    (should= [0 65535 257] (sketch/rgb-16 [0 255 1])))
 
-  (it "wakes the companion session instead of the legacy name when it is live"
-    (let [root (str (System/getProperty "java.io.tmpdir")
-                    "/uv-wake2-" (System/nanoTime))
-          calls (atom [])]
-      (.mkdirs (java.io.File. root))
-      (mailbox/write-companion! root {:session "uml-viewer-mine-abc"})
-      (reset! sketch/!session-name nil)
-      (with-redefs [uml-viewer.adapters.sketch/tmux!
-                    (fn [& args]
-                      (swap! calls conj (vec args))
-                      (cond
-                        (not= "has-session" (first args)) 0
-                        (= "uml-viewer-mine-abc" (last args)) 0
-                        :else 1))]
-        (should (sketch/notify-agent! root))
-        (should (some #(= ["send-keys" "-t" "uml-viewer-mine-abc" "-l" sketch/wake-message] %)
-                      @calls))
-        (should-not (some #(and (= "send-keys" (first %))
-                                (some #{sketch/legacy-session} %))
-                          @calls)))))
+  (it "paints and titles only the new Terminal tab"
+    (let [script (sketch/osascript "herdr session attach 'uml-viewer-A'" "uml-viewer-A")]
+      (should (re-find #"^tell application \"Terminal\"\nlaunch" script))
+      (should (re-find #"custom title of agentTab to \"uml-viewer-A\"" script))
+      (should (re-find #"background color of agentTab to \{5654, 7196, 8224\}" script))
+      (should (re-find #"AXRaise" script))
+      (should (re-find #"return winID" script))
+      (should-not (re-find #"activate" script))))
 
-  (it "on restart binds the live tmux session so later mail can wake it"
-    (let [root (str (System/getProperty "java.io.tmpdir")
-                    "/uv-remember-" (System/nanoTime))]
-      (.mkdirs (java.io.File. root))
-      (reset! sketch/!session-name nil)
-      (reset! sketch/!terminal-window-id nil)
-      (with-redefs [uml-viewer.adapters.sketch/tmux!
-                    (fn [& args]
-                      (if (and (= "has-session" (first args))
-                               (= sketch/legacy-session (last args)))
-                        0
-                        1))]
-        (should= sketch/legacy-session (call 'remember-companion! root))
-        (should= sketch/legacy-session @sketch/!session-name)
-        (should= sketch/legacy-session
-                 (:session (mailbox/read-companion root))))))
+  (it "closes only this viewer's Terminal window by id"
+    (let [script (sketch/close-terminal-script "42")]
+      (should (re-find #"exists process \"Terminal\"" script))
+      (should (re-find #"whose id is 42" script))
+      (should-not (re-find #"custom title" script))
+      (should-not (re-find #"repeat with w" script))))
 
-  (it "kills only this project's tmux session and its Terminal window"
-    (let [root (str (System/getProperty "java.io.tmpdir")
-                    "/uv-comp-" (System/nanoTime))
-          tmux-calls (atom [])
-          scripts (atom [])]
-      (mailbox/write-companion! root {:session "uml-viewer-mine-abc" :window-id "99"})
-      (reset! sketch/!terminal-window-id "88")
-      (reset! sketch/!session-name "other-session")
-      (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& args] (swap! tmux-calls conj (vec args)) 0)
-                    uml-viewer.adapters.sketch/run-osascript (fn [s] (swap! scripts conj s) "")]
-        (sketch/shutdown-children! root)
-        (should (some #(= ["kill-session" "-t" "uml-viewer-mine-abc"] %) @tmux-calls))
-        (should (some #(= ["set-hook" "-t" "uml-viewer-mine-abc" "-u" "pane-died"] %) @tmux-calls))
-        (should-not (some #(some #{"uml-viewer-grok"} %) @tmux-calls))
-        (should-not (some #(some #{"other-session"} %) @tmux-calls))
-        (should= 1 (count @scripts))
-        (should (re-find #"whose id is 99" (first @scripts)))
-        (should-not (re-find #"Grok" (first @scripts)))
-        (should-be-nil @sketch/!terminal-window-id)
-        (should-be-nil @sketch/!session-name))))
-
-  (it "starts a per-project session, arms respawn, and records companion.edn"
-    (let [root (str (System/getProperty "java.io.tmpdir")
-                    "/uv-open-" (System/nanoTime))
-          calls (atom [])]
-      (.mkdirs (java.io.File. root))
-      (mailbox/write-companion! root {:session "uml-viewer-old-ffff" :window-id "1"})
-      (with-redefs [uml-viewer.adapters.sketch/tmux! (fn [& args] (swap! calls conj (vec args)) 0)
-                    uml-viewer.adapters.sketch/run-osascript (fn [_] "1234")]
-        (let [sid (sketch/session-id root)
-              out (sketch/open-in-terminal! root)
-              flat (mapcat identity @calls)]
-          (should= sid (:session out))
-          (should= "1234" (:window-id out))
-          (should= sid (:session (mailbox/read-companion root)))
-          (should= "1234" (:window-id (mailbox/read-companion root)))
-          (should (some #(= ["kill-session" "-t" "uml-viewer-old-ffff"] %) @calls))
-          (should (some #(= ["kill-session" "-t" sid] %) @calls))
-          (should (some #(= "new-session" (first %)) @calls))
-          (should (some #(= ["set-option" "-p" "-t" (str sid ":0.0") "remain-on-exit" "on"] %) @calls))
-          (should (some #(= ["set-hook" "-t" sid "pane-died" "respawn-pane -k"] %) @calls))
-          (should-not (some #{"uml-viewer-grok"} flat))))))))
+  (it "does not scan other Terminal windows when id is missing"
+    (should-not (re-find #"close" (sketch/close-terminal-script)))))
 
 (describe "detail card pointer"
   (before (reset! sketch/!bridge (empty-bridge)))
@@ -1003,7 +937,7 @@
                      (:mail-status (call 'on-main-press (state) (at r nil)))))
           (with-redefs [uml-viewer.adapters.sketch/request-regen!
                         (fn [_root] {:woke? false})]
-            (should= "Regen queued; Grok session not attached."
+            (should= "Regen queued; Claude session not attached."
                      (:mail-status (call 'on-main-press (state) (at r nil)))))
           (should (string? @woke))))))
 

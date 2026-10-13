@@ -19,7 +19,128 @@
    :path "examples/library.edn"
    :mtime 0})
 
+(def display-doc
+  {:hierarchical true :title "Display"
+   :proposals [{:id :saved :name "Saved"
+                :layers [{:id :core :label "Core" :nses [:core]}]}]
+   :classes [{:id :core.alpha :name "Alpha" :ns "demo.core.alpha"}
+             {:id :core.beta :name "Beta" :ns "demo.core.beta"}]
+   :edges [] :order [:core.alpha :core.beta]})
+
+(defn with-display-file [f]
+  (let [root (io/file "target" (str "display-" (System/nanoTime)))
+        path (io/file root "diagram.edn")]
+    (.mkdirs (io/file root ".metrics"))
+    (spit path (pr-str display-doc))
+    (try (f root path)
+         (finally
+           (doseq [file (reverse (file-seq root))] (io/delete-file file true))))))
+
 (describe "document"
+  (it "display reloads IR and metrics while retaining the same diagram view across path spellings"
+    (with-display-file
+      (fn [root path]
+        (doseq [view [{:focus [:core]}
+                      {:focus [] :proposal-id :saved :proposal true
+                       :open-layer :proposal.core}]]
+          (let [before (merge (document/load-path (.getPath path))
+                              {:proposal-id nil :proposal false :open-layer nil} view
+                              {:project-root (.getPath root) :cam-x 47 :cam-y -23
+                               :zoom 1.35 :declutter :classes
+                               :selected {:kind :class :id :core.alpha}
+                               :detail-id :core.alpha})]
+            (spit path (pr-str (assoc display-doc :title "Fresh")))
+            (spit (io/file root ".metrics" "crap.edn")
+                  (pr-str {:entries [{:name "go" :namespace "demo.core.alpha"
+                                      :complexity 4 :coverage 50.0 :crap 12.5}]}))
+            (doseq [spelling ["./diagram.edn" (.getCanonicalPath path)]]
+              (let [after (document/apply-mail before {:op :display :id 9 :path spelling})]
+                (should= (select-keys before [:focus :proposal-id :proposal :open-layer
+                                             :cam-x :cam-y :zoom :declutter :selected :detail-id])
+                         (select-keys after [:focus :proposal-id :proposal :open-layer
+                                            :cam-x :cam-y :zoom :declutter :selected :detail-id]))
+                (should= "Fresh" (get-in after [:doc :title]))
+                (should= 12.5 (get-in after [:doc :classes 0 :crap :mu]))
+                (should= 9 (:mail-seen after)))))))))
+  (it "display restores the closest remaining namespace ancestor and clears vanished card and selection targets"
+    (with-display-file
+      (fn [root path]
+        (spit path (pr-str (assoc display-doc :classes
+                                 [{:id :core.deep.alpha :name "Alpha"}
+                                  {:id :core.beta :name "Beta"} ])))
+        (let [before (assoc (document/load-path (.getPath path))
+                            :project-root (.getPath root) :focus [:core :deep]
+                            :cam-x 47 :cam-y -23 :zoom 1.35
+                            :selected {:kind :class :id :core.deep.alpha}
+                            :detail-id :core.deep.alpha)]
+          (spit path (pr-str (assoc display-doc :classes [{:id :core.beta :name "Beta"}])))
+          (let [after (document/apply-mail before {:op :display :id 1 :path "diagram.edn"})]
+            (should= [:core] (:focus after))
+            (should= #{:core.beta} (set (map :id (get-in after [:scene :classes]))))
+            (should-be-nil (:selected after))
+            (should-be-nil (:detail-id after))
+            (should= [47 -23 1.35] (mapv after [:cam-x :cam-y :zoom])))
+          (spit path (pr-str (assoc display-doc :classes [{:id :other :name "Other"}])))
+          (should= [] (:focus (document/apply-mail before {:op :display :id 2 :path "diagram.edn"})))))))
+
+  (it "display returns vanished proposal layers to proposal root and vanished proposals to the namespace tree"
+    (with-display-file
+      (fn [root path]
+        (let [before (assoc (document/load-path (.getPath path))
+                            :project-root (.getPath root) :focus []
+                            :proposal-id :saved :proposal true :open-layer :proposal.core
+                            :selected {:kind :package :id :proposal.core})]
+          (spit path (pr-str (assoc display-doc :proposals
+                                   [{:id :saved :name "Saved" :layers []}])))
+          (let [after (document/apply-mail before {:op :display :id 1 :path "diagram.edn"})]
+            (should= :saved (:proposal-id after))
+            (should (:proposal after))
+            (should-be-nil (:open-layer after))
+            (should-be-nil (:selected after))
+            (should (seq (get-in after [:scene :classes]))))
+          (spit path (pr-str (dissoc display-doc :proposals)))
+          (let [after (document/apply-mail before {:op :display :id 2 :path "diagram.edn"})]
+            (should-be-nil (:proposal-id after))
+            (should-not (:proposal after))
+            (should-be-nil (:open-layer after))
+            (should= [] (:focus after))
+            (should-not (get-in after [:scene :diagram :proposal])))))))
+
+  (it "display starts a different diagram at its own root while retaining discussion context"
+    (with-display-file
+      (fn [root path]
+        (let [other (io/file root "other.edn")
+              context {:context :proposal :proposal-id :discussion :name "Discussed"}
+              before (assoc (document/load-path (.getPath path))
+                            :project-root (.getPath root) :focus [:core]
+                            :proposal-id :saved :proposal true :open-layer :proposal.core
+                            :cam-x 47 :cam-y -23 :zoom 1.35 :declutter :classes
+                            :selected {:kind :class :id :core.alpha} :detail-id :core.alpha
+                            :discussion-context context)]
+          (spit other (pr-str {:hierarchical true :title "Other"
+                              :classes [{:id :other :name "Other"}] :edges []}))
+          (doseq [discussion [context {:context :real}]]
+            (let [after (document/apply-mail (assoc before :discussion-context discussion)
+                                            {:op :display :id 7 :path "other.edn"})]
+              (should= "Other" (get-in after [:doc :title]))
+              (should= [] (:focus after))
+              (should= [0 0] (mapv after [:cam-x :cam-y]))
+              (doseq [key [:proposal-id :proposal :open-layer :declutter :zoom :selected :detail-id]]
+                (should-be-nil (key after)))
+              (should= discussion (:discussion-context after))
+              (should= 7 (:mail-seen after))))))))
+
+  (it "display retains a card for an existing leaf outside the visible namespace boxes"
+    (with-display-file
+      (fn [root path]
+        (let [before (assoc (document/load-path (.getPath path))
+                            :project-root (.getPath root) :focus []
+                            :selected {:kind :class :id :core.alpha} :detail-id :core.alpha)
+              after (document/apply-mail before {:op :display :id 1 :path "diagram.edn"})]
+          (should= #{:core} (set (map :id (get-in after [:scene :classes]))))
+          (should= :core.alpha (:detail-id after))
+          (should= (:selected before) (:selected after))))))
+
   (around [it]
     (let [f (str (System/getProperty "java.io.tmpdir")
                  "/uv-doc-log-" (System/nanoTime) ".txt")]
@@ -62,6 +183,163 @@
         (should= :arrows (:declutter s))
         (should-not (:waiting s))
         (should (seq (:classes (:scene s)))))))
+
+  (it "roundtrips nonempty namespace focus and an expanded named proposal through disk on restart"
+    (let [root (io/file "target" (str "view-roundtrip-" (System/nanoTime)))
+          path (io/file root "diagram.edn")
+          doc {:hierarchical true :title "Demo"
+               :proposals [{:id :saved :name "Saved"
+                            :layers [{:id :core :label "Core" :nses [:core]}]}]
+               :classes [{:id :core.alpha :name "Alpha" :ns "demo.core.alpha"}
+                         {:id :core.beta :name "Beta" :ns "demo.core.beta"}]
+               :edges [] :order [:core.alpha :core.beta]}]
+      (.mkdirs (io/file root ".metrics"))
+      (spit path (pr-str doc))
+      (try
+        (doseq [[view expected-title expected-ids]
+                [[{:focus [:core] :proposal-id nil :proposal false :open-layer nil}
+                  nil #{:core.alpha :core.beta}]
+                 [{:focus [] :proposal-id :saved :proposal true :open-layer :proposal.core}
+                  "Core" #{:core.alpha :core.beta}]]]
+          (let [saved (merge (document/load-path (.getPath path)) view
+                             {:cam-x 47 :cam-y -23 :zoom 1.35 :declutter :classes
+                              :selected :core.alpha :detail-id :core.alpha})]
+            (document/save-session! saved)
+            (let [restored (document/restart-state (.getPath path))]
+              (should= (select-keys saved document/session-keys)
+                       (select-keys restored document/session-keys))
+              (should= expected-ids (set (map :id (get-in restored [:scene :classes]))))
+              (when expected-title (should= expected-title (get-in restored [:scene :diagram :title])))
+              (should-not (:waiting restored)))))
+        (finally
+          (doseq [f (reverse (file-seq root))] (io/delete-file f true))))))
+
+  (it "restarts the saved diagram and discussion independently of selection, with an explicit path override"
+    (let [root (io/file "target" (str "restart-path-" (System/nanoTime)))
+          original (io/file root "chosen.edn")
+          override (io/file root "other.edn")
+          context {:context :proposal :proposal-id :discussion :name "Discussed"}]
+      (.mkdirs (io/file root ".metrics"))
+      (spit original (pr-str {:title "Original" :packages [] :edges []}))
+      (spit override (pr-str {:title "Override" :packages [] :edges []}))
+      (try
+        (document/save-session! (assoc (document/load-path (.getPath original))
+                                      :project-root (.getPath root)
+                                      :discussion-context context :proposal-id nil :cam-x 31))
+        (let [restored (document/restart-state nil (.getPath root))
+              changed (document/restart-state (.getPath override) (.getPath root))]
+          (should= (.getPath original) (:path restored))
+          (should= "Original" (get-in restored [:doc :title]))
+          (should= context (:discussion-context restored))
+          (should-be-nil (:proposal-id restored))
+          (should= 31 (:cam-x restored))
+          (should= (.getPath override) (:path changed))
+          (should= "Override" (get-in changed [:doc :title]))
+          (should= context (:discussion-context changed)))
+        (finally
+          (doseq [f (reverse (file-seq root))] (io/delete-file f true))))))
+
+  (it "restores a legacy session from the public IR policy output without touching companion ownership"
+    (let [root (io/file "target" (str "legacy-" (System/nanoTime)))
+          output (io/file root "generated" "diagram.edn")
+          context {:context :proposal :proposal-id :saved :name "Saved"}
+          ownership "{:backend :legacy :session \"untouched\"}"]
+      (.mkdirs (.getParentFile output))
+      (.mkdirs (io/file root "examples"))
+      (spit output (slurp "examples/library.edn"))
+      (spit (io/file root "policy.edn") "{:out \"wrong.edn\"}")
+      (spit (io/file root "examples" "a.policy.edn") "{:out \"generated/diagram.edn\"}")
+      (mailbox/write-session! root {:discussion-context context :mail-seen 17
+                                   :cam-x 41 :cam-y -12 :zoom 1.4 :declutter :classes})
+      (spit (io/file root ".uml-viewer" "companion.edn") ownership)
+      (try
+        (let [restored (document/restart-state nil (.getPath root))]
+          (should= (.getPath output) (:path restored))
+          (should= context (:discussion-context restored))
+          (should= 17 (:mail-seen restored))
+          (should= [41 -12 1.4 :classes]
+                   (mapv restored [:cam-x :cam-y :zoom :declutter]))
+          (should= ownership (slurp (io/file root ".uml-viewer" "companion.edn"))))
+        (finally (doseq [f (reverse (file-seq root))] (io/delete-file f true))))))
+
+  (it "fails restart explicitly when the selected legacy output cannot be loaded"
+    (let [root (io/file "target" (str "legacy-invalid-" (System/nanoTime)))]
+      (.mkdirs root)
+      (spit (io/file root "policy.edn") "{:out \"absent.edn\"}")
+      (try
+        (should-throw clojure.lang.ExceptionInfo "Invalid restart diagram"
+                      (document/restart-state nil (.getPath root)))
+        (finally (doseq [f (reverse (file-seq root))] (io/delete-file f true))))))
+
+  (it "diagnoses missing or malformed legacy policies and never replaces an invalid saved path"
+    (let [root (io/file "target" (str "legacy-policy-" (System/nanoTime)))
+          policy (io/file root "policy.edn")]
+      (.mkdirs root)
+      (try
+        (should-throw clojure.lang.ExceptionInfo "No legacy restart policy; supply an explicit diagram path"
+                      (document/restart-state nil (.getPath root)))
+        (doseq [content ["[" "[]" "{:out 42}" "{:out \"\"}"]]
+          (spit policy content)
+          (should-throw clojure.lang.ExceptionInfo (document/restart-state nil (.getPath root))))
+        (spit policy "[]")
+        (should-throw clojure.lang.ExceptionInfo "Invalid legacy restart policy"
+                      (document/restart-state nil (.getPath root)))
+        (spit policy "{:out \"examples/library.edn\"}")
+        (mailbox/write-session! root {:path "missing-saved.edn"})
+        (should-throw clojure.lang.ExceptionInfo "Invalid restart diagram"
+                      (document/restart-state nil (.getPath root)))
+        (finally (doseq [f (reverse (file-seq root))] (io/delete-file f true))))))
+
+  (it "uses project-named policy before sorted examples, then root policy and the IR default"
+    (let [root (io/file "target" (str "legacy-selection-" (System/nanoTime)))
+          preferred (io/file root "examples" (str (.getName root) ".policy.edn"))
+          first-policy (io/file root "examples" "a.policy.edn")
+          last-policy (io/file root "examples" "z.policy.edn")
+          root-policy (io/file root "policy.edn")
+          output (io/file root "examples" "uml-viewer.edn")]
+      (.mkdirs (.getParentFile output))
+      (spit output (slurp "examples/library.edn"))
+      (spit preferred (pr-str {:out (.getAbsolutePath output)}))
+      (spit first-policy "{:out \"missing.edn\"}")
+      (spit last-policy "{:out \"missing.edn\"}")
+      (spit root-policy "{:out \"missing.edn\"}")
+      (try
+        (should= (.getAbsolutePath output) (:path (document/restart-state nil (.getPath root))))
+        (io/delete-file preferred)
+        (spit first-policy "{}")
+        (should= (.getPath output) (:path (document/restart-state nil (.getPath root))))
+        (io/delete-file first-policy)
+        (io/delete-file last-policy)
+        (spit root-policy "{}")
+        (should= (.getPath output) (:path (document/restart-state nil (.getPath root))))
+        (finally (doseq [f (reverse (file-seq root))] (io/delete-file f true))))))
+
+  (it "keeps discussion context across display and consumes pending restart mail oldest first"
+    (let [root (io/file "target" (str "restart-mail-" (System/nanoTime)))
+          path (io/file root "diagram.edn")
+          context {:context :proposal :proposal-id :saved :name "Saved"}]
+      (.mkdirs (io/file root ".metrics"))
+      (spit path (pr-str {:title "Demo" :packages [] :edges []}))
+      (try
+        (let [state (document/apply-mail (assoc (document/load-path (.getPath path))
+                                              :project-root (.getPath root))
+                                       (assoc context :op :context :id 1))
+              displayed (document/apply-mail state {:op :display :path "diagram.edn" :id 2})]
+          (should= context (:discussion-context displayed))
+          (document/save-session! displayed)
+          (mailbox/write-command! (mailbox/to-viewer root) :context {:context :real})
+          (mailbox/write-command! (mailbox/to-viewer root) :context context)
+          (mailbox/write-command! (mailbox/to-viewer root) :display {:path "diagram.edn"})
+          ;; Queue ids above the saved cursor simulate mail arriving while the JVM exits.
+          (let [f (mailbox/to-viewer root)
+                queue (edn/read-string (slurp f))]
+            (spit f (pr-str (assoc queue :next-id 6 :queue
+                                  (mapv #(update % :id + 2) (:queue queue))))))
+          (let [resumed (document/poll-mail (document/restart-state nil (.getPath root)))]
+            (should= context (:discussion-context resumed))
+            (should= 5 (:mail-seen resumed))
+            (should= [] (:queue (edn/read-string (slurp (mailbox/to-viewer root)))))))
+        (finally (doseq [f (reverse (file-seq root))] (io/delete-file f true))))))
 
   (it "compiles named proposal packages at the root and the ns tree otherwise"
     (let [doc {:hierarchical true

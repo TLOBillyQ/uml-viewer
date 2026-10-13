@@ -1,6 +1,8 @@
 (ns uml-viewer.adapters.sketch
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
+            [uml-viewer.adapters.companion :as companion]
+            [uml-viewer.adapters.herdr :as herdr]
             [quil.applet :as applet]
             [quil.core :as q]
             [quil.middleware :as m]
@@ -32,7 +34,7 @@
        "On launch: inspect this directory's source, write or update a\n"
        "hierarchical policy from the real namespaces (dots after the ns prefix\n"
        "are the tree; do not invent Domain/Engine/Adapters packages), then\n"
-       "regenerate the IR (`clj -M:ir` or this project's equivalent) so the\n"
+       "regenerate the IR (`./uml ir`) so the\n"
        "diagram matches. Do not edit the generated EDN by hand.\n"
        "After every later source or policy change:\n"
        "1. Keep the policy as namespace nesting only. Do not re-home a ns to\n"
@@ -43,7 +45,7 @@
        "   diagram above Proposals to return to the namespace tree. If instructed,\n"
        "   add a named proposal to :proposals in the policy (default name is a\n"
        "   timestamp) and regenerate the IR.\n"
-       "TypeScript, Rust, and Python are scanners beside Clojure. A Clojure project keeps\n"
+       "TypeScript, Rust, Python, and Lua are scanners beside Clojure. A Clojure project keeps\n"
        ":lang :clojure (the default) and the CRAP and mutation steps below.\n"
        "Another language sets :lang. More than one language sets :sources, each\n"
        "entry {:lang :root :prefix?}. The policy :prefix is stripped to make\n"
@@ -54,14 +56,38 @@
        "Python is one class per .py module. import and from-import are dependencies.\n"
        "class Child(Base) is inheritance when Base is a project module. A base of\n"
        "Protocol or ABC is implements.\n"
-       "For a non-Clojure language, run that language's CRAP and mutation tools\n"
-       "when they exist. Snapshots join by the class :ns, then by the class id.\n"
-       "Then regenerate the IR.\n"
-       "2. Run clj -M:crap.\n"
-       "3. Run clj -M:mutate on each changed file under src/ (differential).\n"
-       "   Uncovered mutants are coverage gaps: keep the snapshot; do not\n"
-       "   re-run the file or pass --mutate-all because of them.\n"
-       "4. Regenerate the IR so the EDN mtime updates.\n"
+       "Lua is one class per .lua module. require(\"a.b\") is a dependency on the\n"
+       "a.b module. Non-local functions are the operations. A top-level\n"
+       "setmetatable(t, {__index = Base}) or setmetatable(t, Base), with Base\n"
+       "from local Base = require(\"m\"), is inheritance from m.\n"
+       "Snapshots join by the class :ns, then by the class id.\n"
+       "./uml ir runs the IR generator on this project's policy. Use the public\n"
+       "./uml crap and ./uml mutate quality dispatch for mailbox refreshes: it\n"
+       "shares CLI routing, optional uml-quality.json overrides, standard tool\n"
+       "scope/exclusions and Clojure aliases. If the entry is absent, install it\n"
+       "with get-uml-viewer --install-only before refreshing; direct clj commands\n"
+       "do not publish a result record.\n"
+       "2. Run ./uml crap with declared scope: standard tools cover the whole\n"
+       "   business tree; an operation override may declare targets scope.\n"
+       "   Preserve unrelated class metrics under the selected tool contract.\n"
+       "3. Run ./uml mutate on each changed source file (differential).\n"
+       "   For Clojure components invoke once per source file, never a file list.\n"
+       "   Retain explicit targets; never inject --source-root on scoped mutation.\n"
+       "   Uncovered mutants and survivors are findings: keep the snapshot;\n"
+       "   do not re-run the file or pass --mutate-all because of findings.\n"
+       "4. Serialize quality invocations. Before each, remove any previous\n"
+       "   .uml-viewer/quality-result.json and note invocation start; await the\n"
+       "   command and capture its actual exit. Read only its newly published\n"
+       "   record: version 1, matching operation, canonical projectRoot equal\n"
+       "   to this project, exitCode equal to the actual process exit, and\n"
+       "   validResult exactly true. Missing, stale, malformed or mismatched\n"
+       "   records and validResult false stop this request's IR/display; report\n"
+       "   the cause. Exit 3 is valid only under the tool or explicit project\n"
+       "   alias/operation contract, never by a universal success rule.\n"
+       "   Every invocation in a component must pass this gate before IR.\n"
+       "5. Only then run ./uml ir; only IR exit 0 permits :display. An IR\n"
+       "   failure stops display and reports the cause. Continue later FIFO\n"
+       "   requests after a failure; retain the latest discussion context.\n"
        "Mailbox: .uml-viewer/to-agent.edn and to-viewer.edn are queues\n"
        "{:next-id n :queue [cmd …]} (atomic: tmp then rename). Pop the head of\n"
        ":queue as you handle it (rewrite the file). Oldest first. Ops are\n"
@@ -70,9 +96,11 @@
        "and right-click element ops:\n"
        "{:id n :op :refresh-crap :target {...}}, :refresh-mutate,\n"
        ":refresh-mutate-all, :omit. :target is {:id :ns :kind :class|:component\n"
-       " :proposal-id?}. For :refresh-crap run clj -M:crap (that class or the\n"
-       " files under that component) then IR. For :refresh-mutate run\n"
-       " clj -M:mutate on those src files (differential). For\n"
+       " :proposal-id?}. For :refresh-crap follow the declared CRAP scope above,\n"
+       " then apply the result gate before IR. Standard crapper gets no partial\n"
+       " target paths. For\n"
+       " :refresh-mutate run ./uml mutate on those source files\n"
+       " (differential). For\n"
        " :refresh-mutate-all pass --mutate-all on those files. For :omit, if\n"
        " :proposal-id is set add :id to that proposal's :omit; otherwise add it\n"
        " to policy :omit. Then regenerate the IR.\n"
@@ -80,9 +108,9 @@
        "{:context :real} for the namespace tree, or {:context :proposal\n"
        " :proposal-id id :name \"...\"} for a named proposal. Treat that as\n"
        "the architecture under discussion until a later :context arrives.\n"
-       "A tmux wake-up means mail is waiting. If idle, pop and handle each\n"
-       "to-agent command in order. If busy, finish first. Do not send tmux yourself.\n"
-       "After regen, write :display with the generated EDN path.\n"
+       "A companion wake-up means mail is waiting. If idle, pop and handle each\n"
+       "to-agent command in order. If busy, finish first. Do not control the session backend yourself.\n"
+       "After successful regen only, write :display with the generated EDN path.\n"
        "Prefer ./uml (fresh start: spawn this companion, wait for :display)\n"
        "and ./uml --restart (new JVM, keep this session, restore last view).\n"
        "If ./uml is missing, use aliases :uml-viewer and :uml-viewer-restart,\n"
@@ -92,8 +120,9 @@
        "changes. To restart it: write :quit-for-restart, wait for the JVM to\n"
        "exit, then ./uml --restart. Do not pass --restart except through that\n"
        "wrapper (or :uml-viewer-restart). Do not SIGKILL. Closing the viewer\n"
-       "kills only this companion's tmux session, not other Grok agents. If\n"
-       "this Grok process dies, tmux respawns it in the same pane.\n"
+       "closes only this project's Herdr session. Verified abnormal exits receive\n"
+       "at most three retries (1, 2, 4 seconds); normal or unknown exits do not recover.\n"
+       "Recovery resumes this Claude session and drains queued mail without fresh scanning.\n"
        "Do not commit or push unless asked.\n"))
 
 (def launch-prompt
@@ -101,33 +130,39 @@
        "to match the project's namespaces (no invented layers/components), regenerate the "
        "IR, then wait for directives."))
 
-(defn grok-executable
+(defn windows? [] (str/starts-with? (System/getProperty "os.name") "Windows"))
+
+(defn claude-executable
   []
-  (let [home (System/getenv "HOME")
-        named (System/getenv "GROK_BIN")
+  (if (windows?)
+    (let [script (str "$ErrorActionPreference='Stop';$name=if($env:CLAUDE_BIN){$env:CLAUDE_BIN}else{'claude'};"
+                      "$c=Get-Command -Name $name -CommandType Application,ExternalScript -ErrorAction Stop|Select-Object -First 1;"
+                      "if([IO.Path]::GetExtension($c.Source).ToLowerInvariant() -notin @('.exe','.ps1')){throw 'Unsafe Claude wrapper. Set CLAUDE_BIN to native claude.exe (https://code.claude.com/docs/en/setup), or a .ps1 adapter invoking node.exe and the official @anthropic-ai/claude-code/cli.js; .cmd/.bat cannot preserve arbitrary argv.'};[Console]::Write($c.Source)")
+          result (companion/checked! companion/process! ["pwsh.exe" "-NoProfile" "-EncodedCommand" (companion/encoded script)])]
+      (when-not (seq (:out result)) (throw (ex-info "CLAUDE_BIN or Claude on PATH is required" result)))
+      (:out result))
+  (let [named (System/getenv "CLAUDE_BIN")
         candidates (filter identity
                            [named
-                            (when home (str home "/.grok/bin/grok"))
-                            "/usr/local/bin/grok"
-                            "/opt/homebrew/bin/grok"])]
+                            (str (System/getProperty "user.home") "/.local/bin/claude")
+                            "/usr/local/bin/claude"
+                            "/opt/homebrew/bin/claude"])]
     (or (first (filter (fn [p]
                          (let [f (io/file p)]
                            (and (.isFile f) (.canExecute f))))
                        candidates))
-        "grok")))
+        "claude"))))
 
 (defonce !session-name (atom nil))
 
 (defn session-id
-  "Tmux session unique to this project directory."
+  "Companion session name unique to this project directory."
   [cwd]
   (let [path (.getCanonicalPath (io/file (or cwd ".")))
         base (-> (.getName (io/file path))
                  (str/replace #"[^A-Za-z0-9_-]" "-"))
         h (Integer/toHexString (hash path))]
     (str "uml-viewer-" base "-" h)))
-
-(def legacy-session "uml-viewer-grok")
 
 (defn current-session
   "Session name for this project, from companion.edn or the live atom."
@@ -137,30 +172,37 @@
        @!session-name
        (session-id root))))
 
-(defn tmux!
-  "Run tmux with `args`. Returns the process exit code (1 if tmux is missing)."
-  [& args]
-  (try
-    (let [p (.start (ProcessBuilder. (into-array String (cons "tmux" args))))]
-      (.waitFor p))
-    (catch Exception _ 1)))
+(def startup-project-root
+  (.getCanonicalPath (io/file (or (System/getenv "UML_VIEWER_PROJECT_ROOT")
+                                  (System/getProperty "user.dir")))))
+(defonce !project-root (atom nil))
 
-(defn session-candidates
-  "Names to try, unique first, then the pre-isolation session."
-  [root]
-  (->> [(:session (mailbox/read-companion root))
-        @!session-name
-        (when root (session-id root))
-        legacy-session]
-       (filter seq)
-       distinct
-       vec))
+(defn- backend [info]
+  (when-not (= :herdr (companion/recorded-backend info))
+    (throw (ex-info "Unknown companion backend; ownership retained" {:status :failure :record info})))
+  (herdr/herdr info))
 
-(defn live-session
-  "First candidate that tmux currently has, or nil."
-  [root]
-  (first (filter #(zero? (tmux! "has-session" "-t" %))
-                 (session-candidates root))))
+(defn- read-ownership! [root]
+  (let [file (mailbox/companion-file root)]
+    (when (.exists file)
+      (let [record (mailbox/read-companion root)]
+        (when-not (map? record)
+          (throw (ex-info "Present companion ownership is corrupt or unreadable; file retained"
+                          {:status :failure :file (str file)})))
+        record))))
+
+(defn- owned-record! [root]
+  (let [info (read-ownership! root)
+        canonical #(.getCanonicalPath (io/file %))
+        kind (companion/recorded-backend info)]
+    (when-not (and (seq (:session info)) (seq (:pane info))
+                   (:cwd info) (= (canonical root) (canonical (:cwd info)))
+                   (= :companion (:owner-role info))
+                   (= :herdr kind) (not (:provisional info))
+                   (every? #(get info %) [:socket :workspace :terminal-id :shell-pid :owner-start :server-pid :server-start]))
+      (throw (ex-info "Companion ownership is missing, ambiguous or belongs to another project"
+                      {:status :failure :root (str root) :pane (:pane info) :record info})))
+    (assoc info :backend kind)))
 
 (defn rgb-16
   "Terminal.app AppleScript colors are 16-bit (0–65535)."
@@ -171,83 +213,70 @@
   (let [[r g b] (rgb-16 c)]
     (str "{" r ", " g ", " b "}")))
 
-(defn new-session-args
-  ([cwd] (new-session-args cwd (session-id cwd)))
-  ([cwd session]
-   ["new-session" "-d" "-s" session "-c" cwd
-    "-e" "GROK_THEME=terminal"
-    "-e" "GROK_TERMINAL_THEME=1"
-    "-e" "COLORTERM=truecolor"
-    (grok-executable) "--yolo" "--trust" "--rules" standing-rules
-    launch-prompt]))
-
-(defn kill-session-args
-  ([] (kill-session-args (current-session)))
-  ([session]
-   ["kill-session" "-t" session]))
-
 (def wake-message
   "You have mail from the viewer. If idle, read .uml-viewer/to-agent.edn.")
 
-(defn notify-steps
-  "SwarmForge-style wake-up: literal text, pause, CR, pause, LF."
-  ([] (notify-steps (current-session)))
-  ([session]
-   [["send-keys" "-t" session "-l" wake-message]
-    [:sleep 150]
-    ["send-keys" "-t" session "C-m"]
-    [:sleep 50]
-    ["send-keys" "-t" session "C-j"]]))
+(defn- notify-herdr! [root pending-ids]
+  (let [info (owned-record! root)
+        token (str (java.util.UUID/randomUUID))
+        text (str wake-message " Wake token: " token ". Process pending mail oldest first.")]
+    (when-not (seq pending-ids)
+      (throw (ex-info "No pending mail to confirm companion consumption" {:status :failure})))
+    (companion/wake! (backend info) (:pane info) ["-l" text]
+                     {:token token
+                      :timeout-ms 10000
+                      :acknowledged? (fn [_]
+                                       (let [box (mailbox/read-command (mailbox/to-agent root))
+                                             remaining (set (map :id (:queue box)))]
+                                         (and (map? box) (vector? (:queue box))
+                                              (not-any? remaining pending-ids))))})
+    true))
 
 (defn notify-agent!
-  "Wake the companion Grok session. Returns false if tmux/session is missing."
-  ([] (notify-agent! (System/getProperty "user.dir")))
+  "Wake the companion and confirm queued mail consumption; retain mail on failure."
+  ([] (notify-agent! (or @!project-root (System/getProperty "user.dir"))))
   ([root]
-   (if-let [session (live-session root)]
-     (do
-       (reset! !session-name session)
-       (doseq [step (notify-steps session)]
-         (if (= :sleep (first step))
-           (Thread/sleep (long (second step)))
-           (apply tmux! step)))
-       true)
-     false)))
+   (notify-agent! root (mapv :id (:queue (mailbox/read-mailbox (mailbox/to-agent root))))))
+  ([root pending-ids]
+   (try
+     (notify-herdr! root pending-ids)
+     (catch Exception e
+       (binding [*out* *err*] (println "UML viewer: companion wake failed:" (.getMessage e)))
+       false))))
 
 (defn request-agent!
-  "Queue `op` for the companion and wake Grok. Returns {:cmd :woke?}."
+  "Queue `op` for the companion and wake Claude. Returns {:cmd :woke?}."
   [root op extra]
   (let [cmd (mailbox/write-command! (mailbox/to-agent root) op extra)]
-    {:cmd cmd :woke? (notify-agent! root)}))
+    {:cmd cmd :woke? (notify-agent! root [(:id cmd)])}))
 
 (defn request-regen!
-  "Queue a :regen command and wake Grok. Returns {:cmd :woke?}."
+  "Queue a :regen command and wake Claude. Returns {:cmd :woke?}."
   [root]
   (request-agent! root :regen {}))
 
 (defn mail-context!
   "Tell the companion which diagram is under discussion."
   [state]
-  (when-let [path (:path state)]
-    (let [root (overlay/metrics-root path)]
-      (if-let [id (:proposal-id state)]
-        (request-agent! root :context
-                        {:context :proposal
-                         :proposal-id id
-                         :name (:name (policy/proposal-by-id (:doc state) id))})
-        (request-agent! root :context {:context :real}))))
-  state)
+  (if-let [path (:path state)]
+    (let [root (or (:project-root state) @!project-root startup-project-root)
+          context (if-let [id (:proposal-id state)]
+                    {:context :proposal :proposal-id id
+                     :name (:name (policy/proposal-by-id (:doc state) id))}
+                    {:context :real})]
+      (request-agent! root :context context)
+      (assoc state :discussion-context context))
+    state))
 
 (defn terminal-title
   ([] (terminal-title (current-session)))
   ([session]
-   (or session "UML Grok")))
+   (or session "UML Claude")))
 
 (defonce !terminal-window-id (atom nil))
 
-(defn attach-command
-  ([] (attach-command (current-session)))
-  ([session]
-   (str "tmux attach -t " session "; exit")))
+(defn run-command [argv]
+  (companion/process! argv))
 
 (defn osascript
   "AppleScript that opens a Terminal window on `shell-cmd`, painted like the diagram.
@@ -257,18 +286,18 @@
    (let [title (terminal-title session)]
      (str "tell application \"Terminal\"\n"
           "launch\n"
-          "set grokTab to do script " (pr-str shell-cmd) "\n"
-          "set background color of grokTab to " (applescript-rgb draw/bg) "\n"
-          "set normal text color of grokTab to " (applescript-rgb draw/ink) "\n"
-          "set bold text color of grokTab to " (applescript-rgb draw/gold) "\n"
-          "set cursor color of grokTab to " (applescript-rgb draw/gold) "\n"
-          "set font name of grokTab to \"Menlo\"\n"
-          "set font size of grokTab to 13\n"
-          "set custom title of grokTab to \"" title "\"\n"
-          "set title displays custom title of grokTab to true\n"
-          "set title displays device name of grokTab to false\n"
-          "set title displays shell path of grokTab to false\n"
-          "set title displays settings name of grokTab to false\n"
+          "set agentTab to do script " (pr-str shell-cmd) "\n"
+          "set background color of agentTab to " (applescript-rgb draw/bg) "\n"
+          "set normal text color of agentTab to " (applescript-rgb draw/ink) "\n"
+          "set bold text color of agentTab to " (applescript-rgb draw/gold) "\n"
+          "set cursor color of agentTab to " (applescript-rgb draw/gold) "\n"
+          "set font name of agentTab to \"Menlo\"\n"
+          "set font size of agentTab to 13\n"
+          "set custom title of agentTab to \"" title "\"\n"
+          "set title displays custom title of agentTab to true\n"
+          "set title displays device name of agentTab to false\n"
+          "set title displays shell path of agentTab to false\n"
+          "set title displays settings name of agentTab to false\n"
           "set winID to id of front window\n"
           "end tell\n"
           "tell application \"System Events\"\n"
@@ -297,70 +326,82 @@
 (defn run-osascript
   "Run `script` with osascript. Returns trimmed stdout, or \"\"."
   [script]
-  (try
-    (let [p (.start (doto (ProcessBuilder. (into-array String ["osascript" "-e" script]))
-                      (.redirectErrorStream true)))
-          out (slurp (.getInputStream p))]
-      (.waitFor p)
-      (str/trim out))
-    (catch Exception _ "")))
+  (run-command ["osascript" "-e" script]))
 
-(defn close-terminal-window!
-  "Close the Terminal window that attached to the grok session."
-  []
-  (run-osascript (close-terminal-script @!terminal-window-id))
-  (reset! !terminal-window-id nil))
+(defn- command-ok? [result]
+  (let [ok? (if (map? result) (= 0 (:exit result)) (string? result))]
+    (when-not ok?
+      (binding [*out* *err*]
+        (println "UML viewer: terminal open failed:" (:err result) "exit" (:exit result))))
+    ok?))
 
-(defn- kill-companion-session!
-  "Drop this project's tmux session only. Unhook respawn so the pane stays dead."
+(defn open-herdr-window!
+  "Open the full session client; direct terminal attach is unavailable on Windows."
   [session]
-  (when (seq session)
-    (tmux! "set-hook" "-t" session "-u" "pane-died")
-    (apply tmux! (kill-session-args session))))
+  (let [attach (str "herdr session attach " (companion/shell-word session))
+        result (if (windows?)
+                 (companion/process!
+                   ["wt.exe" "-w" "new" "new-tab" "--title" session
+                    "pwsh.exe" "-NoProfile" "-EncodedCommand"
+                    (companion/encoded
+                      (str "$env:HERDR_ENV=$null;$env:NO_COLOR=$null;& herdr session attach '"
+                           (str/replace session "'" "''") "';exit $LASTEXITCODE"))]
+                   10000 ["HERDR_ENV" "NO_COLOR"])
+                 (run-osascript (osascript (str "unset HERDR_ENV; " attach "; exit") session)))
+        ok? (command-ok? result)]
+    (when-not ok?
+      (binding [*out* *err*]
+        (println "UML viewer: companion retained; open a separate terminal and run:" attach)))
+    {:terminal (if ok? (if (windows?) :windows-terminal :terminal) :none)
+     :session session :attach attach
+     :window-id (when (and ok? (not (windows?))) (re-find #"\d+" (:out result)))}))
 
-(defn- arm-respawn!
-  "If Grok dies, tmux restarts that pane only — not other agents."
-  [session]
-  (let [pane (str session ":0.0")]
-    (tmux! "set-option" "-p" "-t" pane "remain-on-exit" "on")
-    (tmux! "set-hook" "-t" session "pane-died" "respawn-pane -k")
-    (tmux! "set-option" "-t" session "status" "off")))
+(defn open-herdr-companion!
+  [cwd]
+  (let [cwd (.getCanonicalPath (io/file cwd))]
+    (let [info (read-ownership! cwd)]
+      (when (seq info)
+        (companion/recorded-backend info)
+        (throw (ex-info "Companion ownership already recorded; use --restart or resolve it before fresh start"
+                        {:status :failure :root cwd}))))
+    (let [session (str "uml-viewer-" (Integer/toHexString (hash cwd)) "-" (java.util.UUID/randomUUID))
+          rules standing-rules
+          claude-session (str (java.util.UUID/randomUUID))
+          command [(claude-executable) "--dangerously-skip-permissions" "--session-id" claude-session
+                   "--append-system-prompt" rules launch-prompt]
+          recovery-command [(first command) "--dangerously-skip-permissions" "--resume" claude-session
+                            "--append-system-prompt" rules herdr/recovery-prompt]
+          provisional {:backend :herdr :owner-role :companion :cwd cwd :session session
+                       :command command :recovery-command recovery-command :claude-session claude-session :provisional true}]
+      (mailbox/write-companion! cwd provisional)
+      (let [identity (companion/create! (herdr/herdr provisional) session cwd command)
+            info (merge (dissoc provisional :provisional) identity)]
+        (mailbox/write-companion! cwd info)
+        (reset! !project-root cwd)
+        (reset! !session-name session)
+        (let [{:keys [window-id] :as opened} (open-herdr-window! session)]
+          (mailbox/write-companion! cwd (assoc info :window-id window-id))
+          opened)))))
 
 (defn open-in-terminal!
-  "Start this project's companion Grok in its own tmux session."
+  "Create the Herdr companion; retained ownership requires explicit resolution."
   ([] (open-in-terminal! (System/getProperty "user.dir")))
-  ([cwd]
-   (let [session (session-id cwd)
-         previous (:session (mailbox/read-companion cwd))]
-     (reset! !session-name session)
-     (when (and previous (not= previous session))
-       (kill-companion-session! previous))
-     (kill-companion-session! session)
-     (let [code (apply tmux! (new-session-args cwd session))]
-       (when-not (zero? code)
-         (binding [*out* *err*]
-           (println "UML viewer: could not start tmux session" session)))
-       (when (zero? code)
-         (arm-respawn! session)))
-     (let [script (osascript (attach-command session) session)
-           out (run-osascript script)
-           win-id (re-find #"\d+" out)]
-       (reset! !terminal-window-id win-id)
-       (mailbox/write-companion! cwd {:session session :window-id win-id})
-       {:script script :session session :window-id win-id}))))
+  ([cwd] (open-herdr-companion! cwd)))
 
 (defn shutdown-children!
-  "Kill only this viewer's tmux session and its Terminal window."
-  ([] (shutdown-children! (System/getProperty "user.dir")))
+  "Release only verified companion ownership; retain records on any failure."
+  ([] (shutdown-children! (or @!project-root (System/getProperty "user.dir"))))
   ([root]
-   (let [info (mailbox/read-companion root)
-         session (or (:session info) @!session-name)
-         win (or (:window-id info) @!terminal-window-id)]
-     (kill-companion-session! session)
-     (when win
-       (run-osascript (close-terminal-script win)))
-     (reset! !terminal-window-id nil)
-     (reset! !session-name nil))))
+   (try
+     (let [info (owned-record! root)]
+       (companion/cleanup! (backend info) (:session info))
+       (mailbox/write-companion! root {})
+       (when-let [win (:window-id info)]
+         (run-osascript (close-terminal-script win)))
+       (reset! !terminal-window-id nil)
+       (reset! !session-name nil))
+     (catch Exception e
+       (binding [*out* *err*] (println "UML viewer: companion cleanup:" (.getMessage e)))))))
 
 (defn- live? [applet]
   (boolean
@@ -374,21 +415,27 @@
     (.getNative (.getSurface applet))
     (catch Exception _ nil)))
 
-(defn- front! [native]
+(defn- hosting-window [native]
   (cond
-    (instance? Frame native)
-    (doto ^Frame native
-      (.setExtendedState Frame/NORMAL)
-      (.setVisible true)
-      (.toFront)
-      (.requestFocus)
-      (.requestFocusInWindow))
-    (instance? java.awt.Window native)
-    (doto ^java.awt.Window native
-      (.setVisible true)
-      (.toFront)
-      (.requestFocus)
-      (.requestFocusInWindow))))
+    (instance? java.awt.Window native) native
+    (instance? Component native) (SwingUtilities/getWindowAncestor native)))
+
+(defn- front! [native]
+  (let [window (hosting-window native)]
+    (cond
+      (instance? Frame window)
+      (doto ^Frame window
+        (.setExtendedState Frame/NORMAL)
+        (.setVisible true)
+        (.toFront)
+        (.requestFocus)
+        (.requestFocusInWindow))
+      (instance? java.awt.Window window)
+      (doto ^java.awt.Window window
+        (.setVisible true)
+        (.toFront)
+        (.requestFocus)
+        (.requestFocusInWindow)))))
 
 (defn- later! [f]
   (SwingUtilities/invokeLater f))
@@ -405,9 +452,9 @@
   (or (get-in model [:class :name]) "Class"))
 
 (defn- set-card-title! [title]
-  (when-let [native (native-window (:applet @!bridge))]
-    (when (instance? Frame native)
-      (.setTitle ^Frame native (str title)))))
+  (when-let [window (hosting-window (native-window (:applet @!bridge)))]
+    (when (instance? Frame window)
+      (.setTitle ^Frame window (str title)))))
 
 (defn- pin-card! [on?]
   (when-let [ap (:applet @!bridge)]
@@ -431,9 +478,8 @@
   (when-let [ap (:applet @!bridge)]
     (swap! !bridge assoc :exiting true :applet nil)
     (try
-      (when-let [native (native-window ap)]
-        (when (instance? java.awt.Window native)
-          (.dispose ^java.awt.Window native)))
+      (when-let [window (hosting-window (native-window ap))]
+        (.dispose ^java.awt.Window window))
       (catch Exception _))))
 
 (defn- quit-for-restart! []
@@ -559,6 +605,13 @@
           (finally
             (swap! !bridge assoc :starting false)))))))
 
+(defn- restored-state [path root]
+  (let [state (document/restart-state path root)]
+    (when-let [model (and (:detail-id state)
+                          (detail/model (events/card-scene state) (:detail-id state)))]
+      (ensure-detail-window! model))
+    state))
+
 (defn setup
   ([path] (setup path false))
   ([path restart?]
@@ -567,7 +620,7 @@
    (q/smooth)
    (q/text-font (q/create-font "SansSerif" 14 true))
    (if restart?
-     (document/restart-state path)
+     (restored-state path (System/getProperty "user.dir"))
      (document/waiting-state path))))
 
 (defn- view-dims []
@@ -602,7 +655,12 @@
     state))
 
 (defn update-state [state]
-  (let [state (-> state document/maybe-reload document/poll-mail)]
+  (let [state (-> state document/maybe-reload document/poll-mail)
+        root (:project-root state)
+        identity (when root (mailbox/read-companion root))
+        recovery (when (= :herdr (:backend identity)) (herdr/recovery-status identity))
+        state (cond-> state recovery (assoc :recovery-status recovery)
+                      (:reason recovery) (assoc :mail-status (:reason recovery)))]
     (if (:quit-for-restart state)
       (do (document/save-session! state)
           (quit-for-restart!)
@@ -687,7 +745,7 @@
 
 (defn- popup-element-menu! [event x y state sel]
   (let [anchor (popup-anchor event x y)
-        root (overlay/metrics-root (:path state))
+        root (or (:project-root state) @!project-root startup-project-root)
         target (element-target state sel)]
     (later!
       (fn []
@@ -748,11 +806,11 @@
                      (:invoker anchor) (:x anchor) (:y anchor))))))
 
 (defn- regen-press [state]
-  (let [root (overlay/metrics-root (:path state))
+  (let [root (or (:project-root state) @!project-root startup-project-root)
         {:keys [woke?]} (request-regen! root)]
     (assoc state :mail-status (if woke?
                                 "Regen requested."
-                                "Regen queued; Grok session not attached."))))
+                                "Regen queued; Claude session not attached."))))
 
 (defn- proposal-menu-click? [event hit]
   (and (right-click? event) (= :proposal (:kind hit))))
@@ -766,9 +824,9 @@
             (:name (policy/proposal-by-id (:doc state) (:id hit))))
           state)
       hit (let [next (events/on-inspector-press state hit)]
-            (when (#{:real-diagram :proposal :new-proposal} (:kind hit))
-              (mail-context! next))
-            next)
+            (if (#{:real-diagram :proposal :new-proposal} (:kind hit))
+              (mail-context! next)
+              next))
       :else state)))
 
 (defn- element-menu? [event sel]
@@ -843,31 +901,44 @@
   state)
 
 (defn- remember-companion!
-  "On --restart, bind this JVM to the existing tmux session so mail can wake it."
+  "绑定已有 companion；探测失败时禁止继续打开 viewer。"
   [root]
-  (let [info (mailbox/read-companion root)
-        session (live-session root)]
-    (when session
+  (let [info (owned-record! root)
+        session (:session info)]
+    (when-not (and (seq session) (companion/probe! (backend info) session))
+      (throw (ex-info "UML viewer: recorded companion is missing; restart cannot replace it"
+                      {:root root :session session :status :missing})))
+    (let [pane (companion/bind! (backend info) session (:pane info))
+          identity (companion/identity! (backend info) session pane)]
+      (reset! !project-root (.getCanonicalPath (io/file root)))
       (reset! !session-name session)
-      (when-let [win (:window-id info)]
-        (reset! !terminal-window-id win))
-      (mailbox/write-companion! root (merge (or info {}) {:session session}))
+      (reset! !terminal-window-id (:window-id info))
+      ;; Verification never publishes a stale ownership snapshot over the original.
+      (companion/recovery! (backend info) session pane root (:command info) true)
       session)))
 
 (defn start!
   ([path source-impl]
    (start! path source-impl false))
   ([path source-impl restart?]
+   (start! path source-impl restart? startup-project-root))
+  ([path source-impl restart? root]
+   (start! path source-impl restart? root nil))
+  ([path source-impl restart? root selected]
    (swap! !bridge assoc :source source-impl)
-   (let [root (overlay/metrics-root path)]
+   (let [root (.getCanonicalPath (io/file root))
+         mail-seen (mailbox/last-id (mailbox/to-viewer root))]
      (if restart?
        (remember-companion! root)
-       (open-in-terminal! root)))
+       (open-in-terminal! root))
    (q/sketch
     :title "UML viewer"
     :size [window-width window-height]
     :features [:resizable]
-    :setup (fn [] (setup path restart?))
+    :setup (fn []
+             (if restart?
+               (restored-state path root)
+               (assoc (setup path false) :project-root root :mail-seen mail-seen)))
     :update #'update-state
     :draw #'draw/draw-state
     :mouse-pressed #'on-main-press
@@ -887,4 +958,4 @@
                     (swallow-esc! event)
                     state)
     :on-close #'on-main-close
-    :middleware [m/fun-mode])))
+    :middleware [m/fun-mode]))))

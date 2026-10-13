@@ -91,7 +91,7 @@
         (spit f "hello\n")
         (let [impl (source/file-source ["nope-%s"] (fn [_text _name] "body"))
               found (source/member-source impl {:file (.getPath f) :name "rect"})]
-          (should= (str (.getPath f) ":1") (:title found))
+          (should= (str (str/replace (.getPath f) #"\\" "/") ":1") (:title found))
           (should= "hello\n" (:body found))
           (should-be-nil (:line found)))
         (finally

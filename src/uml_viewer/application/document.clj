@@ -114,14 +114,17 @@
     (overlay/apply-metrics doc (overlay/load-metrics root))))
 
 (def session-keys
-  [:focus :proposal-id :proposal :open-layer :declutter
+  [:path :discussion-context :mail-seen :focus :proposal-id :proposal :open-layer :declutter
    :cam-x :cam-y :zoom :selected :detail-id])
+
+(defn project-root [state]
+  (or (:project-root state) (overlay/metrics-root (:path state))))
 
 (defn save-session!
   "Write the current view (depth, pan, zoom, proposal) for --restart."
   [state]
   (when-let [path (:path state)]
-    (mailbox/write-session! (overlay/metrics-root path)
+    (mailbox/write-session! (project-root state)
                             (select-keys state session-keys)))
   state)
 
@@ -158,20 +161,57 @@
           (log/log-exception! e (str "load " path))
           (blank-state path (or (.getMessage e) (.getSimpleName (class e)))))))))
 
+(defn- retained-focus [doc focus]
+  (loop [focus (vec (or focus []))]
+    (if (or (empty? focus)
+            (seq (mapcat :classes (:packages (hierarchy/view-at doc focus)))))
+      focus
+      (recur (pop focus)))))
+
+(defn- card-target? [state id]
+  (or (hit/class-by-id (:scene state) id)
+      (when (:hierarchical (:doc state))
+        (some #(= id (:id %))
+              (concat (:classes (:doc state))
+                      (mapcat :classes (:packages (hierarchy/view-at (:doc state) []))))))))
+
+(defn- selected-target? [state selected]
+  (let [scene (:scene state)
+        id (:id selected)]
+    (case (:kind selected)
+      :class (card-target? state id)
+      :package (hit/package-by-id scene id)
+      :edge (some #(and (= (:from selected) (:from %))
+                       (= (:to selected) (:to %))) (:edges scene))
+      (:child :port) (let [parent (hit/class-by-id scene (:parent selected))]
+                       (some #(= id (:id %))
+                             (concat (:contents parent) (:in-ports parent) (:out-ports parent))))
+      :dep (some #(and (= id (:id %)) (= (:dir selected) (:dir %)))
+                 (:dep-indicators scene))
+      ;; Older saved sessions stored the selected class id directly.
+      (card-target? state selected))))
+
 (defn- drop-missing-detail [state]
-  (let [id (:detail-id state)]
-    (cond-> state
-      (and id (nil? (hit/class-by-id (:scene state) id)))
-      (dissoc :detail-id))))
+  (cond-> state
+    (and (:detail-id state) (not (card-target? state (:detail-id state))))
+    (dissoc :detail-id)
+    (and (:selected state) (not (selected-target? state (:selected state))))
+    (assoc :selected nil)))
+
+(defn- retained-layer [doc pid id]
+  (when (and pid id
+             (or (some #(= id (:id %)) (:packages (hierarchy/proposal-view doc pid)))
+                 (hierarchy/find-nested-group doc pid id)))
+    id))
 
 (defn restore-session
   "Reapply a saved view onto a freshly loaded state."
   [state snap]
   (if (or (not (map? snap)) (nil? (:doc state)))
     state
-    (let [focus (vec (or (:focus snap) []))
+    (let [focus (retained-focus (:doc state) (:focus snap))
           pid (known-proposal-id (:doc state) (:proposal-id snap))
-          open (:open-layer snap)
+          open (retained-layer (:doc state) pid (:open-layer snap))
           declutter (:declutter snap)
           root (overlay/metrics-root (:path state))
           scene (compile-view (:doc state) root focus
@@ -190,30 +230,82 @@
                  :zoom (or (:zoom snap) 1.0)
                  :selected (:selected snap)
                  :detail-id (:detail-id snap))
+          (cond-> (contains? snap :discussion-context)
+            (assoc :discussion-context (:discussion-context snap)))
           drop-missing-detail))))
 
+(defn- legacy-policy-path [root]
+  (let [root (io/file root)
+        preferred (io/file root "examples" (str (.getName root) ".policy.edn"))
+        policies (->> (.listFiles (io/file root "examples"))
+                      (filter #(and (.isFile %) (str/ends-with? (.getName %) ".policy.edn")))
+                      (sort-by #(.getName %)))
+        fallback (io/file root "policy.edn")]
+    (cond
+      (.isFile preferred) preferred
+      (seq policies) (first policies)
+      (.isFile fallback) fallback
+      :else (throw (ex-info "No legacy restart policy; supply an explicit diagram path"
+                            {:root (.getPath root) :status :missing-policy})))))
+
+(defn- legacy-output-path [root]
+  (let [policy-file (legacy-policy-path root)
+        p (try (edn/read-string (slurp policy-file))
+               (catch Exception e
+                 (throw (ex-info "Invalid legacy restart policy"
+                                 {:policy (.getPath policy-file) :status :invalid-policy} e))))
+        output (or (:out p) "examples/uml-viewer.edn")]
+    (when-not (map? p)
+      (throw (ex-info "Invalid legacy restart policy"
+                      {:policy (.getPath policy-file) :status :invalid-policy})))
+    (when-not (and (string? output) (not (str/blank? output)))
+      (throw (ex-info "Invalid legacy restart policy output"
+                      {:policy (.getPath policy-file) :status :invalid-output})))
+    (let [file (io/file output)]
+      (.getPath (if (.isAbsolute file) file (io/file root output))))))
+
 (defn restart-state
-  "Load `path` and restore the last saved view, if any."
-  [path]
-  (restore-session (dissoc (load-path path) :waiting)
-                   (mailbox/read-session (overlay/metrics-root path))))
+  "Load explicit, saved, or legacy policy output path and restore the saved view."
+  ([path] (restart-state path (overlay/metrics-root path)))
+  ([path root]
+   (let [snap (mailbox/read-session root)
+         path (or path (:path snap) (legacy-output-path root))
+         state (load-path path)]
+     (when (:error state)
+       (throw (ex-info "Invalid restart diagram"
+                       {:root root :path path :status :invalid-diagram :reason (:error state)})))
+     (restore-session (assoc (dissoc state :waiting) :project-root root
+                             :mail-seen (or (:mail-seen snap) 0)) snap))))
 
 (defn- resolve-display-path [state p]
   (let [f (io/file p)]
     (if (.isAbsolute f)
       (.getPath f)
-      (.getPath (io/file (overlay/metrics-root (:path state)) p)))))
+      (.getPath (io/file (project-root state) p)))))
+
+(defn- same-diagram? [a b]
+  (and a b (= (.getCanonicalFile (io/file a))
+              (.getCanonicalFile (io/file b)))))
+
+(defn- display-state [state path]
+  (let [loaded (load-path path)]
+    (if (same-diagram? (:path state) path)
+      (restore-session loaded state)
+      loaded)))
 
 (defn apply-mail
-  "Act on one unread command from the companion Grok."
+  "Act on one unread command from the companion Claude."
   [state cmd]
   (let [state (assoc state :mail-seen (:id cmd))]
     (case (keyword (:op cmd))
       :display (if-let [p (:path cmd)]
-                 (-> (load-path (resolve-display-path state p))
-                     (assoc :mail-seen (:id cmd))
+                 (-> (display-state state (resolve-display-path state p))
+                     (assoc :mail-seen (:id cmd) :project-root (project-root state))
+                     (cond-> (contains? state :discussion-context)
+                       (assoc :discussion-context (:discussion-context state)))
                      (dissoc :waiting))
                  state)
+      :context (assoc state :discussion-context (select-keys cmd [:context :proposal-id :name]))
       :quit-for-restart (assoc state :quit-for-restart true)
       state)))
 
@@ -221,7 +313,7 @@
   [state]
   (if-not (:path state)
     state
-    (let [root (overlay/metrics-root (:path state))
+    (let [root (project-root state)
           f (mailbox/to-viewer root)]
       (loop [state state]
         (if-let [cmd (mailbox/take-command! f (:mail-seen state))]

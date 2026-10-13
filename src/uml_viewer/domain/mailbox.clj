@@ -1,6 +1,6 @@
 (ns uml-viewer.domain.mailbox
-  "File mailbox between the viewer and the companion Grok.
-  Payload is durable EDN; tmux is only a wake-up."
+  "File mailbox between the viewer and the companion Claude.
+  Payload is durable EDN; Herdr only supplies the wake-up."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io])
   (:import [java.nio.file Files StandardCopyOption]))
@@ -33,8 +33,6 @@
       (edn/read-string (slurp file))
       (catch Exception _ nil))))
 
-(def ^:private keep-n 32)
-
 (defn read-mailbox
   "Envelope `{:next-id n :queue [cmd …]}`. A legacy single command becomes a queue."
   [file]
@@ -51,33 +49,47 @@
   [file]
   (long (or (:id (last (:queue (read-mailbox file)))) 0)))
 
+(defn- move-with-retry!
+  "Bounded retry around the atomic replacement: a concurrent reader briefly
+  holds the target on Windows (mail polls, status reads), and one transient
+  sharing violation must not lose mail or kill the writer."
+  [tmp target]
+  (let [deadline (+ (System/nanoTime) (* 2000 1000000))
+        atomic (into-array StandardCopyOption
+                           [StandardCopyOption/ATOMIC_MOVE
+                            StandardCopyOption/REPLACE_EXISTING])
+        plain (into-array StandardCopyOption [StandardCopyOption/REPLACE_EXISTING])]
+    (loop [options atomic]
+      (let [result (try
+                     (Files/move tmp target options)
+                     :moved
+                     (catch java.nio.file.AtomicMoveNotSupportedException _
+                       :retry-plain)
+                     (catch java.nio.file.FileSystemException e
+                       (if (< (System/nanoTime) deadline)
+                         :retry
+                         (throw e))))]
+        (case result
+          :moved nil
+          :retry-plain (recur plain)
+          :retry (do (Thread/sleep 25) (recur options)))))))
+
 (defn- atomic-write!
   [file m]
   (let [file (io/file file)
         tmp (io/file (str (.getPath file) ".tmp"))]
     (io/make-parents file)
     (spit tmp (pr-str m))
-    (try
-      (Files/move (.toPath tmp)
-                  (.toPath file)
-                  (into-array StandardCopyOption
-                              [StandardCopyOption/REPLACE_EXISTING
-                               StandardCopyOption/ATOMIC_MOVE]))
-      (catch Exception _
-        (Files/move (.toPath tmp)
-                    (.toPath file)
-                    (into-array StandardCopyOption
-                                [StandardCopyOption/REPLACE_EXISTING]))))))
+    (move-with-retry! (.toPath tmp) (.toPath file))))
 
 (defn write-command!
   "Append `op` (and extra keys) onto the mailbox queue."
   [file op extra]
   (let [box (read-mailbox file)
         id (long (or (:next-id box) 1))
-        cmd (merge {:id id :op (keyword op)} extra)
-        kept (vec (filter #(> (long (:id %)) (- id keep-n)) (:queue box)))]
+        cmd (merge {:id id :op (keyword op)} extra)]
     (atomic-write! file {:next-id (inc id)
-                         :queue (conj kept cmd)})
+                         :queue (conj (:queue box) cmd)})
     cmd))
 
 (defn pending
@@ -116,7 +128,7 @@
     (when (map? raw) raw)))
 
 (defn write-companion!
-  "Remember this viewer's tmux session and Terminal window."
+  "Remember this viewer's Herdr ownership and attached terminal window id."
   [root m]
   (atomic-write! (companion-file root) (or m {}))
   m)

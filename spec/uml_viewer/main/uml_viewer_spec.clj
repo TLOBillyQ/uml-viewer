@@ -1,38 +1,32 @@
 (ns uml-viewer.main.uml-viewer-spec
-  (:require [clojure.java.io :as io]
-            [speclj.core :refer :all]
-            [uml-viewer.domain.log :as log]
-            [uml-viewer.graph :as graph]
-            [uml-viewer.main.ir-generator]
+  (:require [speclj.core :refer :all]
+            [clojure.java.io :as io]
+            [clojure.data.json :as json]
+            [uml-viewer.adapters.core :as core]
             [uml-viewer.main.uml-viewer :as main]))
 
-(describe "viewer process"
-  (it "logs exceptions to uml-viewer-log.txt in the working directory"
-    (should= "uml-viewer-log.txt" log/log-name)
-    (should main/-main)))
+(defn temp-root []
+  (.toFile (java.nio.file.Files/createTempDirectory "uml-main" (make-array java.nio.file.attribute.FileAttribute 0))))
+(defn remove-root [root] (doseq [f (reverse (file-seq root))] (io/delete-file f true)))
 
-(describe "ir generator arguments"
-  (it "chooses the policy, output, and language without writing"
-    (let [plan (ns-resolve 'uml-viewer.main.ir-generator 'generation-plan)
-          bare (plan [])
-          path (doto (java.io.File/createTempFile "uv-plan" ".edn")
-                 (spit (pr-str {:lang :python})))
-          plain (doto (java.io.File/createTempFile "uv-plan" ".edn")
-                  (spit (pr-str {:title "T"})))
-          missing (doto (java.io.File/createTempFile "uv-plan" ".edn")
-                    (spit (pr-str {:lang :not-a-language})))]
+(describe "viewer JVM identity recording"
+  (it "records the live JVM only after startup succeeds"
+    (let [root (temp-root)]
       (try
-        (let [chosen (plan [(.getPath path) "out.edn"])]
-          (should= "examples/uml-viewer.policy.edn" (:policy-path bare))
-          (should= "examples/uml-viewer.edn" (:out bare))
-          (should (satisfies? graph/LanguageGraph (:impl bare)))
-          (should= (.getPath path) (:policy-path chosen))
-          (should= "out.edn" (:out chosen))
-          (should (satisfies? graph/LanguageGraph (:impl chosen)))
-          (should (satisfies? graph/LanguageGraph (:impl (plan [(.getPath plain)]))))
-          (should-throw
-            (plan [(.getPath missing)])))
-        (finally
-          (io/delete-file path true)
-          (io/delete-file plain true)
-          (io/delete-file missing true))))))
+        (with-redefs [core/start! (fn [& _] :started)]
+          (main/start-recorded! (.getCanonicalPath root) []))
+        (let [record (json/read-str (slurp (io/file root ".uml-viewer" "viewer-jvm.json")) :key-fn keyword)]
+          (should= (.pid (java.lang.ProcessHandle/current)) (:pid record))
+          (should= (.getCanonicalPath root) (:cwd record)))
+        (finally (remove-root root)))))
+  (it "leaves an existing record untouched when startup is refused"
+    (let [root (temp-root)]
+      (try
+        (let [record (io/file root ".uml-viewer" "viewer-jvm.json")]
+          (.mkdirs (.getParentFile record))
+          (spit record (json/write-str {:pid 4242 :started "keep" :cwd "original"}))
+          (with-redefs [core/start! (fn [& _] (throw (ex-info "Companion ownership already recorded; use --restart or resolve it before fresh start" {})))]
+            (should-throw clojure.lang.ExceptionInfo (main/start-recorded! (.getCanonicalPath root) [])))
+          (should= {:pid 4242 :started "keep" :cwd "original"}
+                   (json/read-str (slurp record) :key-fn keyword)))
+        (finally (remove-root root))))))
