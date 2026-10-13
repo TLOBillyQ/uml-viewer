@@ -22,12 +22,14 @@
   [policy source]
   (let [lang (keyword (or (:lang source) (:lang policy) :clojure))
         impl (or (graph/lookup lang)
-                 (throw (ex-info (str "no LanguageGraph for " lang) {:lang lang})))]
+                 (throw (ex-info (str "no LanguageGraph for " lang) {:lang lang})))
+        exclude (distinct (concat (:exclude policy) (:exclude source)))]
     (graph/scan impl
                 (or (:root source) (:src source) (:src policy) "src")
-                {:prefix (or (:prefix policy) "uml-viewer")
-                 :ns-prefix (or (:prefix source) (:prefix policy) "uml-viewer")
-                 :lang lang})))
+                (cond-> {:prefix (or (:prefix policy) "uml-viewer")
+                         :ns-prefix (or (:prefix source) (:prefix policy) "uml-viewer")
+                         :lang lang}
+                  (seq exclude) (assoc :exclude exclude)))))
 
 (defn scan-policy
   "Scan `policy`. `:sources` merges one scanner per entry.
@@ -37,7 +39,8 @@
     (graph/merge-scans (mapv #(scan-source policy %) (:sources policy)))
     (graph/scan graph-impl
                 (or (:src policy) "src")
-                {:prefix (or (:prefix policy) "uml-viewer")})))
+                (cond-> {:prefix (or (:prefix policy) "uml-viewer")}
+                  (seq (:exclude policy)) (assoc :exclude (:exclude policy))))))
 
 (defn document
   "Scan source with `graph-impl` and apply `policy`. Returns the IR document.

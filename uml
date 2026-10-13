@@ -1,0 +1,8 @@
+#!/bin/sh
+# Thin Unix entry, installed in the examined project.
+if ! command -v pwsh >/dev/null 2>&1; then
+  echo 'uml: PowerShell 7 (pwsh) is required. Install: https://aka.ms/powershell-install' >&2
+  exit 1
+fi
+ROOT=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+exec pwsh -NoLogo -NoProfile -File "$ROOT/uml.ps1" "$@"
