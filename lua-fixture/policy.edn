@@ -1,0 +1,6 @@
+{:title "Lua fixture"
+ :src "src"
+ :prefix "calc"
+ :lang :lua
+ :hierarchical true
+ :out "lua-fixture.edn"}
