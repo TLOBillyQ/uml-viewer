@@ -164,6 +164,26 @@
         h (Integer/toHexString (hash path))]
     (str "uml-viewer-" base "-" h)))
 
+(defn fresh-session-name
+  "Fresh Herdr session name, unique per launch. Kept short: the Herdr client
+  socket path <config>/herdr/sessions/<name>/herdr-client.sock must fit the
+  unix sun_path limit (104 bytes on macOS, including the NUL terminator)."
+  [cwd]
+  (str "uml-viewer-" (Integer/toHexString (hash cwd)) "-"
+       (subs (str (java.util.UUID/randomUUID)) 0 8)))
+
+(defn- assert-session-socket-path-fits!
+  "Fail with guidance when the session's Herdr client socket path would exceed
+  the unix sun_path limit instead of letting the Herdr server die on bind."
+  [session]
+  (when-not (windows?)
+    (let [config-home (or (System/getenv "XDG_CONFIG_HOME")
+                          (str (System/getProperty "user.home") "/.config"))
+          path (str config-home "/herdr/sessions/" session "/herdr-client.sock")]
+      (when (> (count path) 103)
+        (throw (ex-info (str "Herdr session socket path exceeds the unix sun_path limit: " path)
+                        {:status :failure :path path}))))))
+
 (defn current-session
   "Session name for this project, from companion.edn or the live atom."
   ([] (current-session (System/getProperty "user.dir")))
@@ -365,7 +385,7 @@
         (companion/recorded-backend info)
         (throw (ex-info "Companion ownership already recorded; use --restart or resolve it before fresh start"
                         {:status :failure :root cwd}))))
-    (let [session (str "uml-viewer-" (Integer/toHexString (hash cwd)) "-" (java.util.UUID/randomUUID))
+    (let [session (fresh-session-name cwd)
           rules standing-rules
           claude-session (str (java.util.UUID/randomUUID))
           command [(claude-executable) "--dangerously-skip-permissions" "--session-id" claude-session
@@ -374,6 +394,7 @@
                             "--append-system-prompt" rules herdr/recovery-prompt]
           provisional {:backend :herdr :owner-role :companion :cwd cwd :session session
                        :command command :recovery-command recovery-command :claude-session claude-session :provisional true}]
+      (assert-session-socket-path-fits! session)
       (mailbox/write-companion! cwd provisional)
       (let [identity (companion/create! (herdr/herdr provisional) session cwd command)
             info (merge (dissoc provisional :provisional) identity)]

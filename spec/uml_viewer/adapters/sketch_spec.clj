@@ -756,6 +756,20 @@
       (should= a (sketch/session-id "/tmp/proj-a"))
       (should-not (re-find #"grok" a))))
 
+  (it "keeps fresh Herdr session names within the unix socket path limit"
+    (let [a (sketch/fresh-session-name "/tmp/proj-a")
+          b (sketch/fresh-session-name "/tmp/proj-a")]
+      (should (re-matches #"uml-viewer-[0-9a-f]{1,8}-[0-9a-f]{8}" a))
+      (should-not= a b)
+      ;; macOS sun_path holds 104 bytes including the NUL terminator
+      (should (<= (count (str "/Users/a-very-long-user-name/.config/herdr/sessions/" a "/herdr-client.sock"))
+                     103))))
+
+  (it "refuses session names whose Herdr socket path exceeds sun_path"
+    (let [long-name (str "uml-viewer-" (apply str (repeat 60 "x")))]
+      (should-throw clojure.lang.ExceptionInfo
+                    (#'sketch/assert-session-socket-path-fits! long-name))))
+
   (it "skips a new agent on restart"
     (let [opened (atom 0)
           remembered (atom 0)]
