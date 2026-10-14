@@ -42,20 +42,27 @@
       (should-throw (companion/select-backend! @root nil false "Mac OS X" run))
       (spit (mailbox/companion-file @root) "[]")
       (should-throw (companion/select-backend! @root nil false "Windows" run))))
-  (it "accepts only the verified local version and bundled schema without creating resources"
+  (it "accepts only versions >= 0.9.3 with the bundled schema without creating resources"
     (doseq [os ["Mac OS X" "Windows 11"]
             version [{:exit nil :out ""} {:exit 1 :out "herdr 0.9.3"}
-                     {:exit 0 :out "herdr 0.9.4"} {:exit 0 :out "herdr 0.9.3"}]
+                     {:exit 0 :out "herdr 0.9.2"} {:exit 0 :out "herdr 0.8.9"}
+                     {:exit 0 :out "herdr abc"} {:exit 0 :out "herdr 0.9.4-rc.1"}
+                     {:exit 0 :out "herdr v0.9.4"}
+                     {:exit 0 :out "herdr 0.9.4"} {:exit 0 :out "herdr 0.9.3"}
+                     {:exit 0 :out "herdr 0.10.0"} {:exit 0 :out "herdr 1.0.0"}]
             protocol [21 22]]
       (let [calls (atom [])
+            supported? (and (= 0 (:exit version))
+                            (companion/herdr-version-supported?
+                              (second (re-matches #"herdr (\S+)" (:out version)))))
             run (fn [argv] (swap! calls conj argv)
                   (if (= ["herdr" "--version"] argv) version
                     {:exit 0 :out (str "{\"$schema\":\"test\",\"protocol\":" protocol ",\"schema_version\":1}")}))]
-        (if (and (= version {:exit 0 :out "herdr 0.9.3"}) (= protocol 22))
+        (if (and supported? (= protocol 22))
           (should= :herdr (companion/select-backend! @root :herdr false os run))
           (should-throw clojure.lang.ExceptionInfo
                         (companion/select-backend! @root :herdr false os run)))
-        (should= (if (= version {:exit 0 :out "herdr 0.9.3"})
+        (should= (if supported?
                    [["herdr" "--version"] ["herdr" "api" "schema" "--json"]]
                    [["herdr" "--version"]]) @calls)
         (should-not (.exists (mailbox/companion-file @root)))))))

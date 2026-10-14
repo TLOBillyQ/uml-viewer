@@ -1,5 +1,5 @@
 (ns uml-viewer.adapters.herdr
-  "Herdr 0.9.3 session ownership. Every CLI request selects the recorded session."
+  "Herdr (>=0.9.3) session ownership. Every CLI request selects the recorded session."
   (:require [clojure.data.json :as json]
             [clojure.java.io :as io]
             [clojure.string :as str]
@@ -39,10 +39,10 @@
     s))
 
 (defn- compatible! [status]
-  (when-not (and (true? (:running status)) (= "0.9.3" (:version status))
+  (when-not (and (true? (:running status)) (companion/herdr-version-supported? (:version status))
                  (= 22 (:protocol status)) (true? (:compatible status))
                  (true? (:endpoint_compatible status)))
-    (fail! "Herdr endpoint is not the verified 0.9.3/protocol 22 server" {:observed status})))
+    (fail! "Herdr endpoint is not a verified >=0.9.3/protocol 22 server" {:observed status})))
 
 (defn process-owner!
   "Read process creation identity; nil only for positively absent OS PID."
@@ -97,7 +97,7 @@
 
 (defn- snapshot! [session]
   (let [snapshot (get-in (cli! session "api" "snapshot") [:result :snapshot])]
-    (when-not (and (= "0.9.3" (:version snapshot)) (= 22 (:protocol snapshot))
+    (when-not (and (companion/herdr-version-supported? (:version snapshot)) (= 22 (:protocol snapshot))
                    (vector? (:panes snapshot)) (vector? (:workspaces snapshot)))
       (fail! "Invalid Herdr snapshot" {:observed snapshot}))
     snapshot))

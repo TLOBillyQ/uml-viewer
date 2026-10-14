@@ -106,9 +106,9 @@ and macOS. `--backend herdr` remains accepted; `--backend tmux` and
 close require explicit Herdr ownership and verify its recorded identities.
 Legacy or unmarked ownership is retained and refused; see
 [legacy migration](docs/herdr-backend-contract.md#9-旧后端退役与迁移).
-Startup checks the preinstalled **0.9.3** CLI and bundled protocol **22**
+Startup checks the preinstalled CLI is **>= 0.9.3** and the bundled protocol is **22**
 without starting a server, terminal, companion or detached Viewer. Install from
-[the official release](https://github.com/herdrdev/herdr/releases/tag/v0.9.3)
+[the official release](https://github.com/herdrdev/herdr/releases)
 or [herdr.dev](https://herdr.dev) (macOS: Homebrew `herdr`, then verify the version).
 There is no download, upgrade or fallback. `--backend herdr` creates an isolated
 named session and records its server, shell, pane and process creation identities.

@@ -12,16 +12,18 @@ Windows 完整生命周期仅部分原生验收，macOS 端到端验收按维护
 
 ## 1. 版本预检契约
 
-**唯一有证据的版本是 Herdr 0.9.3（socket protocol 22）。** 不虚构范围：
+**接受 Herdr >= 0.9.3 且 socket protocol 22；唯一有验收证据的版本是 0.9.3。**
+更高版本只按协议门槛放行，未经验证（见 [ADR 0003](adr/0003-herdr-version-floor.md)）：
 
 - wrapper 与 JVM 共用只读预检，创建 detached Viewer、终端或 companion 前执行
-  `herdr --version`（必须为 `herdr 0.9.3`）及 `herdr api schema --json`
+  `herdr --version`（必须为纯数字 `herdr X.Y.Z` 且 >= 0.9.3；预发布或带后缀
+  版本拒绝）及 `herdr api schema --json`
   （bundled schema 的顶层 `protocol` 必须为 22），且平台为 macOS 或 Windows。
   schema 是随 CLI 分发的本地数据；预检禁止为了协议核对创建 server。
   #17 创建已拥有的 server 后还须核对实际 endpoint 兼容性。
-- 官方来源：[Herdr 0.9.3 release](https://github.com/herdrdev/herdr/releases/tag/v0.9.3)
+- 官方来源：[Herdr releases](https://github.com/herdrdev/herdr/releases)
   与 https://herdr.dev；macOS 可使用 Homebrew `herdr`，但安装后仍必须核对版本。
-  其他版本（包括更高版本）、缺失依赖或协议不匹配均失败，给出安装指引；
+  低于 0.9.3、缺失依赖或协议不为 22（包括更高协议）均失败，给出安装指引；
   不自动下载、升级或静默回退。
 - fresh 默认 Herdr；`--backend herdr` 兼容，tmux/psmux 明确拒绝。
   restart、wake、close 必须具有显式 `:backend :herdr` ownership，身份核实后
@@ -171,7 +173,7 @@ Windows 已记录真实 Claude 异常恢复、namespace JVM 重启与身份连�
   Viewer 关闭 → 先注销监督取消待重试。
 - **恢复动作**：在原 pane 重新投递 runner 命令（同 pane 重启已验证）。
 - 若未来 Herdr 版本提供带子进程退出码的事件，可简化 runner，但
-  0.9.3 必须按上述实现。
+  protocol 22 必须按上述实现。
 
 ## 7. Viewer 重启连续性
 
@@ -196,7 +198,7 @@ Windows #21 已部分验收收尾；未验证的七项转由 [#30](https://githu
 手动 terminal attach、focus/open-layer 与 metrics overlay 重启复验。
 完整结果及证据见 `windows-herdr-21-acceptance.md`，历史结果不视为本次重跑。
 
-macOS #22 已取消，未完成端到端原生验收。0.9.3 以外版本不接受。
+macOS #22 已取消，未完成端到端原生验收。低于 0.9.3 或 protocol 不为 22 的版本不接受；高于 0.9.3 的版本未验收。
 Linux/WSL companion 不受支持；独立扫描/质量命令保持各自平台要求。
 
 ### 本地收尾记录 — 2026-10-12（#13 / #23）
@@ -227,7 +229,7 @@ Herdr 是唯一后端；tmux/psmux adapter、pane 恢复 hook 和旧终端桥接
 1. 用旧版本正常结束该项目的旧 Viewer/session；确认该项目的 legacy 资源已退出。
 2. 归档该项目的 `.uml-viewer/companion.edn`。保留 `session.edn`、policy/proposal
    和两个 mailbox 队列；不要把旧记录改标为 Herdr。
-3. 在原生 Windows/macOS 安装 Herdr 0.9.3，并通过 `./uml` fresh 创建新 companion。
+3. 在原生 Windows/macOS 安装 Herdr >= 0.9.3（protocol 22），并通过 `./uml` fresh 创建新 companion。
    `--restart` 用于复用已验证的 Herdr 身份，不用于跨后端迁移。
 
 新版本不会自动清理活动 legacy 资源，也不会影响其他项目或共享 Herdr 服务。

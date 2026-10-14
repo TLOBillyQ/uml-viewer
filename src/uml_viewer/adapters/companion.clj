@@ -74,7 +74,14 @@
       {:args forwarded :backend selected})))
 
 (def herdr-guidance
-  "Herdr 0.9.3 (protocol 22) is required. Install the pinned release from https://github.com/herdrdev/herdr/releases/tag/v0.9.3 (https://herdr.dev). No automatic download, upgrade or fallback. Windows native acceptance is partial; macOS has not passed native acceptance.")
+  "Herdr 0.9.3 or newer (protocol 22) is required. Install a release from https://github.com/herdrdev/herdr/releases (https://herdr.dev). No automatic download, upgrade or fallback. Windows native acceptance is partial; macOS has not passed native acceptance.")
+
+(defn herdr-version-supported?
+  "True when version is a dotted numeric X.Y.Z that is >= 0.9.3."
+  [version]
+  (if-let [parts (some->> version (re-matches #"(\d+)\.(\d+)\.(\d+)") rest)]
+    (not (neg? (compare (mapv #(Long/parseLong %) parts) [0 9 3])))
+    false))
 
 (defn select-backend!
   "Read-only preflight before any viewer, terminal or companion resources."
@@ -101,7 +108,7 @@
     (when-not (or (str/starts-with? os "Windows") (str/starts-with? os "Mac"))
       (throw (ex-info "Linux/WSL companion launch is unsupported after tmux retirement. Run the viewer and Herdr from native Windows or macOS; WSL no longer opens a tmux pane. Ownership and queues are retained." {:status :failure})))
     (let [version (run ["herdr" "--version"])
-          schema (when (and (= 0 (:exit version)) (= "herdr 0.9.3" (:out version)))
+          schema (when (and (= 0 (:exit version)) (herdr-version-supported? (some->> (:out version) (re-matches #"herdr (\S+)") second)))
                    (run ["herdr" "api" "schema" "--json"]))]
       (when-not (and schema (= 0 (:exit schema))
                      (re-find #"(?s)^\s*\{\s*\"\$schema\"\s*:\s*\"[^\"]*\"\s*,\s*\"protocol\"\s*:\s*22\s*," (:out schema)))
