@@ -207,6 +207,21 @@
                         [(companion/herdr) "--session" (:session identity) "pane" "send-keys" (:pane identity) "ctrl+c"])
     (Thread/sleep 150)))
 
+(defn- pane-run!
+  "Deliver text to the pane. A freshly spawned macOS pty is still in canonical
+  mode (MAX_CANON 1024), so herdr rejects long lines until the shell enters
+  raw mode; retry only that rejection, per the server's own guidance."
+  [session pane text]
+  (let [argv [(companion/herdr) "--session" session "pane" "run" pane text]
+        deadline (+ (System/currentTimeMillis) 10000)]
+    (loop []
+      (let [result (companion/process! argv)]
+        (when-not (= 0 (:exit result))
+          (if (and (< (System/currentTimeMillis) deadline)
+                   (str/includes? (str (:out result) (:err result)) "canonical mode"))
+            (do (Thread/sleep 100) (recur))
+            (fail! "Herdr pane run failed" {:result result})))))))
+
 (defn relaunch!
   "Submit one journalled generation only into the verified, idle original pane."
   [identity]
@@ -222,7 +237,7 @@
         command (if (:recovery-command identity) (:recovery-command identity)
                     (:command identity))
         text (pane-command! (:cwd identity) (runner-command! identity command) (:name shell))]
-    (companion/checked! companion/process! [(companion/herdr) "--session" (:session identity) "pane" "run" (:pane identity) text])))
+    (pane-run! (:session identity) (:pane identity) text)))
 
 (defn recovery-status [identity]
   (when (:supervisor identity) (recovery/status identity)))
@@ -271,7 +286,7 @@
           _ (mailbox/write-companion! cwd base)
           _ (observe! base session (:pane base))
           text (pane-command! cwd (runner-command! base command) (:name shell))]
-      (companion/checked! companion/process! [(companion/herdr) "--session" session "pane" "run" (:pane base) text])
+      (pane-run! session (:pane base) text)
       ;; Native PowerShell startup exceeded five seconds during concurrent coverage.
       ;; Wait for this launch token without ever resubmitting the command.
       (let [state (poll! 30000 100 #(runner-state base) "Herdr runner did not acknowledge startup")]

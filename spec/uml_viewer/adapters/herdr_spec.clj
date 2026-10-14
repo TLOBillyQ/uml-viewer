@@ -240,3 +240,17 @@
   (it "still rejects unsupported shells"
     (should-throw clojure.lang.ExceptionInfo
                   (#'herdr/pane-command! "/tmp" ["echo" "hi"] "fish"))))
+
+(describe "Herdr pane run delivery"
+  (it "retries while a fresh macOS pty is still in canonical mode"
+    (let [calls (atom 0)]
+      (with-redefs [companion/process! (fn [_] (if (< (swap! calls inc) 3)
+                                                 {:exit 1 :out "" :err "pane_send_failed: input exceeds the canonical mode limit"}
+                                                 {:exit 0 :out "{}" :err ""}))]
+        (#'herdr/pane-run! "s" "w1:p1" "text")
+        (should= 3 @calls))))
+  (it "does not retry other pane run failures"
+    (let [calls (atom 0)]
+      (with-redefs [companion/process! (fn [_] (swap! calls inc) {:exit 1 :out "" :err "pane_not_found"})]
+        (should-throw clojure.lang.ExceptionInfo (#'herdr/pane-run! "s" "w1:p1" "text"))
+        (should= 1 @calls)))))
