@@ -19,12 +19,15 @@ Windows 完整生命周期仅部分原生验收，macOS 端到端验收按维护
   `herdr --version`（必须为纯数字 `herdr X.Y.Z` 且 >= 0.9.3；预发布或带后缀
   版本拒绝）及 `herdr api schema --json`
   （bundled schema 的顶层 `protocol` 必须为 22），且平台为 macOS 或 Windows。
+  PATH 上每个 `herdr` 都逐一核对，选出 selected Herdr（兼容者中版本最高，
+  同版本取 PATH 靠前者），本次启动的所有 Herdr 调用都用其绝对路径
+  （见 [ADR 0004](adr/0004-herdr-executable-selection.md)）。
   schema 是随 CLI 分发的本地数据；预检禁止为了协议核对创建 server。
   #17 创建已拥有的 server 后还须核对实际 endpoint 兼容性。
 - 官方来源：[Herdr releases](https://github.com/herdrdev/herdr/releases)
   与 https://herdr.dev；macOS 可使用 Homebrew `herdr`，但安装后仍必须核对版本。
   低于 0.9.3、缺失依赖或协议不为 22（包括更高协议）均失败，给出安装指引；
-  不自动下载、升级或静默回退。
+  不自动下载、升级或静默回退；无兼容候选时列出每个候选的路径与拒绝原因。
 - fresh 默认 Herdr；`--backend herdr` 兼容，tmux/psmux 明确拒绝。
   restart、wake、close 必须具有显式 `:backend :herdr` ownership，身份核实后
   才操作；legacy、无 backend、未知或不完整记录保留并拒绝接管。

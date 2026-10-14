@@ -188,6 +188,7 @@
 (describe "Herdr recovery relaunch"
   (defn launch [calls state]
     (with-redefs [companion/process! (fake-relaunch-cli calls state)
+                  companion/selected-herdr (atom {:path "herdr" :release "0.9.3"})
                   herdr/process-owner! (fake-owner state)
                   recovery/write-state! (fn [_ _] nil)
                   recovery/java-command (fn [_ _] ["java" "-cp" "x" "runner" "manifest"])]

@@ -25,7 +25,7 @@
     data))
 
 (defn- cli! [session & args]
-  (checked-json! (into ["herdr" "--session" session] args)))
+  (checked-json! (into [(companion/herdr) "--session" session] args)))
 
 (defn- session! [session]
   (when-not (and (string? session) (re-matches #"uml-viewer-[A-Za-z0-9_-]+" session))
@@ -86,11 +86,11 @@
     (checked-json!
       ["pwsh.exe" "-NoProfile" "-EncodedCommand"
        (companion/encoded
-         (str "$ErrorActionPreference='Stop';$exe=(Get-Command herdr -CommandType Application).Source;"
-              "$p=Start-Process -FilePath $exe -ArgumentList @('--session'," (ps-word session)
+         (str "$ErrorActionPreference='Stop';"
+              "$p=Start-Process -FilePath " (ps-word (companion/herdr)) " -ArgumentList @('--session'," (ps-word session)
               ",'server') -WorkingDirectory " (ps-word cwd) " -WindowStyle Hidden -PassThru;"
               "@{pid=$p.Id;start=$p.StartTime.ToUniversalTime().Ticks.ToString();name=$p.ProcessName}|ConvertTo-Json -Compress"))])
-    (let [script (str "cd " (companion/shell-word cwd) " || exit; nohup herdr --session "
+    (let [script (str "cd " (companion/shell-word cwd) " || exit; nohup " (companion/shell-word (companion/herdr)) " --session "
                       (companion/shell-word session) " server </dev/null >/dev/null 2>&1 & echo $!")
           pid (:out (companion/checked! companion/process! ["/bin/sh" "-c" script]))]
       (or (process-owner! pid) (fail! "Detached Herdr server exited" {:pid pid})))))
@@ -203,12 +203,13 @@
                          (companion/encoded (terminal-reset-script (:shell-pid identity)))])
     (Thread/sleep 250)
     (companion/checked! companion/process!
-                        ["herdr" "--session" (:session identity) "pane" "send-keys" (:pane identity) "ctrl+c"])
+                        [(companion/herdr) "--session" (:session identity) "pane" "send-keys" (:pane identity) "ctrl+c"])
     (Thread/sleep 150)))
 
 (defn relaunch!
   "Submit one journalled generation only into the verified, idle original pane."
   [identity]
+  (companion/ensure-herdr!)
   (observe! identity (:session identity) (:pane identity))
   (let [info (get-in (cli! (:session identity) "pane" "process-info" "--pane" (:pane identity)) [:result :process_info])
         foreground (:foreground_processes info)]
@@ -220,7 +221,7 @@
         command (if (:recovery-command identity) (:recovery-command identity)
                     (:command identity))
         text (pane-command! (:cwd identity) (runner-command! identity command) (:name shell))]
-    (companion/checked! companion/process! ["herdr" "--session" (:session identity) "pane" "run" (:pane identity) text])))
+    (companion/checked! companion/process! [(companion/herdr) "--session" (:session identity) "pane" "run" (:pane identity) text])))
 
 (defn recovery-status [identity]
   (when (:supervisor identity) (recovery/status identity)))
@@ -269,7 +270,7 @@
           _ (mailbox/write-companion! cwd base)
           _ (observe! base session (:pane base))
           text (pane-command! cwd (runner-command! base command) (:name shell))]
-      (companion/checked! companion/process! ["herdr" "--session" session "pane" "run" (:pane base) text])
+      (companion/checked! companion/process! [(companion/herdr) "--session" session "pane" "run" (:pane base) text])
       ;; Native PowerShell startup exceeded five seconds during concurrent coverage.
       ;; Wait for this launch token without ever resubmitting the command.
       (let [state (poll! 30000 100 #(runner-state base) "Herdr runner did not acknowledge startup")]
@@ -301,7 +302,7 @@
         (fail! "No Claude agent occupies the owned Herdr pane" {:pane pane})))
     ;; Herdr validates agent occupancy again and atomically submits text+Enter.
     (companion/checked! companion/process!
-                        ["herdr" "--session" (:session identity) "agent" "prompt" pane (second keys)])
+                        [(companion/herdr) "--session" (:session identity) "agent" "prompt" pane (second keys)])
     (poll! timeout-ms interval-ms #(acknowledged? token)
            "Herdr wake consumption was not acknowledged; mail remains queued")
     (observe! identity (:session identity) pane)

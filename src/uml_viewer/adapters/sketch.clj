@@ -338,14 +338,15 @@
 (defn open-herdr-window!
   "Open the full session client; direct terminal attach is unavailable on Windows."
   [session]
-  (let [attach (str "herdr session attach " (companion/shell-word session))
+  (let [attach (str (when (windows?) "& ") (companion/shell-word (companion/herdr))
+                    " session attach " (companion/shell-word session))
         result (if (windows?)
                  (companion/process!
                    ["wt.exe" "-w" "new" "new-tab" "--title" session
                     "pwsh.exe" "-NoProfile" "-EncodedCommand"
                     (companion/encoded
-                      (str "$env:HERDR_ENV=$null;$env:NO_COLOR=$null;& herdr session attach '"
-                           (str/replace session "'" "''") "';exit $LASTEXITCODE"))]
+                      (str "$env:HERDR_ENV=$null;$env:NO_COLOR=$null;& '" (str/replace (companion/herdr) "'" "''")
+                           "' session attach '" (str/replace session "'" "''") "';exit $LASTEXITCODE"))]
                    10000 ["HERDR_ENV" "NO_COLOR"])
                  (run-osascript (osascript (str "unset HERDR_ENV; " attach "; exit") session)))
         ok? (command-ok? result)]

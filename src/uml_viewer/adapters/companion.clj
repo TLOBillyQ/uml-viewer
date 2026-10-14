@@ -83,9 +83,70 @@
     (not (neg? (compare (mapv #(Long/parseLong %) parts) [0 9 3])))
     false))
 
+(defonce ^{:doc "The selected Herdr of this JVM: {:path :release}; nil until selection."}
+  selected-herdr (atom nil))
+
+(defn herdr
+  "Executable for every Herdr call; the bare name only before selection."
+  []
+  (or (:path @selected-herdr) "herdr"))
+
+(defn herdr-candidates
+  "Every distinct herdr executable on PATH, in PATH order."
+  [os path]
+  (let [exe (if (str/starts-with? os "Windows") "herdr.exe" "herdr")]
+    (->> (str/split (or path "") (re-pattern (java.util.regex.Pattern/quote java.io.File/pathSeparator)))
+         (map #(str/replace % "\"" ""))
+         (remove str/blank?)
+         (map #(io/file % exe))
+         (filter #(and (.isFile ^java.io.File %) (.canExecute ^java.io.File %)))
+         (map #(.getCanonicalPath ^java.io.File %))
+         distinct
+         vec)))
+
+(def ^:private protocol-22-schema
+  #"(?s)^\s*\{\s*\"\$schema\"\s*:\s*\"[^\"]*\"\s*,\s*\"protocol\"\s*:\s*22\s*,")
+
+(defn- probe-herdr [run exe]
+  (let [version (run [exe "--version"])
+        release (when (= 0 (:exit version)) (some->> (:out version) (re-matches #"herdr (\S+)") second))]
+    (if-not (herdr-version-supported? release)
+      {:path exe :reason "not a herdr X.Y.Z >= 0.9.3" :result version}
+      (let [schema (run [exe "api" "schema" "--json"])]
+        (if (and (= 0 (:exit schema)) (re-find protocol-22-schema (:out schema)))
+          {:path exe :release release}
+          {:path exe :release release :reason "bundled schema is not protocol 22" :result schema})))))
+
+(defn select-herdr
+  "Highest compatible release among candidates; equal releases keep PATH order."
+  [candidates run]
+  (let [probes (mapv #(probe-herdr run %) candidates)
+        rank #(mapv (fn [part] (Long/parseLong part)) (str/split (:release %) #"\."))
+        best (reduce (fn [best p] (if (or (nil? best) (pos? (compare (rank p) (rank best)))) p best))
+                     nil (remove :reason probes))]
+    (or best
+        (throw (ex-info (str herdr-guidance " Candidates on PATH: "
+                             (if (seq probes)
+                               (str/join "; " (map #(str (:path %) " (" (or (:release %) "unknown") ": " (:reason %) ")") probes))
+                               "none"))
+                        {:status :failure :candidates probes})))))
+
+(defn select-herdr!
+  "Select once for this JVM; later Herdr calls all use the same executable."
+  ([] (select-herdr! (herdr-candidates (System/getProperty "os.name") (System/getenv "PATH")) process!))
+  ([candidates run] (reset! selected-herdr (select-herdr candidates run))))
+
+(defn ensure-herdr!
+  "JVMs that skip the preflight (the recovery controller) select on first use."
+  []
+  (when-not @selected-herdr (select-herdr!))
+  (herdr))
+
 (defn select-backend!
   "Read-only preflight before any viewer, terminal or companion resources."
-  [root requested restart? os run]
+  ([root requested restart? os run]
+   (select-backend! root requested restart? os run #(herdr-candidates os (System/getenv "PATH"))))
+  ([root requested restart? os run candidates]
   (let [file (mailbox/companion-file root)
         record (when (.exists file) (edn/read-string (slurp file)))
         _ (when (and (.exists file) (not (map? record)))
@@ -107,13 +168,8 @@
       (throw (ex-info "Companion ownership is missing; cannot restart" {:status :failure})))
     (when-not (or (str/starts-with? os "Windows") (str/starts-with? os "Mac"))
       (throw (ex-info "Linux/WSL companion launch is unsupported after tmux retirement. Run the viewer and Herdr from native Windows or macOS; WSL no longer opens a tmux pane. Ownership and queues are retained." {:status :failure})))
-    (let [version (run ["herdr" "--version"])
-          schema (when (and (= 0 (:exit version)) (herdr-version-supported? (some->> (:out version) (re-matches #"herdr (\S+)") second)))
-                   (run ["herdr" "api" "schema" "--json"]))]
-      (when-not (and schema (= 0 (:exit schema))
-                     (re-find #"(?s)^\s*\{\s*\"\$schema\"\s*:\s*\"[^\"]*\"\s*,\s*\"protocol\"\s*:\s*22\s*," (:out schema)))
-        (throw (ex-info herdr-guidance {:status :failure :version version :schema schema}))))
-    :herdr))
+    (select-herdr! (candidates) run)
+    :herdr)))
 
 (defn -main
   "Lightweight foreground wrapper preflight: no Quil or GUI namespaces."
@@ -121,6 +177,8 @@
   (try
     (let [{:keys [backend args]} (selection-args args)]
       (println (name (select-backend! root backend (boolean (some #{"--restart"} args)) os process!)))
+      (binding [*out* *err*]
+        (println "uml: selected Herdr" (:release @selected-herdr) "at" (herdr)))
       ;; process!'s non-daemon stream readers must not delay this foreground JVM.
       (System/exit 0))
     (catch Throwable t

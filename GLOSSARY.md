@@ -7,6 +7,10 @@
 **Herdr**:
 Windows 和 macOS 上唯一的 companion 启动后端。Linux/WSL companion 启动不受支持。
 
+**selected Herdr**:
+本次启动时 PATH 上所有兼容 Herdr 中版本最高的那一个；同一次启动内所有 Herdr 调用都用它。
+_Avoid_: default herdr, PATH herdr
+
 **companion**:
 由 viewer 管理的外部 Claude 会话，按序消费邮件队列、执行质量命令并驱动图展示。
 

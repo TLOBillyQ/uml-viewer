@@ -107,7 +107,9 @@ close require explicit Herdr ownership and verify its recorded identities.
 Legacy or unmarked ownership is retained and refused; see
 [legacy migration](docs/herdr-backend-contract.md#9-旧后端退役与迁移).
 Startup checks the preinstalled CLI is **>= 0.9.3** and the bundled protocol is **22**
-without starting a server, terminal, companion or detached Viewer. Install from
+without starting a server, terminal, companion or detached Viewer. With several
+`herdr` executables on `PATH`, the highest compatible release is used for every
+Herdr call ([ADR 0004](docs/adr/0004-herdr-executable-selection.md)). Install from
 [the official release](https://github.com/herdrdev/herdr/releases)
 or [herdr.dev](https://herdr.dev) (macOS: Homebrew `herdr`, then verify the version).
 There is no download, upgrade or fallback. `--backend herdr` creates an isolated

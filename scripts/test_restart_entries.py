@@ -61,7 +61,9 @@ class RestartEntries(unittest.TestCase):
                     self.installed / 'src/uml_viewer/domain/mailbox.clj')
         adapter = (REPO / 'src/uml_viewer/adapters/companion.clj').read_text(encoding='utf-8')
         self.assertEqual(1, adapter.count('os process!'))
-        probes = '''(defn fixture-run [argv]
+        probes = '''(defn herdr-candidates [& _] ["herdr"])
+
+(defn fixture-run [argv]
   (cond
     (= argv ["herdr" "--version"]) {:exit 0 :out "herdr 0.9.3"}
     (= argv ["herdr" "api" "schema" "--json"]) {:exit 0 :out "{\\"$schema\\":\\"fixture\\",\\"protocol\\":22,\\"fixture\\":true}"}
