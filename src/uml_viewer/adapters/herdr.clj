@@ -154,7 +154,8 @@
     (recovery/java-command "runner" manifest)))
 
 (defn- pane-command! [cwd command shell-name]
-  (let [name (-> shell-name (str/split #"[/\\]") last str/lower-case)]
+  ;; ps comm reports argv0; macOS login shells carry a leading dash (-zsh).
+  (let [name (-> shell-name (str/split #"[/\\]") last str/lower-case (str/replace #"^-" ""))]
     (cond
       (#{"pwsh" "pwsh.exe" "powershell" "powershell.exe"} name)
       (str "& " (str/join " " (map ps-word command)))

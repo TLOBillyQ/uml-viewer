@@ -232,3 +232,11 @@
         (should-throw clojure.lang.ExceptionInfo (launch calls state))
         (should-not (some #(= "pwsh.exe" (first %)) @calls))
         (should-not (some #(= ["pane" "run"] (cli-op %)) @calls))))))
+
+(describe "Herdr pane command shell detection"
+  (it "accepts macOS login shells whose argv0 carries a leading dash"
+    (doseq [shell ["-zsh" "-bash" "-sh" "/bin/-zsh"]]
+      (should= "'echo' 'hi there'" (#'herdr/pane-command! "/tmp" ["echo" "hi there"] shell))))
+  (it "still rejects unsupported shells"
+    (should-throw clojure.lang.ExceptionInfo
+                  (#'herdr/pane-command! "/tmp" ["echo" "hi"] "fish"))))
