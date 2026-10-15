@@ -10,6 +10,20 @@ follow-up issue **#49**, superseding #46). Follow-up observations live in
 the 问题清单 section (#47, #48, and smaller items). This document is the
 single acceptance log required by spec #32 user story 17.
 
+Maintainer authorizations (given in the orchestrating Claude session,
+recorded here for traceability):
+- 2026-10-14 「解决阻断」: after #34's FAIL blocked the remaining criteria,
+  the maintainer authorized diagnosing **and fixing** the blocking defects
+  during acceptance. This deviates from spec #32's "不改动被测代码" default;
+  the three fix commits (0b6f1ea, 6355aa4, 5e4407e) land under that
+  authorization, each with red-green specs, and every fix was verified by a
+  real cold-start re-run before #34 was re-judged PASS.
+- 2026-10-15 「授权你处理」: the maintainer authorized the closing
+  commits — the `./uml` mode fix (c2b3c5c, spec said the maintainer decides
+  commit-or-revert of the mode change), the evidence import (3ef8a99,
+  0badde2) and the three documentation updates (d0276e5). No push was
+  performed or authorized.
+
 Evidence root: `acceptance-evidence/` in this worktree
 (`/Users/billyq/Dev/unclebob/uml-acc-32/project-a/`). No
 credentials or API keys appear in any captured artifact. The host screen
