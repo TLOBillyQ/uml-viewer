@@ -253,16 +253,16 @@
         p (try (edn/read-string (slurp policy-file))
                (catch Exception e
                  (throw (ex-info "Invalid legacy restart policy"
-                                 {:policy (.getPath policy-file) :status :invalid-policy} e))))
-        output (or (:out p) "examples/uml-viewer.edn")]
+                                 {:policy (.getPath policy-file) :status :invalid-policy} e))))]
     (when-not (map? p)
       (throw (ex-info "Invalid legacy restart policy"
                       {:policy (.getPath policy-file) :status :invalid-policy})))
-    (when-not (and (string? output) (not (str/blank? output)))
-      (throw (ex-info "Invalid legacy restart policy output"
-                      {:policy (.getPath policy-file) :status :invalid-output})))
-    (let [file (io/file output)]
-      (.getPath (if (.isAbsolute file) file (io/file root output))))))
+    (let [output (or (:out p) "examples/uml-viewer.edn")]
+      (when-not (and (string? output) (not (str/blank? output)))
+        (throw (ex-info "Invalid legacy restart policy output"
+                        {:policy (.getPath policy-file) :status :invalid-output})))
+      (let [file (io/file output)]
+        (.getPath (if (.isAbsolute file) file (io/file root output)))))))
 
 (defn restart-state
   "Load explicit, saved, or legacy policy output path and restore the saved view."

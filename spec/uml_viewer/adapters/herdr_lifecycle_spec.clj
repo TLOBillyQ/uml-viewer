@@ -16,8 +16,8 @@
         record {:backend :herdr :owner-role :companion :cwd root
                 :session (str "uml-viewer-" suffix) :socket (.getAbsolutePath (io/file root "herdr.sock"))
                 :workspace "w1" :pane "w1:p1" :terminal-id (str "term_" suffix)
-                :shell-pid 42 :owner-start (if (sketch/windows?) "shell-start" "Sun Oct 11 12:00:00 2026")
-                :server-pid 41 :server-start (if (sketch/windows?) "server-start" "Sun Oct 11 12:00:00 2026")
+                :shell-pid 42 :owner-start (if (companion/windows?) "shell-start" "Sun Oct 11 12:00:00 2026")
+                :server-pid 41 :server-start (if (companion/windows?) "server-start" "Sun Oct 11 12:00:00 2026")
                 :command ["claude"]}]
     (.mkdirs (io/file root ".metrics"))
     (spit diagram (pr-str {:title suffix :hierarchical true
@@ -160,7 +160,7 @@
 
   (it "opens the Windows full session client with nesting disabled only in its child environment"
     (let [calls (atom [])]
-      (with-redefs [sketch/windows? (constantly true)
+      (with-redefs [companion/windows? (constantly true)
                     companion/process! (fn [argv timeout env-remove]
                                          (swap! calls conj [argv timeout env-remove])
                                          {:exit 0 :out ""})]

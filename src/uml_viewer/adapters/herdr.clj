@@ -10,7 +10,7 @@
 (defn- fail! [message data]
   (throw (ex-info (str message "; ownership retained") (merge {:status :failure} data))))
 
-(defn- windows? [] (str/starts-with? (System/getProperty "os.name") "Windows"))
+(defn- clock [] (System/nanoTime))
 (defn- canonical [path] (.getCanonicalPath (io/file path)))
 (defn- ps-word [text] (str "'" (str/replace (str text) "'" "''") "'"))
 
@@ -49,7 +49,7 @@
   [pid]
   (when-not (re-matches #"[1-9][0-9]*" (str pid))
     (fail! "Invalid owned process PID" {:pid pid}))
-  (if (windows?)
+  (if (companion/windows?)
     (checked-json!
       ["pwsh.exe" "-NoProfile" "-EncodedCommand"
        (companion/encoded
@@ -80,7 +80,7 @@
             (fail! message {:status :timeout}))))))
 
 (defn- launch-server! [session cwd]
-  (if (windows?)
+  (if (companion/windows?)
     ;; Start-Process on Windows creates an independent process. No inherited JVM
     ;; output pipes are retained, and the launcher exits after reporting identity.
     (checked-json!
@@ -147,13 +147,13 @@
         (catch Exception _ nil)))))
 
 (defn- runner-command! [identity command]
-  (when (and (windows?) (not (str/ends-with? (str/lower-case (first command)) ".exe")))
+  (when (and (companion/windows?) (not (str/ends-with? (str/lower-case (first command)) ".exe")))
     (fail! "Herdr recovery requires direct claude.exe or node.exe + official cli.js; wrappers cannot prove child identity" {:status :unsupported}))
   (let [manifest (str (:runner-state identity) ".launch.edn")]
     (recovery/write-state! manifest (assoc identity :command command))
     (recovery/java-command "runner" manifest)))
 
-(defn- pane-command! [cwd command shell-name]
+(defn- pane-command! [command shell-name]
   ;; ps comm reports argv0; macOS login shells carry a leading dash (-zsh).
   (let [name (-> shell-name (str/split #"[/\\]") last str/lower-case (str/replace #"^-" ""))]
     (cond
@@ -198,7 +198,7 @@
   "Clear killed-TUI terminal residue, then cancel any half-typed input line.
   Keystrokes only decode after the modes reset, so ctrl+c follows the write."
   [identity]
-  (when (windows?)
+  (when (companion/windows?)
     (companion/checked! companion/process!
                         ["pwsh.exe" "-NoProfile" "-EncodedCommand"
                          (companion/encoded (terminal-reset-script (:shell-pid identity)))])
@@ -213,11 +213,11 @@
   raw mode; retry only that rejection, per the server's own guidance."
   [session pane text]
   (let [argv [(companion/herdr) "--session" session "pane" "run" pane text]
-        deadline (+ (System/currentTimeMillis) 10000)]
+        deadline (+ (clock) (* 10000 1000000))]
     (loop []
       (let [result (companion/process! argv)]
         (when-not (= 0 (:exit result))
-          (if (and (< (System/currentTimeMillis) deadline)
+          (if (and (< (clock) deadline)
                    (str/includes? (str (:out result) (:err result)) "canonical mode"))
             (do (Thread/sleep 100) (recur))
             (fail! "Herdr pane run failed" {:result result})))))))
@@ -236,7 +236,7 @@
   (let [shell (process-owner! (:shell-pid identity))
         command (if (:recovery-command identity) (:recovery-command identity)
                     (:command identity))
-        text (pane-command! (:cwd identity) (runner-command! identity command) (:name shell))]
+        text (pane-command! (runner-command! identity command) (:name shell))]
     (pane-run! (:session identity) (:pane identity) text)))
 
 (defn recovery-status [identity]
@@ -248,7 +248,7 @@
     (session! session)
     (when-not (and (seq command) (every? string? command))
       (fail! "Herdr command must be a nonempty argv vector" {:command command}))
-    (when (and (windows?) (not (str/ends-with? (str/lower-case (first command)) ".exe")))
+    (when (and (companion/windows?) (not (str/ends-with? (str/lower-case (first command)) ".exe")))
       (fail! "Herdr requires direct native claude.exe (or node.exe + official cli.js); wrapper child identity is unsupported" {:status :unsupported}))
     (when (and identity (not (:provisional identity)))
       (fail! "Cannot create over existing Herdr ownership" {:identity identity}))
@@ -285,7 +285,7 @@
                                         :lock-file (.getAbsolutePath (io/file cwd ".uml-viewer" "recovery-controller.lock"))})
           _ (mailbox/write-companion! cwd base)
           _ (observe! base session (:pane base))
-          text (pane-command! cwd (runner-command! base command) (:name shell))]
+          text (pane-command! (runner-command! base command) (:name shell))]
       (pane-run! session (:pane base) text)
       ;; Native PowerShell startup exceeded five seconds during concurrent coverage.
       ;; Wait for this launch token without ever resubmitting the command.

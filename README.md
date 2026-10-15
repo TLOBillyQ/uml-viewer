@@ -132,8 +132,10 @@ namespace restart continuity and project isolation were recorded, with seven
 remaining native checks tracked by the
 [Windows Herdr #30 record](docs/windows-herdr-30-observations.md)
 ([baseline](docs/windows-herdr-30-baseline.md)).
-The maintainer cancelled macOS end-to-end acceptance and authorized legacy
-backend retirement; macOS is not claimed to have passed that acceptance.
+macOS end-to-end acceptance passed under spec #32 (Herdr 0.9.4/protocol 22,
+Darwin 27.0.0 arm64), recorded in the
+[acceptance log](acceptance-evidence/acceptance-log.md); platform terminal
+attach is NOT VERIFIED under [#49](https://github.com/qinyuanj/uml-viewer/issues/49).
 Linux/WSL companion launch is unsupported after tmux retirement; use native
 Windows or macOS for the integrated viewer/companion workflow. Historical
 backend evidence remains in [platform acceptance](docs/platform-acceptance.md).

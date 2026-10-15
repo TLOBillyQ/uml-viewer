@@ -688,7 +688,7 @@
 
 (describe "external process integration"
   (it "exposes process failures and deadlines through the existing process boundary"
-    (when (sketch/windows?)
+    (when (companion/windows?)
       (pending "exercises a real Unix shell"))
     (let [failure (sketch/run-command ["/bin/sh" "-c" "printf stdout; printf stderr >&2; exit 7"])]
       (should= 7 (:exit failure))

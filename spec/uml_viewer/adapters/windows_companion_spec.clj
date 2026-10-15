@@ -5,7 +5,7 @@
 
 (describe "Native Windows companion at the external process boundary"
   (it "discovers a configured PowerShell Claude entry with spaces at the process boundary"
-    (with-redefs [sketch/windows? (fn [] true)
+    (with-redefs [companion/windows? (fn [] true)
                   companion/process! (fn [args]
                                        (should= "pwsh.exe" (first args))
                                        {:exit 0 :out "C:\\With Spaces\\claude.ps1"})]

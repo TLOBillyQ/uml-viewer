@@ -130,28 +130,26 @@
        "to match the project's namespaces (no invented layers/components), regenerate the "
        "IR, then wait for directives."))
 
-(defn windows? [] (str/starts-with? (System/getProperty "os.name") "Windows"))
-
 (defn claude-executable
   []
-  (if (windows?)
+  (if (companion/windows?)
     (let [script (str "$ErrorActionPreference='Stop';$name=if($env:CLAUDE_BIN){$env:CLAUDE_BIN}else{'claude'};"
                       "$c=Get-Command -Name $name -CommandType Application,ExternalScript -ErrorAction Stop|Select-Object -First 1;"
                       "if([IO.Path]::GetExtension($c.Source).ToLowerInvariant() -notin @('.exe','.ps1')){throw 'Unsafe Claude wrapper. Set CLAUDE_BIN to native claude.exe (https://code.claude.com/docs/en/setup), or a .ps1 adapter invoking node.exe and the official @anthropic-ai/claude-code/cli.js; .cmd/.bat cannot preserve arbitrary argv.'};[Console]::Write($c.Source)")
           result (companion/checked! companion/process! ["pwsh.exe" "-NoProfile" "-EncodedCommand" (companion/encoded script)])]
       (when-not (seq (:out result)) (throw (ex-info "CLAUDE_BIN or Claude on PATH is required" result)))
       (:out result))
-  (let [named (System/getenv "CLAUDE_BIN")
-        candidates (filter identity
-                           [named
-                            (str (System/getProperty "user.home") "/.local/bin/claude")
-                            "/usr/local/bin/claude"
-                            "/opt/homebrew/bin/claude"])]
-    (or (first (filter (fn [p]
-                         (let [f (io/file p)]
-                           (and (.isFile f) (.canExecute f))))
-                       candidates))
-        "claude"))))
+    (let [named (System/getenv "CLAUDE_BIN")
+          candidates (filter identity
+                             [named
+                              (str (System/getProperty "user.home") "/.local/bin/claude")
+                              "/usr/local/bin/claude"
+                              "/opt/homebrew/bin/claude"])]
+      (or (first (filter (fn [p]
+                           (let [f (io/file p)]
+                             (and (.isFile f) (.canExecute f))))
+                         candidates))
+          "claude"))))
 
 (defonce !session-name (atom nil))
 
@@ -176,7 +174,7 @@
   "Fail with guidance when the session's Herdr client socket path would exceed
   the unix sun_path limit instead of letting the Herdr server die on bind."
   [session]
-  (when-not (windows?)
+  (when-not (companion/windows?)
     (let [config-home (or (System/getenv "XDG_CONFIG_HOME")
                           (str (System/getProperty "user.home") "/.config"))
           path (str config-home "/herdr/sessions/" session "/herdr-client.sock")]
@@ -358,9 +356,9 @@
 (defn open-herdr-window!
   "Open the full session client; direct terminal attach is unavailable on Windows."
   [session]
-  (let [attach (str (when (windows?) "& ") (companion/shell-word (companion/herdr))
+  (let [attach (str (when (companion/windows?) "& ") (companion/shell-word (companion/herdr))
                     " session attach " (companion/shell-word session))
-        result (if (windows?)
+        result (if (companion/windows?)
                  (companion/process!
                    ["wt.exe" "-w" "new" "new-tab" "--title" session
                     "pwsh.exe" "-NoProfile" "-EncodedCommand"
@@ -373,9 +371,9 @@
     (when-not ok?
       (binding [*out* *err*]
         (println "UML viewer: companion retained; open a separate terminal and run:" attach)))
-    {:terminal (if ok? (if (windows?) :windows-terminal :terminal) :none)
+    {:terminal (if ok? (if (companion/windows?) :windows-terminal :terminal) :none)
      :session session :attach attach
-     :window-id (when (and ok? (not (windows?))) (re-find #"\d+" (:out result)))}))
+     :window-id (when (and ok? (not (companion/windows?))) (re-find #"\d+" (:out result)))}))
 
 (defn open-herdr-companion!
   [cwd]

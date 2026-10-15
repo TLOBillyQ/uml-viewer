@@ -221,7 +221,7 @@
       (should-not (some #(= ["pane" "send-keys"] (cli-op %)) @calls))))
   (it "skips the ConPTY reset off Windows"
     (let [calls (atom []) state (atom {})]
-      (with-redefs [uml-viewer.adapters.herdr/windows? (constantly false)]
+      (with-redefs [companion/windows? (constantly false)]
         (launch calls state))
       (should-not (some #(= "pwsh.exe" (first %)) @calls))
       (should-not (some #(= ["pane" "send-keys"] (cli-op %)) @calls))
@@ -236,10 +236,10 @@
 (describe "Herdr pane command shell detection"
   (it "accepts macOS login shells whose argv0 carries a leading dash"
     (doseq [shell ["-zsh" "-bash" "-sh" "/bin/-zsh"]]
-      (should= "'echo' 'hi there'" (#'herdr/pane-command! "/tmp" ["echo" "hi there"] shell))))
+      (should= "'echo' 'hi there'" (#'herdr/pane-command! ["echo" "hi there"] shell))))
   (it "still rejects unsupported shells"
     (should-throw clojure.lang.ExceptionInfo
-                  (#'herdr/pane-command! "/tmp" ["echo" "hi"] "fish"))))
+                  (#'herdr/pane-command! ["echo" "hi"] "fish"))))
 
 (describe "Herdr pane run delivery"
   (it "retries while a fresh macOS pty is still in canonical mode"
@@ -253,4 +253,12 @@
     (let [calls (atom 0)]
       (with-redefs [companion/process! (fn [_] (swap! calls inc) {:exit 1 :out "" :err "pane_not_found"})]
         (should-throw clojure.lang.ExceptionInfo (#'herdr/pane-run! "s" "w1:p1" "text"))
-        (should= 1 @calls)))))
+        (should= 1 @calls))))
+  (it "stops retrying once the delivery deadline is exhausted"
+    (let [calls (atom 0)
+          ticks (atom [0 (* 5000 1000000) (* 20000 1000000)])]
+      (with-redefs [companion/process! (fn [_] (swap! calls inc)
+                                         {:exit 1 :out "" :err "pane_send_failed: input exceeds the canonical mode limit"})
+                    uml-viewer.adapters.herdr/clock (fn [] (let [t (first @ticks)] (swap! ticks rest) t))]
+        (should-throw clojure.lang.ExceptionInfo (#'herdr/pane-run! "s" "w1:p1" "text"))
+        (should= 2 @calls)))))

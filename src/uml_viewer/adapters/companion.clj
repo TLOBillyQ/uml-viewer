@@ -35,6 +35,11 @@
 (defn shell-word [s]
   (str "'" (str/replace (str s) "'" "'\"'\"'") "'"))
 
+(defn windows?
+  "True on native Windows; WSL reports a Linux os.name and is unsupported."
+  []
+  (str/starts-with? (System/getProperty "os.name") "Windows"))
+
 (defprotocol SessionBackend
   (create! [backend session cwd command])
   (probe! [backend session])
@@ -74,7 +79,7 @@
       {:args forwarded :backend selected})))
 
 (def herdr-guidance
-  "Herdr 0.9.3 or newer (protocol 22) is required. Install a release from https://github.com/herdrdev/herdr/releases (https://herdr.dev). No automatic download, upgrade or fallback. Windows native acceptance is partial; macOS has not passed native acceptance.")
+  "Herdr 0.9.3 or newer (protocol 22) is required. Install a release from https://github.com/herdrdev/herdr/releases (https://herdr.dev). No automatic download, upgrade or fallback. Windows native acceptance is partial; macOS end-to-end acceptance passed with Herdr 0.9.4 (spec #32), terminal attach unverified (#49).")
 
 (defn herdr-version-supported?
   "True when version is a dotted numeric X.Y.Z that is >= 0.9.3."

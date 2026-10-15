@@ -3,8 +3,10 @@
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.data.json :as json]
-            [clojure.string :as str])
-  (:import [java.nio.file Files StandardCopyOption]
+            [clojure.string :as str]
+            [uml-viewer.adapters.companion :as companion]
+            [uml-viewer.domain.mailbox :as mailbox])
+  (:import [java.nio.file Files]
            [java.io RandomAccessFile]
            [java.lang ProcessHandle ProcessBuilder ProcessBuilder$Redirect]))
 
@@ -15,26 +17,6 @@
 (def gone-grace-ms 2000)
 (defn clock [] (quot (System/nanoTime) 1000000))
 
-(defn- move-with-retry!
-  "ATOMIC_MOVE with bounded retry: a concurrent reader briefly holds the
-  target on Windows (viewer status polls), and one transient sharing
-  violation must not kill the controller or lose a journal entry."
-  [tmp target]
-  (let [deadline (+ (System/nanoTime) (* 2000 1000000))
-        options (into-array java.nio.file.CopyOption
-                            [StandardCopyOption/ATOMIC_MOVE StandardCopyOption/REPLACE_EXISTING])]
-    (loop []
-      (let [result (try
-                     (Files/move tmp target options)
-                     :moved
-                     (catch java.nio.file.FileSystemException e
-                       (if (< (System/nanoTime) deadline)
-                         :retry
-                         (throw e))))]
-        (when (= :retry result)
-          (Thread/sleep 25)
-          (recur))))))
-
 (defn write-state!
   "Atomic replacement with a unique temporary file; no shared .tmp writer."
   [path value]
@@ -44,7 +26,7 @@
                                   (make-array java.nio.file.attribute.FileAttribute 0))]
     (try
       (spit (.toFile tmp) (pr-str value))
-      (move-with-retry! tmp (.toPath file))
+      (mailbox/move-with-retry! tmp (.toPath file))
       value
       (finally (Files/deleteIfExists tmp)))))
 
@@ -197,7 +179,7 @@
             (throw (ex-info "Recovery cancellation was not acknowledged; resources retained" {}))))))))
 
 (defn java-command [mode manifest]
-  [(str (io/file (System/getProperty "java.home") "bin" (if (str/starts-with? (System/getProperty "os.name") "Windows") "java.exe" "java")))
+  [(str (io/file (System/getProperty "java.home") "bin" (if (companion/windows?) "java.exe" "java")))
    "-cp" (str/join java.io.File/pathSeparator
                     (map #(.getCanonicalPath (io/file %)) (str/split (System/getProperty "java.class.path")
                                                                   (re-pattern (java.util.regex.Pattern/quote java.io.File/pathSeparator)))))
@@ -224,7 +206,7 @@
       (.directory builder (io/file (:cwd identity)))
       (.redirectErrorStream builder true)
       (.redirectOutput builder (io/file (:cwd identity) ".uml-viewer" "recovery.log"))
-      (.redirectInput builder (ProcessBuilder$Redirect/from (io/file (if (str/starts-with? (System/getProperty "os.name") "Windows") "NUL" "/dev/null"))))
+      (.redirectInput builder (ProcessBuilder$Redirect/from (io/file (if (companion/windows?) "NUL" "/dev/null"))))
       (.start builder))
     (let [deadline (+ (clock) 30000)]
       (loop []
@@ -233,9 +215,8 @@
             (throw (ex-info "Detached recovery controller did not register; ownership retained" {}))))))))
 
 (defn run-child! [identity]
-  (let [argv (:command identity)
-        windows? (str/starts-with? (System/getProperty "os.name") "Windows")]
-    (when (and windows? (not (str/ends-with? (str/lower-case (first argv)) ".exe")))
+  (let [argv (:command identity)]
+    (when (and (companion/windows?) (not (str/ends-with? (str/lower-case (first argv)) ".exe")))
       (throw (ex-info "Recovery needs direct claude.exe or node.exe + official cli.js; wrappers cannot prove child identity" {})))
     (with-open [raf (RandomAccessFile. (str (:runner-state identity) ".lock") "rw")
                 channel (.getChannel raf) lock (.tryLock channel)]

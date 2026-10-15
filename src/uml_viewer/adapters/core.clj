@@ -17,8 +17,9 @@
        "\n"
        "  --backend herdr   Optional compatibility flag; Herdr is the only backend.\n"
        "                    Legacy ownership is refused; migrate with a fresh start.\n"
-       "                    Requires >=0.9.3/protocol 22. Windows acceptance is partial;\n"
-       "                    macOS native acceptance was cancelled. Linux/WSL unsupported.\n"
+       "                    Requires >=0.9.3/protocol 22. Windows acceptance is partial.\n"
+       "                    macOS end-to-end acceptance passed (0.9.4, spec #32);\n"
+       "                    terminal attach unverified (#49). Linux/WSL unsupported.\n"
        "  -h, --help        Print this help and exit.\n"))
 
 (defn parse-args

@@ -47,3 +47,5 @@ Companions serialize quality requests, read only the record produced by the invo
 Rejected alternatives: configuration inside policy (couples diagram policy to command execution); mandatory project script location (forces consumer adapter scripts).
 
 Automated public-entry acceptance runs controlled commands from a different directory with a project path containing spaces and `&`, checks argv/output/status, scope, findings and fail-closed behavior. Native Windows automated acceptance is distinct from real companion mailbox acceptance. macOS uses the shared PS7 runtime but native macOS acceptance remains unexecuted; wrapper tests do not claim it passed.
+
+Addendum (2026-10-15, spec #32): the final sentence above is historical. Serialized quality dispatch gating (crap/mutate record gate, FIFO mail, IR/display gating) was exercised and passed on native macOS under spec #32 with Herdr 0.9.4/protocol 22; evidence is recorded in [acceptance-evidence/acceptance-log.md](../../acceptance-evidence/acceptance-log.md). Platform terminal attach remains NOT VERIFIED under [#49](https://github.com/qinyuanj/uml-viewer/issues/49).

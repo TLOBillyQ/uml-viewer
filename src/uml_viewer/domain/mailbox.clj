@@ -49,10 +49,12 @@
   [file]
   (long (or (:id (last (:queue (read-mailbox file)))) 0)))
 
-(defn- move-with-retry!
+(defn move-with-retry!
   "Bounded retry around the atomic replacement: a concurrent reader briefly
   holds the target on Windows (mail polls, status reads), and one transient
-  sharing violation must not lose mail or kill the writer."
+  sharing violation must not lose mail or kill the writer. Falls back to a
+  plain move where ATOMIC_MOVE is unsupported. Shared by the mailbox and the
+  recovery journal."
   [tmp target]
   (let [deadline (+ (System/nanoTime) (* 2000 1000000))
         atomic (into-array StandardCopyOption

@@ -2,6 +2,7 @@
   (:require [clojure.data.json :as json]
             [clojure.java.io :as io]
             [uml-viewer.adapters.core :as core]
+            [uml-viewer.adapters.sketch :as sketch]
             [uml-viewer.clojure-language.source-clojure :as clj-source]
             [uml-viewer.domain.log :as log]
             [uml-viewer.lua-language.source-lua]
@@ -31,7 +32,7 @@
 (defn -main [& args]
   (log/install-exception-log!)
   (try
-    (start-recorded! (System/getenv "UML_VIEWER_PROJECT_ROOT") args)
+    (start-recorded! sketch/startup-project-root args)
     (catch Throwable t
       (log/log-exception! t "start!")
       (System/exit 1))))

@@ -2,6 +2,8 @@
 
 Herdr is now the sole companion backend on native Windows/macOS. Windows Herdr acceptance is **partial**, recorded in [windows-herdr-21-acceptance.md](windows-herdr-21-acceptance.md); seven native checks are tracked by [#30](https://github.com/qinyuanj/uml-viewer/issues/30). The maintainer cancelled macOS end-to-end acceptance (#22) and authorized tmux/psmux retirement (#23); cancellation is not a pass. Linux/WSL companion launch is unsupported after retirement. Automated simulations do not replace native observations.
 
+Addendum (2026-10-15, spec #32): the cancellation sentence above is historical. macOS end-to-end acceptance was later executed and **passed** with Herdr 0.9.4/protocol 22 on Darwin 27.0.0 arm64; #22 was closed with the acceptance log in [acceptance-evidence/acceptance-log.md](../acceptance-evidence/acceptance-log.md). Platform terminal attach remains NOT VERIFIED and is tracked by [#49](https://github.com/qinyuanj/uml-viewer/issues/49).
+
 The records below are **historical evidence for earlier backends and tool versions**, including native Windows psmux #11/#12 and macOS tmux. They do not establish acceptance of the current Herdr-only runtime.
 
 ## mutator Lua 接入复验 — 2026-10-10

@@ -8,6 +8,8 @@ session 恢复契约采用显式路径、保存路径、旧会话 policy 输出�
 
 #28 自动验证覆盖应用恢复及隔离的 Windows 公共 wrapper fixtures（受控 JVM/进程），不启动或重启用户正在运行的 viewer。此验证不等同于真实 Herdr 端到端验收；Windows 原生验收仍为部分完成，macOS 未执行验收，不能声明通过。
 
+增补（2026-10-15，spec #32）：上一句的 macOS 部分自此过时——macOS 端到端原生验收由 spec #32 执行并通过（Herdr 0.9.4 / protocol 22，Darwin 27.0.0 arm64），wrapper --restart 身份连续与视图恢复、质量分发串行门控均实测通过，验收日志见 acceptance-evidence/acceptance-log.md；平台终端 attach 未验证，移交 #49。Windows 原生验收仍为部分完成。
+
 同图 `:display` 以 canonical file 身份比较路径，重新读取 IR 和质量快照，恢复 focus、camera、zoom、proposal、open layer、declutter 以及仍然有效的 selection/detail card。相对路径按 project root 解析，当前加载路径按其原始文件位置比较。focus 消失时退到最近有效的 namespace 祖先；proposal 消失时回 namespace tree；open layer 消失时回该 proposal 根；失效 selection/card 清除，不创造 proposal。不同图加载采用新图根视图。discussion context 独立于浏览视图，直到后续 `:context` mail 才改变。mtime/metrics reload 与 FIFO mail 契约保持不变。
 
 companion 提示需写明质量命令失败停止后续 IR/展示，以及项目声明的 mutation 退出 3 为有效结果。
