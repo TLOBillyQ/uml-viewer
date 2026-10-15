@@ -2,18 +2,21 @@
 
 本文档记录 Herdr 的能力证据和当前生命周期契约。#23 退役后 Herdr 是原生
 Windows/macOS 唯一 companion 后端；`--backend herdr` 保留为兼容选项。
-Windows 完整生命周期仅部分原生验收，macOS 端到端验收按维护者决定取消，
-两者均不宣称全部通过。能力实验与端到端验收分开记录；未验证项不按官网
+Windows 完整生命周期仅部分原生验收；macOS 端到端验收由 spec #32 完成
+（Herdr 0.9.4，见 §8）。能力实验与端到端验收分开记录；未验证项不按官网
 声明或命令退出码 0 推断。旧 ownership 迁移见 §9。
 
 证据来源：
 - Windows checkpoint：#14 评论（2026-10-10，Herdr 0.9.3 / protocol 22）
 - macOS checkpoint：#14 评论（2026-10-10，Darwin 27.0.0 arm64，同上版本）
+- macOS 端到端验收：#32 / #44 验收日志（2026-10-15，Herdr 0.9.4 / protocol 22，
+  Darwin 27.0.0 arm64，acceptance-evidence/acceptance-log.md）
 
 ## 1. 版本预检契约
 
-**接受 Herdr >= 0.9.3 且 socket protocol 22；唯一有验收证据的版本是 0.9.3。**
-更高版本只按协议门槛放行，未经验证（见 [ADR 0003](adr/0003-herdr-version-floor.md)）：
+**接受 Herdr >= 0.9.3 且 socket protocol 22；有验收证据的版本是 0.9.3（Windows
+部分、macOS checkpoint）与 0.9.4（macOS 端到端，spec #32）。**
+其他更高版本只按协议门槛放行，未经验证（见 [ADR 0003](adr/0003-herdr-version-floor.md)）：
 
 - wrapper 与 JVM 共用只读预检，创建 detached Viewer、终端或 companion 前执行
   `herdr --version`（必须为纯数字 `herdr X.Y.Z` 且 >= 0.9.3；预发布或带后缀
@@ -147,7 +150,7 @@ wake 投递成功或 `pane wait-output`（socket `pane.wait_for_output`）匹配
 
 Windows 已记录真实 Claude 异常恢复、namespace JVM 重启与身份连续性等部分
 原生结果，详见 `windows-herdr-21-acceptance.md`。预算耗尽、正常退出不恢复、
-待重试取消和部分 GUI 恢复仍未原生验证；macOS 端到端验收已取消，不声明通过。
+待重试取消和部分 GUI 恢复仍未原生验证；macOS 端到端验收由 spec #32 完成（见 §8）。
 
 ### Herdr 原生证据边界（#14）
 
@@ -192,7 +195,8 @@ Windows 已记录真实 Claude 异常恢复、namespace JVM 重启与身份连�
   companion 跨 JVM 更换存活是设计预期；restart 绑定后调用 `recovery! true`
   核实既有 controller，不重置 generation/budget、不重建 ownership。
   Windows namespace 重启已部分原生通过，proposal/detail 等缺口见验收记录；
-  macOS 端到端连续性未完成原生验收。
+  macOS 端到端连续性已由 spec #32 #39 原生验证（三次重启循环，companion
+  身份连续、视图状态与邮箱游标恢复）。
 
 ## 8. 原生验收边界
 
@@ -201,7 +205,14 @@ Windows #21 已部分验收收尾；未验证的七项转由 [#30](https://githu
 手动 terminal attach、focus/open-layer 与 metrics overlay 重启复验。
 完整结果及证据见 `windows-herdr-21-acceptance.md`，历史结果不视为本次重跑。
 
-macOS #22 已取消，未完成端到端原生验收。低于 0.9.3 或 protocol 不为 22 的版本不接受；高于 0.9.3 的版本未验收。
+macOS 端到端原生验收由 spec #32 完成并通过（#22 以验收日志关闭，Herdr 0.9.4 /
+protocol 22，Darwin 27.0.0 arm64）：fresh 创建、FIFO 邮件、A/B 并行隔离、
+异常退出 1/2/4s 退避至多 3 次、正常退出零恢复、close 取消待重试、wrapper
+--restart 身份连续与视图恢复、质量分发串行门控均实测通过；平台终端 attach
+因宿主锁屏判 NOT VERIFIED，移交 [#49](https://github.com/qinyuanj/uml-viewer/issues/49)。
+验收期间修复三个 macOS 阻断缺陷（#45：sun_path 上限、登录 shell argv0、fresh
+pty canonical mode），证据见 acceptance-evidence/acceptance-log.md。
+低于 0.9.3 或 protocol 不为 22 的版本不接受；高于 0.9.4 的版本未验收。
 Linux/WSL companion 不受支持；独立扫描/质量命令保持各自平台要求。
 
 ### 本地收尾记录 — 2026-10-12（#13 / #23）

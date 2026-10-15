@@ -68,7 +68,8 @@ The diagram is already on screen.
   companion launch is unsupported. Legacy tmux/psmux or unmarked ownership
   is retained and refused; before migration read
   `docs/herdr-backend-contract.md` §9. Windows native acceptance is partial;
-  macOS end-to-end acceptance was cancelled, not passed.
+  macOS end-to-end acceptance passed under spec #32 (Herdr 0.9.4); terminal
+  attach remains NOT VERIFIED (#49).
 
 Do not commit or push unless asked. Esc interrupts a turn in this terminal;
 do not kill the process on interrupt.
