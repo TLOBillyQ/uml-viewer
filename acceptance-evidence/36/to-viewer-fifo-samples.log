@@ -1,0 +1,5 @@
+00:41:51.248243000 {:next-id 2, :queue []}
+00:41:51.562640000 {:next-id 5, :queue [{:id 2 :op :display :path "examples/library.edn"} {:id 3 :op :display :path "examples/uml-viewer.edn"} {:id 4 :op :display :path "examples/library.edn"}]}
+00:41:51.570912000 {:next-id 5, :queue [{:id 3, :op :display, :path "examples/uml-viewer.edn"} {:id 4, :op :display, :path "examples/library.edn"}]}
+00:41:51.662614000 {:next-id 5, :queue [{:id 4, :op :display, :path "examples/library.edn"}]}
+00:41:51.772850000 {:next-id 5, :queue []}

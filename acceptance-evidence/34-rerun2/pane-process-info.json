@@ -1,0 +1,1 @@
+{"id":"cli:pane:process_info","result":{"process_info":{"foreground_process_group_id":81506,"foreground_processes":[{"argv":["-zsh"],"argv0":"zsh","cmdline":"-zsh","cwd":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","name":"zsh","pid":81506}],"pane_id":"w1:p1","shell_pid":81506},"type":"pane_process_info"}}

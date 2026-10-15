@@ -1,0 +1,2 @@
+{"error":{"code":"server_unavailable","message":"request handling failed: receiving on a closed channel"},"id":"cli:workspace:create"}
+Error: Custom { kind: InvalidInput, error: "local socket name length exceeds capacity of sun_path of sockaddr_un" }

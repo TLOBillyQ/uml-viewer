@@ -1,0 +1,15 @@
+# #39 session.edn round-trip evidence (viewer-written via production save-session!, except the proposal augment noted)
+
+[baseline after fresh ./uml + to-viewer :context :real + :quit-for-restart, 08:39]
+{:path "/Users/billyq/Dev/unclebob/uml-acc-32/project-a/examples/uml-viewer.edn", :discussion-context {:context :real}, :mail-seen 14, :focus [], :cam-x 0, :cam-y 0, :selected nil, :detail-id nil}
+
+[round-trip A: after ./uml --restart (saved path) + live session + :quit-for-restart, 08:40]
+{:path "/Users/billyq/Dev/unclebob/uml-acc-32/project-a/examples/uml-viewer.edn", :declutter nil, :zoom 1.0, :proposal-id nil, :selected nil, :mail-seen 15, :cam-y 0, :cam-x 0, :discussion-context {:context :real}, :detail-id nil, :open-layer nil, :focus [], :proposal false}
+; => discussion-context {:context :real} restored + retained; mail-seen advanced 14->15 (no replay); namespace-tree view (proposal-id nil, proposal false)
+
+[augmented via production mailbox/write-session! (GUI proposal click unreachable under locked screen), then ./uml --restart]
+input:  round-trip A map merged with {:proposal-id :p-1791033119418 :discussion-context {:context :proposal :proposal-id :p-1791033119418 :name "test"}}
+
+[round-trip B: live session after proposal restart + :quit-for-restart, 08:41]
+{:path "/Users/billyq/Dev/unclebob/uml-acc-32/project-a/examples/uml-viewer.edn", :declutter nil, :zoom 1.0, :proposal-id :p-1791033119418, :selected nil, :mail-seen 16, :cam-y 0, :cam-x 0, :discussion-context {:context :proposal, :proposal-id :p-1791033119418, :name "test"}, :detail-id nil, :open-layer nil, :focus [], :proposal true}
+; => proposal-id validated against EDN proposals and retained; :proposal flipped false->true by the live restored JVM; discussion-context proposal variant retained

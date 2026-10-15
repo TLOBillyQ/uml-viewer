@@ -1,0 +1,11 @@
+=== 2026-10-15 02:39:12 #39 pre-state (A closed by #43)
+screenIsLocked: 1
+A processes: 
+A companion.edn: {}
+A session.edn: {:path "/Users/billyq/Dev/unclebob/uml-acc-32/project-a/examples/uml-viewer.edn", :mail-seen 6, :focus [], :cam-x 0, :cam-y 0, :selected nil, :detail-id nil}
+A viewer-process.json: {"started":"639275959781046620","pid":16343}
+A viewer-jvm.json: {"pid":16347,"started":"2026-10-14T17:32:58.504Z","cwd":"\/Users\/billyq\/Dev\/unclebob\/uml-acc-32\/project-a"}
+A recovery phase: :phase :cancelled
+A TA: {:next-id 15, :queue []} TV: {:next-id 12, :queue []}
+herdr: uml-viewer-7db6871f-aa6c2aa8 running  /Users/billyq/.config/herdr/sessions/uml-viewer-7db6871f-aa6c2aa8 /Users/billyq/.config/herdr/sessions/uml-viewer-7db6871f-aa6c2aa8/herdr.sock
+B viewer: 19487 56:04

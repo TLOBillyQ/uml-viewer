@@ -1,0 +1,25 @@
+01:31:40.972367000 phase-c start; baseline recovery: {:controller {:pid 14684, :start "2026-10-14T17:29:03.528Z"}, :generation 1, :runner-state "/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.uml-viewer/uml-viewer-5f26e88b-6fc7dc58-runner-1.edn", :exit 0, :attempts 1, :cwd "/Users/billyq/Dev/unclebob/uml-acc-32/project-a", :phase :normal, :runner-token "22bf3a2f-074c-45ce-91c3-ecf40fdae6b2", :token "75ea8039-4124-4710-bcce-a46826579d11", :reason "Companion exited normally", :submitted-at 818320781, :child {:pid 14717, :start "2026-10-14T17:29:06.157Z"}, :uptime-since 818321767, :session "uml-viewer-5f26e88b-6fc7dc58"}
+01:31:43.542706000 canceller JVM ready (pid 15616)
+REARM session uml-viewer-5f26e88b-6fc7dc58
+JOURNAL-AFTER-START {:controller {:pid 15663, :start 2026-10-14T17:31:44.262Z}, :generation 0, :runner-state /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.uml-viewer/uml-viewer-5f26e88b-6fc7dc58-runner.edn, :attempts 0, :cwd /Users/billyq/Dev/unclebob/uml-acc-32/project-a, :phase :running, :runner-token 69d85357-f7d9-40d3-8ae6-00e47b0bba49, :token 75ea8039-4124-4710-bcce-a46826579d11, :submitted-at 818480421, :session uml-viewer-5f26e88b-6fc7dc58}
+01:31:45.419833000 re-armed
+01:31:46.928304000 RELAUNCHED gen1 child 15698
+01:31:46.936784000 VERIFY gen1: pid 15698 ->15698 15688 Thu Oct 15 01:31:46 2026     /opt/homebrew/bin/claude
+01:31:46.954084000   runner parent chain: 15688 83331 /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java (parent 83331 -zsh)
+01:31:46.957564000 SIGTERM gen1 child 15698
+01:31:49.978346000 RELAUNCHED gen2 child 15783
+01:31:49.984165000 VERIFY gen2: pid 15783 ->15783 15773 Thu Oct 15 01:31:49 2026     /opt/homebrew/bin/claude
+01:31:50.000210000   runner parent chain: 15773 83331 /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java (parent 83331 -zsh)
+01:31:50.003669000 SIGTERM gen2 child 15783
+01:31:50.128337000 gen2 exit record: {:token "d0b5ec73-7a19-409a-a8c9-eb23d8617623", :phase :exited, :child {:pid 15783, :start "2026-10-14T17:31:49.843Z"}, :exit 143, :at 818485500}
+01:31:50.135078000 TRIGGER touched (4s backoff window)
+01:31:50.942352000 canceller done: CANCELLER-READY TRIGGER-OBSERVED 1791999110145 CLEANUP-DONE 1791999110850 
+01:31:51.460998000 FINAL recovery.edn: {:controller {:pid 15663, :start "2026-10-14T17:31:44.262Z"}, :generation 2, :runner-state "/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.uml-viewer/uml-viewer-5f26e88b-6fc7dc58-runner-2.edn", :exit 143, :attempts 2, :cwd "/Users/billyq/Dev/unclebob/uml-acc-32/project-a", :phase :cancelled, :runner-token "d0b5ec73-7a19-409a-a8c9-eb23d8617623", :token "75ea8039-4124-4710-bcce-a46826579d11", :reason "Viewer closed; recovery revoked", :submitted-at 818484507, :child {:pid 15783, :start "2026-10-14T17:31:49.843Z"}, :uptime-since 818485445, :deadline 818489557, :session "uml-viewer-5f26e88b-6fc7dc58"}
+01:31:51.475074000 controller 15663: GONE
+01:32:03.236717000 NO zombie relaunch within 12s (expected)
+01:32:03.242280000 companion.edn: {}
+01:32:03.253316000 herdr sessions: name                 status   directory                                        socket default              stopped  /Users/billyq/.config/herdr                      /Users/billyq/.config/herdr/herdr.sock 
+01:32:03.259666000 herdr server 83305: GONE
+01:32:03.266455000 pane shell 83331: GONE
+01:32:03.273344000 viewer 83289: 83289 /usr/bin/java
+01:32:03.276016000 phase-c end

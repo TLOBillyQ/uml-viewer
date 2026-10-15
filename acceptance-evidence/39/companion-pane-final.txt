@@ -1,0 +1,22 @@
+  pending mail oldest first.
+
+  Thought for 2s, ran 3 shell commands
+
+⏺ The viewer asked for a regen (mail :id 16), and it's
+  done. I ran ./uml ir and it exited with 0,
+  rewriting examples/uml-viewer.edn. Then I sent
+  :display for that file to the viewer (:id 19). The
+  to-agent.edn queue is now empty, and we're still
+  discussing the namespace tree.
+
+✻ Brewed for 15s · done 8:44 AM
+╭───────────────────────────────────────────────╮ [-]
+│ ◆▾ context26.9k of 200k · compacts at    13%  │
+│                167k                           │
+│                                     │         │
+╰───────────────────────────────────────────────╯
+
+──────────────────────────────────────────────────────
+❯ 
+──────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ←…

@@ -1,0 +1,14 @@
+=== 2026-10-15 02:28:46 B survival after A close
+--- B processes (compare lstart with pre-state):
+19487 Thu Oct 15 01:43:08 2026     /usr/bin/java -XX:-OmitStackTraceInFastThrow 
+19507 Thu Oct 15 01:43:10 2026     /opt/homebrew/Cellar/herdr/0.9.4/bin/herdr --
+19644 Thu Oct 15 01:43:12 2026     /Library/Java/JavaVirtualMachines/temurin-21.
+19533 Thu Oct 15 01:43:10 2026     -zsh
+19630 Thu Oct 15 01:43:11 2026     /Library/Java/JavaVirtualMachines/temurin-21.
+19634 Thu Oct 15 01:43:12 2026     /opt/homebrew/bin/claude --dangerously-skip-p
+--- B files md5 (pre: companion 9bc9d90405128124c6c928ca37c7da5a, recovery 70adaa3ceffeb4505cb8dc939a770e03, to-viewer 2c980e0a8f92cd77a9cecb811340fb11):
+9bc9d90405128124c6c928ca37c7da5a
+70adaa3ceffeb4505cb8dc939a770e03
+2c980e0a8f92cd77a9cecb811340fb11
+--- B pane md5 (pre: abc5f25cd61fb344afa30917e3baf1ef):
+abc5f25cd61fb344afa30917e3baf1ef

@@ -1,0 +1,1 @@
+UML viewer starting (launcher pid 92613). Log: /Users/billyq/Dev/unclebob/uml-acc-32/uml acc test/proj arg (35)/uml-viewer-log.txt

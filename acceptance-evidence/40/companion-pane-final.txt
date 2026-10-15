@@ -1,0 +1,23 @@
+  可能有环境影响： 测试期间输出了很多 "tmux/psmux
+  companions are retired" 和 "Companion ownership is
+  missing" 的提示。所以这些 spec 可能受到本机 Herdr
+  状态或 .uml-viewer/companion.edn
+  的影响。这一点我还没有确认。
+
+  顺序偏差： mail 7 的 :display 我是在跑完 mail 8 的
+  CRAP 之后才补写的。补写的内容仍是 mail 7 生成的那份
+  EDN，CRAP 期间没有重新生成。
+
+  要我排查这 9 个 spec 失败的原因吗？
+
+✻ Cooked for 2m 3s · done 1:58 AM
+╭───────────────────────────────────────────────╮ [-]
+│ ◆▾ context37.6k of 200k · compacts at    19%  │
+│                167k                           │
+│                                     │         │
+╰───────────────────────────────────────────────╯
+
+──────────────────────────────────────────────────────
+❯ 排查这 9 个 spec 失败
+──────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ←…

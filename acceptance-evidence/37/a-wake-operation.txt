@@ -1,0 +1,4 @@
+WROTE {:id 6, :op :context, :context :real}
+QUEUE {:next-id 7, :queue [{:id 6, :op :context, :context :real}]}
+WAKE-RESULT true
+QUEUE-AFTER {:next-id 7, :queue []}

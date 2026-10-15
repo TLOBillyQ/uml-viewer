@@ -1,0 +1,20 @@
+=== timestamp: 2026-10-15 01:45:44 +0800
+=== identity table
+A: session=uml-viewer-5f26e88b-06582e8d viewer=16347 controller=16502 server=16364 shell=16394 runner=16481 claude=16494 cwd=/Users/billyq/Dev/unclebob/uml-acc-32/project-a
+B: session=uml-viewer-7db6871f-aa6c2aa8 viewer=19487 controller=19644 server=19507 shell=19533 runner=19630 claude=19634 cwd=/Users/billyq/Dev/unclebob/uml-acc-32/project-b
+=== B companion.edn md5: 9bc9d90405128124c6c928ca37c7da5a
+=== B recovery.edn md5: 70adaa3ceffeb4505cb8dc939a770e03
+=== B mailboxes: to-viewer={:next-id 2, :queue []} to-agent=ABSENT
+=== B pane read revision:
+=== B process table:
+19507     1 Thu Oct 15 01:43:10 2026     /opt/homebrew/Cellar/herdr/0.9.4/bin/herdr
+19644 19487 Thu Oct 15 01:43:12 2026     /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java
+19533 19507 Thu Oct 15 01:43:10 2026     -zsh
+19630 19533 Thu Oct 15 01:43:11 2026     /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java
+19634 19630 Thu Oct 15 01:43:12 2026     /opt/homebrew/bin/claude
+=== session sockets:
+total 0
+drwxr-xr-x@  4 billyq  staff  128 Oct 15 01:43 .
+drwxr-xr-x@ 10 billyq  staff  320 Oct 10 20:36 ..
+drwxr-xr-x@  9 billyq  staff  288 Oct 15 01:33 uml-viewer-5f26e88b-06582e8d
+drwxr-xr-x@  9 billyq  staff  288 Oct 15 01:43 uml-viewer-7db6871f-aa6c2aa8

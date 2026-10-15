@@ -1,0 +1,6 @@
+Phase 3 failed-wake retention (in-process timestamps, companion busy with a 15-file reading task):
+  ENQUEUED {:id 5, :op :context, :context :real} millis 1791996566820
+  UML viewer: companion wake failed: Herdr wake consumption was not acknowledged; mail remains queued; ownership retained
+  WAKE-RESULT false elapsed-ms 10387
+  QUEUE-AT-RETURN {:next-id 6, :queue [{:id 5, :op :context, :context :real}]}
+Companion later popped id 5 at 00:49:48.370 (sampler) and confirmed: 已处理邮件 {:id 5 ...}：讨论上下文为命名空间树，队列已清空。

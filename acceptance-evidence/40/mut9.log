@@ -1,0 +1,329 @@
+=== Mutation Testing: src/uml_viewer/domain/mailbox.clj ===
+Previous mutation test: 2026-10-12T11:34:05.0182863+08:00
+Generated LCOV for the requested mutation test profile at 2026-10-15 01:57:44 CST.
+Coverage command exited non-zero; using the LCOV it wrote.
+Coverage command exited 9.
+Coverage command stdout:
+Loading namespaces:  (uml-viewer.domain.geom uml-viewer.domain.config uml-viewer.engine.layout uml-viewer.graph uml-viewer.domain.policy uml-viewer.domain.hierarchy uml-viewer.engine.curve uml-viewer.engine.route uml-viewer.engine.hit uml-viewer.engine.compose uml-viewer.domain.mailbox uml-viewer.domain.ir uml-viewer.application.overlay uml-viewer.application.detail uml-viewer.domain.log uml-viewer.application.document uml-viewer.adapters.draw uml-viewer.adapters.companion uml-viewer.adapters.recovery uml-viewer.adapters.herdr uml-viewer.source uml-viewer.typescript-language.source-typescript uml-viewer.python-language.graph-python uml-viewer.clojure-language.graph-clojure uml-viewer.lua-language.graph-lua uml-viewer.application.ir-generator uml-viewer.rust-language.graph-rust uml-viewer.typescript-language.graph-typescript uml-viewer.main.ir-generator uml-viewer.clojure-language.source-clojure uml-viewer.application.events uml-viewer.adapters.source-window uml-viewer.adapters.sketch uml-viewer.adapters.core uml-viewer.rust-language.source-rust uml-viewer.python-language.source-python uml-viewer.lua-language.source-lua uml-viewer.main.uml-viewer)
+Test namespaces:  (uml-viewer.adapters.backend-selection-spec uml-viewer.adapters.core-spec uml-viewer.adapters.draw-spec uml-viewer.adapters.herdr-lifecycle-spec uml-viewer.adapters.herdr-spec uml-viewer.adapters.ownership-spec uml-viewer.adapters.recovery-spec uml-viewer.adapters.sketch-spec uml-viewer.adapters.source-window-spec uml-viewer.adapters.windows-companion-spec uml-viewer.application.detail-spec uml-viewer.application.document-spec uml-viewer.application.events-spec uml-viewer.application.ir-generator-spec uml-viewer.application.overlay-spec uml-viewer.architecture-spec uml-viewer.domain.config-spec uml-viewer.domain.geom-spec uml-viewer.domain.hierarchy-spec uml-viewer.domain.ir-spec uml-viewer.domain.log-spec uml-viewer.domain.mailbox-spec uml-viewer.domain.policy-spec uml-viewer.engine.curve-spec uml-viewer.engine.hit-spec uml-viewer.engine.layout-spec uml-viewer.engine.route-spec uml-viewer.graph-spec uml-viewer.lua-language.graph-lua-spec uml-viewer.lua-language.metrics-spec uml-viewer.lua-language.source-lua-spec uml-viewer.main.uml-viewer-spec uml-viewer.polyglot-spec uml-viewer.python-language.graph-python-spec uml-viewer.python-language.source-python-spec uml-viewer.rust-language.graph-rust-spec uml-viewer.rust-language.source-rust-spec uml-viewer.source-spec uml-viewer.typescript-language.graph-typescript-spec uml-viewer.typescript-language.source-typescript-spec)
+Instrumented uml-viewer.domain.geom
+Instrumented uml-viewer.domain.config
+Instrumented uml-viewer.engine.layout
+Instrumented uml-viewer.graph
+Instrumented uml-viewer.domain.policy
+Instrumented uml-viewer.domain.hierarchy
+Instrumented uml-viewer.engine.curve
+Instrumented uml-viewer.engine.route
+Instrumented uml-viewer.engine.hit
+Instrumented uml-viewer.engine.compose
+Instrumented uml-viewer.domain.mailbox
+Instrumented uml-viewer.domain.ir
+Instrumented uml-viewer.application.overlay
+Instrumented uml-viewer.application.detail
+Instrumented uml-viewer.domain.log
+Instrumented uml-viewer.application.document
+Instrumented uml-viewer.adapters.draw
+Instrumented uml-viewer.adapters.companion
+Instrumented uml-viewer.adapters.recovery
+Instrumented uml-viewer.adapters.herdr
+Instrumented uml-viewer.source
+Instrumented uml-viewer.typescript-language.source-typescript
+Instrumented uml-viewer.python-language.graph-python
+Instrumented uml-viewer.clojure-language.graph-clojure
+Instrumented uml-viewer.lua-language.graph-lua
+Instrumented uml-viewer.application.ir-generator
+Instrumented uml-viewer.rust-language.graph-rust
+Instrumented uml-viewer.typescript-language.graph-typescript
+Instrumented uml-viewer.main.ir-generator
+Instrumented uml-viewer.clojure-language.source-clojure
+Instrumented uml-viewer.application.events
+Instrumented uml-viewer.adapters.source-window
+Instrumented uml-viewer.adapters.sketch
+Instrumented uml-viewer.adapters.core
+Instrumented uml-viewer.rust-language.source-rust
+Instrumented uml-viewer.python-language.source-python
+Instrumented uml-viewer.lua-language.source-lua
+Instrumented uml-viewer.main.uml-viewer
+Instrumented 38 namespaces in 2.8 seconds.
+Filtering tags. Excluding: no-mutate.
+[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[31mF[0m[32m.[0m[32m.[0m[31mF[0m[32m.[0m[32m.[0m[31mF[0m[31mF[0m[32m.[0m[31mF[0m[31mF[0m[32m.[0m[31mF[0m[31mF[0m[32m.[0m[31mF[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0mbookwriter checkout not found; scan skipped
+[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m
+
+Failures:
+
+  1) Herdr owned session backend binds the full identity via explicit session selectors
+[31m     Ambiguous Herdr endpoint; ownership retained[0m
+[90m     clojure.lang.ExceptionInfo: Ambiguous Herdr endpoint; ownership retained {:status :failure, :observed {:session "uml-viewer-A", :socket "C:/herdr/sessions/A/herdr.sock", :running true, :version "0.9.3", :protocol 22, :compatible true, :endpoint_compatible true}}
+     	at uml_viewer.adapters.herdr$fail_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:11)
+     	at uml_viewer.adapters.herdr$fail_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr$status_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:38)
+     	at uml_viewer.adapters.herdr$status_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr$observe_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:117)
+     	at uml_viewer.adapters.herdr$observe_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr.Herdr.bind_BANG_(uml_viewer/adapters/herdr.clj:303)
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21191$fn__21192.invoke(herdr_spec.clj:58)
+     	... 2 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21191.invoke(herdr_spec.clj:57)
+     	... 3 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21185$fn__21188.invoke(herdr_spec.clj:54)
+     	... 2 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21185.invoke(herdr_spec.clj:52)
+     	... 47 stack levels elided ...
+     	at cloverage.coverage$run_tests$fn__4992.invoke(coverage.clj:257)
+     	at cloverage.coverage$form_for_suppressing_unselected_tests.invokeStatic(coverage.clj:54)
+     	at cloverage.coverage$form_for_suppressing_unselected_tests.invoke(coverage.clj:32)
+     	at cloverage.coverage$run_tests.invokeStatic(coverage.clj:255)
+     	at cloverage.coverage$run_tests.invoke(coverage.clj:245)
+     	at cloverage.coverage$run_main.invokeStatic(coverage.clj:307)
+     	at cloverage.coverage$run_main.invoke(coverage.clj:299)
+     	... 12 stack levels elided ...[0m
+
+  2) Herdr owned session backend closes and confirms only A while leaving B in the inventory
+[31m     Ambiguous Herdr endpoint; ownership retained[0m
+[90m     clojure.lang.ExceptionInfo: Ambiguous Herdr endpoint; ownership retained {:status :failure, :observed {:session "uml-viewer-A", :socket "C:/herdr/sessions/A/herdr.sock", :running true, :version "0.9.3", :protocol 22, :compatible true, :endpoint_compatible true}}
+     	at uml_viewer.adapters.herdr$fail_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:11)
+     	at uml_viewer.adapters.herdr$fail_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr$status_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:38)
+     	at uml_viewer.adapters.herdr$status_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr.Herdr.cleanup_BANG_(uml_viewer/adapters/herdr.clj:342)
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21283$fn__21284.invoke(herdr_spec.clj:75)
+     	... 2 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21283.invoke(herdr_spec.clj:74)
+     	... 3 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21185$fn__21188.invoke(herdr_spec.clj:54)
+     	... 2 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21185.invoke(herdr_spec.clj:52)
+     	... 47 stack levels elided ...
+     	at cloverage.coverage$run_tests$fn__4992.invoke(coverage.clj:257)
+     	at cloverage.coverage$form_for_suppressing_unselected_tests.invokeStatic(coverage.clj:54)
+     	at cloverage.coverage$form_for_suppressing_unselected_tests.invoke(coverage.clj:32)
+     	at cloverage.coverage$run_tests.invokeStatic(coverage.clj:255)
+     	at cloverage.coverage$run_tests.invoke(coverage.clj:245)
+     	at cloverage.coverage$run_main.invokeStatic(coverage.clj:307)
+     	at cloverage.coverage$run_main.invoke(coverage.clj:299)
+     	... 12 stack levels elided ...[0m
+
+  3) Herdr owned session backend requires fresh consumption acknowledgement and a real Claude occupant
+[31m     Expected: true
+          got: false (using =)[0m
+[90m     /Users/billyq/Dev/unclebob/uml-acc-32/project-a/spec/uml_viewer/adapters/herdr_spec.clj:95[0m
+
+  4) Herdr owned session backend returns success only after this prompt was consumed
+[31m     Ambiguous Herdr endpoint; ownership retained[0m
+[90m     clojure.lang.ExceptionInfo: Ambiguous Herdr endpoint; ownership retained {:status :failure, :observed {:session "uml-viewer-A", :socket "C:/herdr/sessions/A/herdr.sock", :running true, :version "0.9.3", :protocol 22, :compatible true, :endpoint_compatible true}}
+     	at uml_viewer.adapters.herdr$fail_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:11)
+     	at uml_viewer.adapters.herdr$fail_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr$status_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:38)
+     	at uml_viewer.adapters.herdr$status_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr$observe_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:117)
+     	at uml_viewer.adapters.herdr$observe_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr.Herdr.wake_BANG_(uml_viewer/adapters/herdr.clj:311)
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21425$fn__21426.invoke(herdr_spec.clj:100)
+     	... 2 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21425.invoke(herdr_spec.clj:98)
+     	... 3 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21185$fn__21188.invoke(herdr_spec.clj:54)
+     	... 2 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21185.invoke(herdr_spec.clj:52)
+     	... 47 stack levels elided ...
+     	at cloverage.coverage$run_tests$fn__4992.invoke(coverage.clj:257)
+     	at cloverage.coverage$form_for_suppressing_unselected_tests.invokeStatic(coverage.clj:54)
+     	at cloverage.coverage$form_for_suppressing_unselected_tests.invoke(coverage.clj:32)
+     	at cloverage.coverage$run_tests.invokeStatic(coverage.clj:255)
+     	at cloverage.coverage$run_tests.invoke(coverage.clj:245)
+     	at cloverage.coverage$run_main.invokeStatic(coverage.clj:307)
+     	at cloverage.coverage$run_main.invoke(coverage.clj:299)
+     	... 12 stack levels elided ...[0m
+
+  5) Herdr owned session backend persists observed provisional identity before run and returns original argv
+[31m     [0m
+[90m     java.lang.IndexOutOfBoundsException
+     	... 3 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21475$fn__21476.invoke(herdr_spec.clj:117)
+     	at uml_viewer.adapters.companion$checked_BANG_.invokeStatic(uml_viewer/adapters/companion.clj:28)
+     	at uml_viewer.adapters.companion$checked_BANG_.invoke(uml_viewer/adapters/companion.clj:0)
+     	at uml_viewer.adapters.herdr$launch_server_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:95)
+     	at uml_viewer.adapters.herdr$launch_server_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr.Herdr.create_BANG_(uml_viewer/adapters/herdr.clj:262)
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21475$fn__21497.invoke(herdr_spec.clj:131)
+     	... 2 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21475.invoke(herdr_spec.clj:113)
+     	... 3 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21185$fn__21188.invoke(herdr_spec.clj:54)
+     	... 2 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21185.invoke(herdr_spec.clj:52)
+     	... 47 stack levels elided ...
+     	at cloverage.coverage$run_tests$fn__4992.invoke(coverage.clj:257)
+     	at cloverage.coverage$form_for_suppressing_unselected_tests.invokeStatic(coverage.clj:54)
+     	at cloverage.coverage$form_for_suppressing_unselected_tests.invoke(coverage.clj:32)
+     	at cloverage.coverage$run_tests.invokeStatic(coverage.clj:255)
+     	at cloverage.coverage$run_tests.invoke(coverage.clj:245)
+     	at cloverage.coverage$run_main.invokeStatic(coverage.clj:307)
+     	at cloverage.coverage$run_main.invoke(coverage.clj:299)
+     	... 12 stack levels elided ...[0m
+
+  6) Herdr owned session backend resumes cleanup after workspace closure only under the same server identity
+[31m     Expected: :server-stopping
+          got: nil (using =)[0m
+[90m     /Users/billyq/Dev/unclebob/uml-acc-32/project-a/spec/uml_viewer/adapters/herdr_spec.clj:142[0m
+
+  7) Herdr owned session backend explicitly refuses automatic recovery
+[31m     Ambiguous Herdr endpoint; ownership retained[0m
+[90m     clojure.lang.ExceptionInfo: Ambiguous Herdr endpoint; ownership retained {:status :failure, :observed {:session "uml-viewer-A", :socket "C:/herdr/sessions/A/herdr.sock", :running true, :version "0.9.3", :protocol 22, :compatible true, :endpoint_compatible true}}
+     	at uml_viewer.adapters.herdr$fail_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:11)
+     	at uml_viewer.adapters.herdr$fail_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr$status_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:38)
+     	at uml_viewer.adapters.herdr$status_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr$observe_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:117)
+     	at uml_viewer.adapters.herdr$observe_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr.Herdr.recovery_BANG_(uml_viewer/adapters/herdr.clj:327)
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21581$fn__21582.invoke(herdr_spec.clj:160)
+     	... 2 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21581.invoke(herdr_spec.clj:159)
+     	... 3 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21185$fn__21188.invoke(herdr_spec.clj:54)
+     	... 2 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21179$fn__21180$fn__21185.invoke(herdr_spec.clj:52)
+     	... 47 stack levels elided ...
+     	at cloverage.coverage$run_tests$fn__4992.invoke(coverage.clj:257)
+     	at cloverage.coverage$form_for_suppressing_unselected_tests.invokeStatic(coverage.clj:54)
+     	at cloverage.coverage$form_for_suppressing_unselected_tests.invoke(coverage.clj:32)
+     	at cloverage.coverage$run_tests.invokeStatic(coverage.clj:255)
+     	at cloverage.coverage$run_tests.invoke(coverage.clj:245)
+     	at cloverage.coverage$run_main.invokeStatic(coverage.clj:307)
+     	at cloverage.coverage$run_main.invoke(coverage.clj:299)
+     	... 12 stack levels elided ...[0m
+
+  8) Herdr recovery relaunch resets killed-TUI terminal modes and the input line before submitting
+[31m     Ambiguous Herdr endpoint; ownership retained[0m
+[90m     clojure.lang.ExceptionInfo: Ambiguous Herdr endpoint; ownership retained {:status :failure, :observed {:session "uml-viewer-A", :socket "C:/herdr/sessions/A/herdr.sock", :running true, :version "0.9.3", :protocol 22, :compatible true, :endpoint_compatible true}}
+     	at uml_viewer.adapters.herdr$fail_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:11)
+     	at uml_viewer.adapters.herdr$fail_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr$status_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:38)
+     	at uml_viewer.adapters.herdr$status_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr$observe_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:117)
+     	at uml_viewer.adapters.herdr$observe_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr$relaunch_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:229)
+     	at uml_viewer.adapters.herdr$relaunch_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr_spec$eval21627$fn__21628$launch__21633$fn__21638.invoke(herdr_spec.clj:195)
+     	... 2 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21627$fn__21628$launch__21633.invoke(herdr_spec.clj:190)
+     	at uml_viewer.adapters.herdr_spec$eval21627$fn__21628$fn__21641.invoke(herdr_spec.clj:198)
+     	... 49 stack levels elided ...
+     	at cloverage.coverage$run_tests$fn__4992.invoke(coverage.clj:257)
+     	at cloverage.coverage$form_for_suppressing_unselected_tests.invokeStatic(coverage.clj:54)
+     	at cloverage.coverage$form_for_suppressing_unselected_tests.invoke(coverage.clj:32)
+     	at cloverage.coverage$run_tests.invokeStatic(coverage.clj:255)
+     	at cloverage.coverage$run_tests.invoke(coverage.clj:245)
+     	at cloverage.coverage$run_main.invokeStatic(coverage.clj:307)
+     	at cloverage.coverage$run_main.invoke(coverage.clj:299)
+     	... 12 stack levels elided ...[0m
+
+  9) Herdr recovery relaunch skips the ConPTY reset off Windows
+[31m     Ambiguous Herdr endpoint; ownership retained[0m
+[90m     clojure.lang.ExceptionInfo: Ambiguous Herdr endpoint; ownership retained {:status :failure, :observed {:session "uml-viewer-A", :socket "C:/herdr/sessions/A/herdr.sock", :running true, :version "0.9.3", :protocol 22, :compatible true, :endpoint_compatible true}}
+     	at uml_viewer.adapters.herdr$fail_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:11)
+     	at uml_viewer.adapters.herdr$fail_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr$status_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:38)
+     	at uml_viewer.adapters.herdr$status_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr$observe_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:117)
+     	at uml_viewer.adapters.herdr$observe_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr$relaunch_BANG_.invokeStatic(uml_viewer/adapters/herdr.clj:229)
+     	at uml_viewer.adapters.herdr$relaunch_BANG_.invoke(uml_viewer/adapters/herdr.clj:0)
+     	at uml_viewer.adapters.herdr_spec$eval21627$fn__21628$launch__21633$fn__21638.invoke(herdr_spec.clj:195)
+     	... 2 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21627$fn__21628$launch__21633.invoke(herdr_spec.clj:190)
+     	at uml_viewer.adapters.herdr_spec$eval21627$fn__21628$fn__21714$fn__21715.invoke(herdr_spec.clj:225)
+     	... 2 stack levels elided ...
+     	at uml_viewer.adapters.herdr_spec$eval21627$fn__21628$fn__21714.invoke(herdr_spec.clj:224)
+     	... 49 stack levels elided ...
+     	at cloverage.coverage$run_tests$fn__4992.invoke(coverage.clj:257)
+     	at cloverage.coverage$form_for_suppressing_unselected_tests.invokeStatic(coverage.clj:54)
+     	at cloverage.coverage$form_for_suppressing_unselected_tests.invoke(coverage.clj:32)
+     	at cloverage.coverage$run_tests.invokeStatic(coverage.clj:255)
+     	at cloverage.coverage$run_tests.invoke(coverage.clj:245)
+     	at cloverage.coverage$run_main.invokeStatic(coverage.clj:307)
+     	at cloverage.coverage$run_main.invoke(coverage.clj:299)
+     	... 12 stack levels elided ...[0m
+
+Finished in 10.03329 seconds
+[31m567 examples, 9 failures, 2462 assertions[0m
+Ran tests.
+Writing HTML report to: /Users/billyq/Dev/unclebob/uml-acc-32/project-a/target/coverage/index.html
+Writing LCOV report to: /Users/billyq/Dev/unclebob/uml-acc-32/project-a/target/coverage/lcov.info
+
+|--------------------------------------------------+---------+---------|
+|                                        Namespace | % Forms | % Lines |
+|--------------------------------------------------+---------+---------|
+|                    [32muml-viewer.adapters.companion[0m |   [32m84.96[0m |   [32m90.32[0m |
+|                         [32muml-viewer.adapters.core[0m |  [32m100.00[0m |  [32m100.00[0m |
+|                         [32muml-viewer.adapters.draw[0m |   [32m88.00[0m |   [32m95.16[0m |
+|                        [31muml-viewer.adapters.herdr[0m |   [31m45.05[0m |   [33m50.83[0m |
+|                     [33muml-viewer.adapters.recovery[0m |   [33m70.39[0m |   [33m72.12[0m |
+|                       [32muml-viewer.adapters.sketch[0m |   [32m85.79[0m |   [32m89.72[0m |
+|                [33muml-viewer.adapters.source-window[0m |   [32m83.53[0m |   [33m76.67[0m |
+|                    [32muml-viewer.application.detail[0m |   [32m98.92[0m |  [32m100.00[0m |
+|                  [32muml-viewer.application.document[0m |   [32m91.26[0m |   [32m95.07[0m |
+|                    [32muml-viewer.application.events[0m |   [32m96.67[0m |   [32m98.22[0m |
+|              [32muml-viewer.application.ir-generator[0m |   [32m83.45[0m |   [32m97.56[0m |
+|                   [32muml-viewer.application.overlay[0m |   [32m96.31[0m |   [32m97.56[0m |
+|        [32muml-viewer.clojure-language.graph-clojure[0m |   [32m96.91[0m |   [32m98.76[0m |
+|       [32muml-viewer.clojure-language.source-clojure[0m |   [32m92.93[0m |   [32m95.92[0m |
+|                         [32muml-viewer.domain.config[0m |   [32m98.89[0m |  [32m100.00[0m |
+|                           [32muml-viewer.domain.geom[0m |   [32m93.77[0m |   [32m99.35[0m |
+|                      [32muml-viewer.domain.hierarchy[0m |   [32m94.84[0m |   [32m98.13[0m |
+|                             [32muml-viewer.domain.ir[0m |   [32m92.64[0m |   [32m97.95[0m |
+|                            [32muml-viewer.domain.log[0m |   [32m98.25[0m |  [32m100.00[0m |
+|                        [32muml-viewer.domain.mailbox[0m |   [32m88.97[0m |   [32m94.05[0m |
+|                         [32muml-viewer.domain.policy[0m |   [32m95.11[0m |   [32m98.52[0m |
+|                        [32muml-viewer.engine.compose[0m |   [32m99.34[0m |   [32m98.63[0m |
+|                          [32muml-viewer.engine.curve[0m |   [32m98.97[0m |   [32m98.50[0m |
+|                            [32muml-viewer.engine.hit[0m |   [32m96.61[0m |   [32m96.33[0m |
+|                         [32muml-viewer.engine.layout[0m |   [32m99.18[0m |  [32m100.00[0m |
+|                          [32muml-viewer.engine.route[0m |   [32m97.54[0m |   [32m98.91[0m |
+|                                 [32muml-viewer.graph[0m |   [32m95.62[0m |   [32m98.33[0m |
+|                [32muml-viewer.lua-language.graph-lua[0m |   [32m98.64[0m |  [32m100.00[0m |
+|               [33muml-viewer.lua-language.source-lua[0m |   [33m76.19[0m |   [32m85.71[0m |
+|                     [31muml-viewer.main.ir-generator[0m |    [31m4.17[0m |   [31m25.00[0m |
+|                       [33muml-viewer.main.uml-viewer[0m |   [33m71.93[0m |   [33m72.22[0m |
+|          [32muml-viewer.python-language.graph-python[0m |   [32m92.15[0m |  [32m100.00[0m |
+|         [32muml-viewer.python-language.source-python[0m |  [32m100.00[0m |  [32m100.00[0m |
+|              [32muml-viewer.rust-language.graph-rust[0m |   [32m89.72[0m |   [32m96.38[0m |
+|             [32muml-viewer.rust-language.source-rust[0m |   [32m95.59[0m |  [32m100.00[0m |
+|                                [32muml-viewer.source[0m |   [32m98.71[0m |  [32m100.00[0m |
+|  [32muml-viewer.typescript-language.graph-typescript[0m |   [32m90.51[0m |   [32m96.81[0m |
+| [32muml-viewer.typescript-language.source-typescript[0m |  [32m100.00[0m |  [32m100.00[0m |
+|--------------------------------------------------+---------+---------|
+|                                        [32mALL FILES[0m |   [32m89.91[0m |   [32m94.16[0m |
+|--------------------------------------------------+---------+---------|
+Coverage command stderr:
+UML viewer: companion wake failed: Companion ownership is missing, ambiguous or belongs to another project
+UML viewer: companion wake failed: agent not ready
+UML viewer: companion cleanup: cannot confirm release
+UML viewer: companion cleanup: Companion ownership is missing, ambiguous or belongs to another project
+UML viewer: companion wake failed: tmux/psmux companions are retired. Ownership and resources were retained; no takeover or cleanup was attempted. Finish the old viewer/session using the old release, verify that this project's legacy resources have exited, then archive .uml-viewer/companion.edn and start ./uml fresh with Herdr. Do not use --restart to migrate; retain session.edn and mailbox queues.
+UML viewer: companion cleanup: tmux/psmux companions are retired. Ownership and resources were retained; no takeover or cleanup was attempted. Finish the old viewer/session using the old release, verify that this project's legacy resources have exited, then archive .uml-viewer/companion.edn and start ./uml fresh with Herdr. Do not use --restart to migrate; retain session.edn and mailbox queues.
+UML viewer: companion wake failed: tmux/psmux companions are retired. Ownership and resources were retained; no takeover or cleanup was attempted. Finish the old viewer/session using the old release, verify that this project's legacy resources have exited, then archive .uml-viewer/companion.edn and start ./uml fresh with Herdr. Do not use --restart to migrate; retain session.edn and mailbox queues.
+UML viewer: companion cleanup: tmux/psmux companions are retired. Ownership and resources were retained; no takeover or cleanup was attempted. Finish the old viewer/session using the old release, verify that this project's legacy resources have exited, then archive .uml-viewer/companion.edn and start ./uml fresh with Herdr. Do not use --restart to migrate; retain session.edn and mailbox queues.
+UML viewer: companion wake failed: tmux/psmux companions are retired. Ownership and resources were retained; no takeover or cleanup was attempted. Finish the old viewer/session using the old release, verify that this project's legacy resources have exited, then archive .uml-viewer/companion.edn and start ./uml fresh with Herdr. Do not use --restart to migrate; retain session.edn and mailbox queues.
+UML viewer: companion cleanup: tmux/psmux companions are retired. Ownership and resources were retained; no takeover or cleanup was attempted. Finish the old viewer/session using the old release, verify that this project's legacy resources have exited, then archive .uml-viewer/companion.edn and start ./uml fresh with Herdr. Do not use --restart to migrate; retain session.edn and mailbox queues.
+UML viewer: companion wake failed: Companion ownership is missing, ambiguous or belongs to another project
+UML viewer: companion cleanup: Companion ownership is missing, ambiguous or belongs to another project
+UML viewer: companion wake failed: Companion ownership is missing, ambiguous or belongs to another project
+UML viewer: companion cleanup: Companion ownership is missing, ambiguous or belongs to another project
+UML viewer: companion wake failed: Companion ownership is missing, ambiguous or belongs to another project
+UML viewer: companion cleanup: Companion ownership is missing, ambiguous or belongs to another project
+UML viewer: companion wake failed: Companion ownership is missing, ambiguous or belongs to another project
+UML viewer: companion cleanup: Companion ownership is missing, ambiguous or belongs to another project
+UML viewer: companion wake failed: Companion ownership is missing, ambiguous or belongs to another project
+UML viewer: companion cleanup: Companion ownership is missing, ambiguous or belongs to another project
+Total mutation sites: 38
+Covered mutation sites: 36
+Uncovered mutation sites: 2
+Changed mutation sites: 38
+Manifest exists: yes
+Module hash changed: no
+Differential surface area: 0 mutations in new top-level forms
+Manifest-violating surface area: 0 mutations
+
+Baseline: FAIL — specs do not pass without mutations. Aborting.

@@ -1,0 +1,1 @@
+uml: PowerShell 7 (pwsh) is required. Install: https://aka.ms/powershell-install

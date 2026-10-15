@@ -1,0 +1,80 @@
+6fc7dc58-runner-1.edn.launch.edn'
+➜  project-a git:(5e4407e) ✗ >....
+an-2.7.2.jar:/Users/billyq/.m2/repository/xml-apis/xm
+l-apis/1.4.01/xml-apis-1.4.01.jar:/Users/billyq/.m2/r
+epository/xml-apis/xml-apis-ext/1.3.04/xml-apis-ext-1
+.3.04.jar:/Users/billyq/.m2/repository/org/apache/xml
+graphics/batik-awt-util/1.14/batik-awt-util-1.14.jar:
+/Users/billyq/.m2/repository/org/bouncycastle/bcmail-
+jdk14/1.38/bcmail-jdk14-1.38.jar:/Users/billyq/.m2/re
+pository/org/bouncycastle/bcprov-jdk14/1.38/bcprov-jd
+k14-1.38.jar:/Users/billyq/.m2/repository/org/apache/
+xmlgraphics/xmlgraphics-commons/2.6/xmlgraphics-commo
+ns-2.6.jar:/Users/billyq/.m2/repository/org/apache/xm
+lgraphics/batik-constants/1.14/batik-constants-1.14.j
+ar:/Users/billyq/.m2/repository/org/apache/xmlgraphic
+s/batik-i18n/1.14/batik-i18n-1.14.jar:/Users/billyq/.
+m2/repository/xalan/serializer/2.7.2/serializer-2.7.2
+.jar:/Users/billyq/.m2/repository/commons-io/commons-
+io/1.3.1/commons-io-1.3.1.jar:/Users/billyq/.m2/repos
+itory/commons-logging/commons-logging/1.0.4/commons-l
+ogging-1.0.4.jar' 'clojure.main' '-m' 'uml-viewer.ada
+pters.recovery' 'runner' '/Users/billyq/Dev/unclebob/
+uml-acc-32/project-a/.uml-viewer/uml-viewer-5f26e88b-
+6fc7dc58-runner-2.edn.launch.edn'
+➜  project-a git:(5e4407e) ✗ >....
+an-2.7.2.jar:/Users/billyq/.m2/repository/xml-apis/xm
+l-apis/1.4.01/xml-apis-1.4.01.jar:/Users/billyq/.m2/r
+epository/xml-apis/xml-apis-ext/1.3.04/xml-apis-ext-1
+.3.04.jar:/Users/billyq/.m2/repository/org/apache/xml
+graphics/batik-awt-util/1.14/batik-awt-util-1.14.jar:
+/Users/billyq/.m2/repository/org/bouncycastle/bcmail-
+jdk14/1.38/bcmail-jdk14-1.38.jar:/Users/billyq/.m2/re
+pository/org/bouncycastle/bcprov-jdk14/1.38/bcprov-jd
+k14-1.38.jar:/Users/billyq/.m2/repository/org/apache/
+xmlgraphics/xmlgraphics-commons/2.6/xmlgraphics-commo
+ns-2.6.jar:/Users/billyq/.m2/repository/org/apache/xm
+lgraphics/batik-constants/1.14/batik-constants-1.14.j
+ar:/Users/billyq/.m2/repository/org/apache/xmlgraphic
+s/batik-i18n/1.14/batik-i18n-1.14.jar:/Users/billyq/.
+m2/repository/xalan/serializer/2.7.2/serializer-2.7.2
+.jar:/Users/billyq/.m2/repository/commons-io/commons-
+io/1.3.1/commons-io-1.3.1.jar:/Users/billyq/.m2/repos
+itory/commons-logging/commons-logging/1.0.4/commons-l
+ogging-1.0.4.jar' 'clojure.main' '-m' 'uml-viewer.ada
+pters.recovery' 'runner' '/Users/billyq/Dev/unclebob/
+uml-acc-32/project-a/.uml-viewer/uml-viewer-5f26e88b-
+6fc7dc58-runner-3.edn.launch.edn'
+➜  project-a git:(5e4407e) ✗ '/Library/Java/JavaVirtu
+alMachines/temurin-21.jdk/Contents/Home/bin/java' '-c
+p' '/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.
+uml-viewer/uml-viewer/src:/Users/billyq/.m2/repositor
+y/org/clojure/clojure/1.12.0/clojure-1.12.0.jar:/User
+s/billyq/.m2/repository/org/clojure/data.json/2.5.1/d
+ata.json-2.5.1.jar:/Users/billyq/.m2/repository/org/c
+lojure/core.specs.alpha/0.4.74/core.specs.alpha-0.4.7
+4.jar:/Users/billyq/.m2/repository/org/clojure/spec.a
+lpha/0.5.238/spec.alpha-0.5.238.jar' 'clojure.main' '
+-m' 'uml-viewer.adapters.recovery' 'runner' '/Users/b
+illyq/Dev/unclebob/uml-acc-32/project-a/.uml-viewer/u
+ml-viewer-5f26e88b-6fc7dc58-runner-1.edn.launch.edn'
+
+Resume this session with:
+claude --resume b7e464ee-8e78-45be-b51b-a479db6c2981
+➜  project-a git:(5e4407e) ✗ '/Library/Java/JavaVirtu
+alMachines/temurin-21.jdk/Contents/Home/bin/java' '-c
+p' '/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.
+uml-viewer/uml-viewer/src:/Users/billyq/.m2/repositor
+y/org/clojure/clojure/1.12.0/clojure-1.12.0.jar:/User
+s/billyq/.m2/repository/org/clojure/data.json/2.5.1/d
+ata.json-2.5.1.jar:/Users/billyq/.m2/repository/org/c
+lojure/core.specs.alpha/0.4.74/core.specs.alpha-0.4.7
+4.jar:/Users/billyq/.m2/repository/org/clojure/spec.a
+lpha/0.5.238/spec.alpha-0.5.238.jar' 'clojure.main' '
+-m' 'uml-viewer.adapters.recovery' 'runner' '/Users/b
+illyq/Dev/unclebob/uml-acc-32/project-a/.uml-viewer/u
+ml-viewer-5f26e88b-6fc7dc58-runner-1.edn.launch.edn'
+
+Resume this session with:
+claude --resume b7e464ee-8e78-45be-b51b-a479db6c2981
+➜  project-a git:(5e4407e) ✗

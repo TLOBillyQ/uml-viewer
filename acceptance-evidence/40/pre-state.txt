@@ -1,0 +1,105 @@
+=== 2026-10-15 01:54:31 +0800
+--- quality-result.json: ABSENT
+--- examples/uml-viewer.edn: a9ab83d6c8f6c4309a9a714875f9f970 1791999202 Oct 15 01:33:22 2026
+--- .metrics tree:
+/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/dry.edn
+/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/crap.edn
+/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.application.detail.edn
+/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.domain.log.edn
+/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.graph.edn
+/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.python-language.graph-python.edn
+/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.adapters.draw.edn
+/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.typescript-language.graph-typescript.edn
+/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.clojure-language.source-clojure.edn
+/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.engine.hit.edn
+
+--- .metrics md5s:
+fb1d8ae8ff3d8145e926b8f6378ee1aa
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/dry.edn
+86c008ad61bf04fbdadd281f6cc64373
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/crap.edn
+7f8b1e83c000c34c2a69525461c9ade4
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.application.detail.edn
+56655835019d66cc333e98c01ea33ed7
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.domain.log.edn
+a23d2655f1d17a270190764f63b8ce1a
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.graph.edn
+c07e40f48c24b3bec7a23206987f5fda
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.python-language.graph-python.edn
+79642b03128d377bdcecb890d666cae8
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.adapters.draw.edn
+a40b34d20120e231668502eb5b580cf2
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.typescript-language.graph-typescript.edn
+5434873d43a488b196b07f54e47c387a
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.clojure-language.source-clojure.edn
+2a12f61abf5fc7be09022df4385f1549
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.engine.hit.edn
+8c014c468b2d416994e957f12282314d
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.rust-language.source-rust.edn
+97c6fb4ffc6f9eb5590f6c481840b29d
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.adapters.source-window.edn
+fc5e4a126086f5d5252b04e78cff1859
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.main.ir-generator.edn
+5ec177fb6c7bc4d526a8582426ba1d75
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.domain.policy.edn
+19ee38bc3896aeb36559a50f4c22192f
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.adapters.core.edn
+b2f1d583342857e607b3924d4cb6b84e
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.main.uml-viewer.edn
+20851a54089b16bb6d8d52546806b734
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.engine.route.edn
+cbba8593b93c7d3b3227c51c7267624d
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.application.events.edn
+76c0ee59cbcac38876327a395836ce0f
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.application.ir-generator.edn
+1f03c5a9901f2f33cb0957f9970f4c5b
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.engine.compose.edn
+a22dd0a0d416e5c7abd35b22f0e76737
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.rust-language.graph-rust.edn
+433b65d253f786961767064339f771fe
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.engine.curve.edn
+d9971cd273ce831a346f428c4d8ef297
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.application.document.edn
+9079922d12004cd38e4b7de74fbfe3c3
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.domain.geom.edn
+3a5af8ad2f409081e927a367e2322593
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.clojure-language.graph-clojure.edn
+144dd40b94846d5711a8e94475526c8c
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml-viewer.source.edn
+1a85e1d0020e470e91d95dcfeb2c037a
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/lua_language/source_lua.edn
+ce70346feb3dae45517ec68cbc1ea837
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/lua_language/graph_lua.edn
+095eae095107d2f27d744a5fa8506291
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/adapters/companion.edn
+1532cc3da932246608f9d9ededc6eb17
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/adapters/recovery.edn
+4e3f813ce4fe2f0e6011ee75c8b10ba5
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/adapters/core.edn
+5c93e085dbef56f98ef9c0fa50f75498
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/adapters/sketch.edn
+873c0b6a6b9c099fb8976b891196e84d
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/adapters/herdr.edn
+f00c9d71028f842a602103c8869fb4e4
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/application/ir_generator.edn
+89dbe1f90603dc74d908dbc9b691bed7
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/application/document.edn
+a8f4f1bc711ed03eaacfba23e0c7c34e
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/application/overlay.edn
+23c843c643ecce8063924a408387390e
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/main/uml_viewer.edn
+747fe056fe69e148f50013eb660a170f
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/engine/layout.edn
+8030b12adc727ba8657ee08e75639db7
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/domain/config.edn
+312e8535a4aab85c48ba85617ae7dfe8
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/domain/mailbox.edn
+f66b68614686fc302fea8273bea0bbc7
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/domain/hierarchy.edn
+96bac0304ba3ab50fcbcf21650aae1db
+  /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.metrics/mutate/uml_viewer/domain/ir.edn
+--- mailboxes: to-viewer={:next-id 8, :queue []} to-agent={:next-id 7, :queue []}
+--- viewer log tail:
+UML viewer: companion retained; open a separate terminal and run: '/opt/homebrew/Cellar/herdr/0.9.4/bin/herdr' session attach 'uml-viewer-5f26e88b-06582e8d'
+Watching examples/library.edn
+Double-click a class for its card. Scroll to pan (Shift-scroll for horizontal). Ctrl+/− zoom; Ctrl+0 resets. R reloads. Click the real diagram above Proposals, or a proposal to show it.

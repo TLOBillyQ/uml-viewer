@@ -1,0 +1,15 @@
+=== 2026-10-15 01:00:04 +0800 pre-SIGTERM process tree ===
+83289 83284 Thu Oct 15 00:25:38 2026     /usr/bin/java
+83305     1 Thu Oct 15 00:25:39 2026     /opt/homebrew/Cellar/herdr/0.9.4/bin/herdr
+83331 83305 Thu Oct 15 00:25:39 2026     -zsh
+83395 83331 Thu Oct 15 00:25:40 2026     /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java
+83410 83395 Thu Oct 15 00:25:41 2026     /opt/homebrew/bin/claude
+83418 83289 Thu Oct 15 00:25:41 2026     /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java
+--- runner state ---
+{:token "69d85357-f7d9-40d3-8ae6-00e47b0bba49", :phase :started, :child {:pid 83410, :start "2026-10-14T16:25:41.486Z"}}
+--- recovery.edn ---
+{:controller {:pid 83418, :start "2026-10-14T16:25:41.558Z"}, :generation 0, :runner-state "/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.uml-viewer/uml-viewer-5f26e88b-6fc7dc58-runner.edn", :attempts 0, :cwd "/Users/billyq/Dev/unclebob/uml-acc-32/project-a", :phase :running, :runner-token "69d85357-f7d9-40d3-8ae6-00e47b0bba49", :token "75ea8039-4124-4710-bcce-a46826579d11", :submitted-at 814517761, :child {:pid 83410, :start "2026-10-14T16:25:41.486Z"}, :uptime-since 814517769, :session "uml-viewer-5f26e88b-6fc7dc58"}
+--- pane foreground ---
+shell_pid: 83331
+fg: 83410 claude /Users/billyq/Dev/unclebob/uml-acc-32/project-a
+fg: 83395 java /Users/billyq/Dev/unclebob/uml-acc-32/project-a

@@ -1,0 +1,23 @@
+
+  Ran 2 shell commands
+
+⏺ 我把 domain.policy 加进了 proposal
+  test（:p-1791033119418）的 :omit（mail
+  12）。真实树的 :omit 没有动，仍然只有
+  domain.mailbox。
+
+  IR 退出码 0，生成的 EDN 里这个 proposal 已带上 :omit
+  [:domain.policy]，之后已发 :display。图上是否已隐藏
+  ，我没有在屏幕上确认。收件队列已空。
+
+✻ Sautéed for 15s · done 2:16 AM
+╭───────────────────────────────────────────────╮ [-]
+│ ◆▾ context41.7k of 200k · compacts at    21%  │
+│                167k                           │
+│                                     │         │
+╰───────────────────────────────────────────────╯
+
+──────────────────────────────────────────────────────
+❯ 
+──────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ←…

@@ -1,0 +1,7 @@
+2026-10-14T14:47:29.455824Z  INFO herdr::api::server: api server listening path=/Users/billyq/.config/herdr/sessions/uml-viewer-5f26e88b-31591941-3430-444c-a468-749f074c3f9b/herdr.sock
+2026-10-14T14:47:29.456339Z  INFO herdr::persist::io: session file is missing event="persist.restore" subsystem="persist" outcome="missing" path=/Users/billyq/.config/herdr/sessions/uml-viewer-5f26e88b-31591941-3430-444c-a468-749f074c3f9b/session.json
+2026-10-14T14:47:29.456408Z  INFO herdr::app: using pane scrollback configuration pane_scrollback_limit_bytes=10000000
+2026-10-14T14:47:29.475824Z  INFO herdr::logging: api request received event="api.request.start" subsystem="api" outcome="started" request_id="cli:workspace:create" method="workspace.create" changes_ui=true
+2026-10-14T14:47:29.485888Z  INFO herdr::logging: checking for updates event="update.check.start" subsystem="update" outcome="started"
+2026-10-14T14:47:29.486141Z  INFO herdr::logging: api request completed event="api.request.complete" subsystem="api" outcome="error" request_id="cli:workspace:create" method="workspace.create"
+2026-10-14T14:47:29.486323Z  INFO herdr::logging: herdr exiting event="app.shutdown" subsystem="server" outcome="completed" pid=32564

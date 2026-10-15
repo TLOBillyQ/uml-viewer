@@ -1,0 +1,8 @@
+=== 2026-10-15 02:10:20 pre-state
+screenIsLocked: 1
+policy md5: 95a86be5d64ea8c7a46637df4239441e
+diagram md5: a9ab83d6c8f6c4309a9a714875f9f970 mtime: 1792000683
+domain.mailbox mentions in EDN: 7
+TA: {:next-id 11, :queue []}
+TV: {:next-id 10, :queue []}
+recovery: {:controller {:pid 16502, :start "2026-10-14T17:33:02.170Z"}, :generation 0, :runner-state "/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.uml-viewer/uml-viewer-5f26e88b-06582e8d-runner.edn", :attempts 0, :cwd "/Users/billyq/Dev/unclebob/uml-acc-32/project-a", :phase :running, :runner-token "292a630a-2f04-478c-864c-42c4b7d927ed", :token "cdbb5191-1c57-42d9-9b0d-33456af94175", :submitted-at 818558387, :child {:pid 16494, :start "2026-10-14T17:33:02.100Z"}, :uptime-since 818558393, :session "uml-viewer-5f26e88b-06582e8d"}

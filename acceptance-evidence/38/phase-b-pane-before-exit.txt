@@ -1,0 +1,14 @@
+
+✻ Worked for 11s · done 12:49 AM
+
+❯ Recovery: do not scan sources or rewrite policy.
+  Read the current .uml-viewer/to-agent.edn queue;
+  pop and handle commands oldest first, preserving
+  the latest context and existing proposals. Apply
+  the standing quality-result gate to each refresh;
+  only valid results followed by successful IR
+  permit :display. A failed refresh stops that
+  request's IR/display, reports its cause, and
+  leaves later FIFO mail runnable. If there is no
+  pending refresh, restore :display from
+  .uml-viewer/view.edn; never issue an

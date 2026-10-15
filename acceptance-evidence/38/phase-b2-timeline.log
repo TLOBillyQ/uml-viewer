@@ -1,0 +1,15 @@
+01:29:02.825279000 stale gen>=1 runner artifacts removed; baseline recovery: {:controller {:pid 12641, :start "2026-10-14T17:23:25.161Z"}, :generation 1, :runner-state "/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.uml-viewer/uml-viewer-5f26e88b-6fc7dc58-runner-1.edn", :exit 143, :attempts 1, :cwd "/Users/billyq/Dev/unclebob/uml-acc-32/project-a", :phase :failed, :runner-token "51883827-cdfa-4c3f-973c-dae7b0471434", :token "75ea8039-4124-4710-bcce-a46826579d11", :reason "Runner generation changed; exit cause unknown", :submitted-at 817982400, :session "uml-viewer-5f26e88b-6fc7dc58"}
+REARM session uml-viewer-5f26e88b-6fc7dc58
+JOURNAL-AFTER-START {:controller {:pid 14684, :start 2026-10-14T17:29:03.528Z}, :generation 0, :runner-state /Users/billyq/Dev/unclebob/uml-acc-32/project-a/.uml-viewer/uml-viewer-5f26e88b-6fc7dc58-runner.edn, :attempts 0, :cwd /Users/billyq/Dev/unclebob/uml-acc-32/project-a, :phase :running, :runner-token 69d85357-f7d9-40d3-8ae6-00e47b0bba49, :token 75ea8039-4124-4710-bcce-a46826579d11, :submitted-at 818319686, :session uml-viewer-5f26e88b-6fc7dc58}
+01:29:04.703822000 start! exit=0
+01:29:06.291817000 RELAUNCHED gen1 child pid 14717 runner-1: {:token "22bf3a2f-074c-45ce-91c3-ecf40fdae6b2", :phase :started, :child {:pid 14717, :start "2026-10-14T17:29:06.157Z"}}
+01:29:06.298678000 child ps: 14717 14710 Thu Oct 15 01:29:06 2026     /opt/homebrew/bin/claude
+01:29:06.308819000 runner ps: 14710 83331 /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java
+01:29:06.318784000 runner parent (expect pane shell 83331): 83331 -zsh
+01:29:22.492462000 sent draft-clear + rapid double ctrl+c
+01:29:23.030541000 runner exit record: {:token "22bf3a2f-074c-45ce-91c3-ecf40fdae6b2", :phase :exited, :child {:pid 14717, :start "2026-10-14T17:29:06.157Z"}, :exit 0, :at 818338504}
+01:29:23.303986000 FINAL recovery.edn: {:controller {:pid 14684, :start "2026-10-14T17:29:03.528Z"}, :generation 1, :runner-state "/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.uml-viewer/uml-viewer-5f26e88b-6fc7dc58-runner-1.edn", :exit 0, :attempts 1, :cwd "/Users/billyq/Dev/unclebob/uml-acc-32/project-a", :phase :normal, :runner-token "22bf3a2f-074c-45ce-91c3-ecf40fdae6b2", :token "75ea8039-4124-4710-bcce-a46826579d11", :reason "Companion exited normally", :submitted-at 818320781, :child {:pid 14717, :start "2026-10-14T17:29:06.157Z"}, :uptime-since 818321767, :session "uml-viewer-5f26e88b-6fc7dc58"}
+01:29:24.326173000 controller 14684: GONE
+01:29:36.074824000 ZERO RECOVERY after normal exit (12s watch clean)
+{"id":"cli:pane:process_info","result":{"process_info":{"foreground_process_group_id":83331,"foreground_processes":[{"argv":["-zsh"],"argv0":"zsh","cmdline":"-zsh","cwd":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","name":"zsh","pid":83331}],"pane_id":"w1:p1","shell_pid":83331},"type":"pane_process_info"}}
+01:29:36.093435000 phase-b2 end

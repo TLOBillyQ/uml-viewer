@@ -1,0 +1,6 @@
+2026-10-14 22:49:18 +0800
+PATH=/Users/billyq/Dev/unclebob/uml-acc-32/herdr-0.9.3-shim:/usr/bin:/bin:/usr/sbin:/sbin
+uml: selected Herdr 0.9.3 at /Users/billyq/Dev/unclebob/uml-acc-32/herdr-0.9.3/herdr
+UML viewer starting (launcher pid 33026). Log: /Users/billyq/Dev/unclebob/uml-acc-32/project-a/uml-viewer-log.txt
+wrapper-exit=0
+2026-10-14 22:49:19 +0800

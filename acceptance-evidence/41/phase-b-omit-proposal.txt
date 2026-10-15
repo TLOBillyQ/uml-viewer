@@ -1,0 +1,19 @@
+=== 2026-10-15 02:17:58 phase-B post-omit (proposal p-1791033119418)
+policy mtime: Oct 15 02:16:18 2026  diagram mtime: Oct 15 02:16:21 2026
+31: :omit [:domain.mailbox],
+32: :proposals [{:id :p-1791033119418,
+35:   :omit [:domain.policy]}],
+--- EDN diff vs pre:
+35c35
+<    :omit [],
+---
+>    :omit [:domain.policy],
+65c65
+<  :omit [],
+---
+>  :omit [:domain.mailbox],
+--- proposals block in EDN:
+31: :proposals
+32- [{:id :p-1791033119418,
+33-   :name "test",
+34-   :layers [],

@@ -1,0 +1,17 @@
+01:01:28.627293000 phase-a start; target session uml-viewer-5f26e88b-6fc7dc58
+01:01:28.632216000 baseline recovery: {:controller {:pid 83418, :start "2026-10-14T16:25:41.558Z"}, :generation 0, :runner-state "/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.uml-viewer/uml-viewer-5f26e88b-6fc7dc58-runner.edn", :attempts 0, :cwd "/Users/billyq/Dev/unclebob/uml-acc-32/project-a", :phase :running, :runner-token "69d85357-f7d9-40d3-8ae6-00e47b0bba49", :token "75ea8039-4124-4710-bcce-a46826579d11", :submitted-at 814517761, :child {:pid 83410, :start "2026-10-14T16:25:41.486Z"}, :uptime-since 814517769, :session "uml-viewer-5f26e88b-6fc7dc58"}
+01:01:28.637859000 VERIFY gen0: pid 83410 ->83410 83395 Thu Oct 15 00:25:41 2026     /opt/homebrew/bin/claude
+01:01:28.640906000 SIGTERM sent to 83410 (gen0)
+01:01:31.730430000 RELAUNCHED gen1 child pid 3958 runner-file=/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.uml-viewer/uml-viewer-5f26e88b-6fc7dc58-runner-1.edn content={:token "5a5dee37-2863-4baa-8116-5a9313432933", :phase :started, :child {:pid 3958, :start "2026-10-14T17:01:31.684Z"}}
+01:01:31.737139000 VERIFY gen1: pid 3958 -> 3958  3923 Thu Oct 15 01:01:31 2026     /opt/homebrew/bin/claude
+01:01:31.740355000 SIGTERM sent to 3958 (gen1)
+01:01:35.290930000 RELAUNCHED gen2 child pid 4213 runner-file=/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.uml-viewer/uml-viewer-5f26e88b-6fc7dc58-runner-2.edn content={:token "cd1533ee-a869-47ca-b3c5-5f1d1c124dd5", :phase :started, :child {:pid 4213, :start "2026-10-14T17:01:35.254Z"}}
+01:01:35.297569000 VERIFY gen2: pid 4213 -> 4213  4169 Thu Oct 15 01:01:35 2026     /opt/homebrew/bin/claude
+01:01:35.300687000 SIGTERM sent to 4213 (gen2)
+01:01:40.893494000 RELAUNCHED gen3 child pid 4583 runner-file=/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.uml-viewer/uml-viewer-5f26e88b-6fc7dc58-runner-3.edn content={:token "981d963f-3904-4556-aabd-ad23a9788446", :phase :started, :child {:pid 4583, :start "2026-10-14T17:01:40.808Z"}}
+01:01:40.899861000 VERIFY gen3: pid 4583 -> 4583  4549 Thu Oct 15 01:01:40 2026     /opt/homebrew/bin/claude
+01:01:40.902710000 SIGTERM sent to 4583 (gen3)
+01:01:41.128523000 final recovery.edn: {:controller {:pid 83418, :start "2026-10-14T16:25:41.558Z"}, :generation 3, :runner-state "/Users/billyq/Dev/unclebob/uml-acc-32/project-a/.uml-viewer/uml-viewer-5f26e88b-6fc7dc58-runner-3.edn", :exit 143, :attempts 3, :cwd "/Users/billyq/Dev/unclebob/uml-acc-32/project-a", :phase :failed, :runner-token "981d963f-3904-4556-aabd-ad23a9788446", :token "75ea8039-4124-4710-bcce-a46826579d11", :reason "Recovery exhausted after three retries", :submitted-at 816674908, :child {:pid 4583, :start "2026-10-14T17:01:40.808Z"}, :uptime-since 816676395, :session "uml-viewer-5f26e88b-6fc7dc58"}
+01:01:52.933644000 NO 4th relaunch within 12s after exhaustion (expected)
+01:01:52.940105000 controller 83418: GONE
+01:01:52.942835000 phase-a end

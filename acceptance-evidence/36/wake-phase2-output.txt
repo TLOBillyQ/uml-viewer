@@ -1,0 +1,5 @@
+Phase 2 wake (notify-agent! production path), 3 mails id 1-3 queued:
+  command: clojure -Sdeps '{:deps {quil/quil {:mvn/version "4.3.1563"}}}' -M -e '(require (quote [uml-viewer.adapters.sketch :as s])) (println "notify-agent! returned:" (s/notify-agent!))'
+  stderr: UML viewer: companion wake failed: Herdr wake consumption was not acknowledged; mail remains queued; ownership retained
+  stdout: notify-agent! returned: false
+  (companion popped the queue at 00:44:51, just after the 10 s ack window closed — incidental first retention observation)

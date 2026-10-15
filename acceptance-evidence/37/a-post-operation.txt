@@ -1,0 +1,16 @@
+=== timestamp: 2026-10-15 01:48:11 +0800
+=== A processes:
+16347 16343 Thu Oct 15 01:32:58 2026     /usr/bin/java
+16364     1 Thu Oct 15 01:33:00 2026     /opt/homebrew/Cellar/herdr/0.9.4/bin/herdr
+16502 16347 Thu Oct 15 01:33:02 2026     /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java
+16394 16364 Thu Oct 15 01:33:00 2026     -zsh
+16481 16394 Thu Oct 15 01:33:01 2026     /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java
+16494 16481 Thu Oct 15 01:33:02 2026     /opt/homebrew/bin/claude
+=== A mailboxes: to-viewer={:next-id 8, :queue []} to-agent={:next-id 7, :queue []}
+=== A pane tail:
+─╯
+
+──────────────────────────────────────────────────────
+❯
+──────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ←…

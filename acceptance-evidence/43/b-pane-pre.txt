@@ -1,0 +1,20 @@
+  policy 本身没有改。它的顶层包和 src/uml_viewer/
+  下的真实命名空间逐一对应：adapters、application、dom
+  ain、engine、main、clojure/typescript/rust/python/lu
+  a-language，再加顶层的 source 和
+  graph。没有发现自造的分层，已有的 proposal test
+  也留着。
+
+  现在等待指令。
+
+✻ Cogitated for 23s · done 1:43 AM
+╭───────────────────────────────────────────────╮ [-]
+│ ◆▾ context24.1k of 200k · compacts at    12%  │
+│                167k                           │
+│                                     │         │
+╰───────────────────────────────────────────────╯
+
+──────────────────────────────────────────────────────
+❯ 运行 ./uml crap 刷新 CRAP 指标
+──────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ←…

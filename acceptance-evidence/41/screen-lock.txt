@@ -1,0 +1,1 @@
+screenIsLocked = 1 (checked 2026-10-15 02:10 via CGSessionCopyCurrentDictionary, swift; reconfirmed at every later criterion)

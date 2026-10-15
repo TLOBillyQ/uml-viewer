@@ -1,0 +1,1 @@
+birth=Oct 15 00:25:43 2026 mtime=Oct 15 00:25:43 2026 .uml-viewer/companion.edn

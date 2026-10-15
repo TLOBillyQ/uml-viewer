@@ -1,0 +1,290 @@
+--- 01:55:55
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 7, :queue []}
+--- 01:55:57
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 7, :queue []}
+--- 01:55:59
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 7, :queue []}
+--- 01:56:01
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 7, :queue []}
+--- 01:56:03
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 7, :queue []}
+--- 01:56:05
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 7, :queue []}
+--- 01:56:07
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 7, :queue []}
+--- 01:56:09
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 7, :queue []}
+--- 01:56:11
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 7, :queue []}
+--- 01:56:13
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 7, :op :refresh-mutate, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 8, :op :refresh-crap, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:15
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 7, :op :refresh-mutate, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 8, :op :refresh-crap, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:17
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 7, :op :refresh-mutate, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 8, :op :refresh-crap, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:19
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 7, :op :refresh-mutate, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 8, :op :refresh-crap, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:21
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 8, :op :refresh-crap, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:24
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 8, :op :refresh-crap, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:26
+QR: ABSENT
+23539       00:01 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 8, :op :refresh-crap, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:28
+QR: {"tool":"clojure-alias:mutate","exitCode":0,"projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","validResult":true,"crapScope":null,"version":1,"configured":false,"operation":"mutate"}
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 8, :op :refresh-crap, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:30
+QR: {"tool":"clojure-alias:mutate","exitCode":0,"projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","validResult":true,"crapScope":null,"version":1,"configured":false,"operation":"mutate"}
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 8, :op :refresh-crap, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:32
+QR: {"tool":"clojure-alias:mutate","exitCode":0,"projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","validResult":true,"crapScope":null,"version":1,"configured":false,"operation":"mutate"}
+23610       00:01 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dclojure.basis=.cpcache/3730760414.basis -classpath src:/Users/billyq/.m2/repository/o
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 8, :op :refresh-crap, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:34
+QR: ABSENT
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:36
+QR: ABSENT
+23666       00:02 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:38
+QR: ABSENT
+23666       00:04 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:40
+QR: ABSENT
+23666       00:06 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:42
+QR: ABSENT
+23666       00:08 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:44
+QR: ABSENT
+23666       00:10 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:46
+QR: ABSENT
+23666       00:12 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+23757       00:01 /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java -cp /Users/billyq/Dev/unclebob/uml-acc-32/project-a/spec:/Us
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:48
+QR: ABSENT
+23666       00:14 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:50
+QR: ABSENT
+23666       00:17 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:53
+QR: ABSENT
+23823       00:01 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:55
+QR: ABSENT
+23823       00:03 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:57
+QR: ABSENT
+23823       00:05 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:56:59
+QR: ABSENT
+23823       00:07 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:57:01
+QR: ABSENT
+23823       00:09 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:57:03
+QR: ABSENT
+23823       00:11 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+23914       00:01 /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java -cp /Users/billyq/Dev/unclebob/uml-acc-32/project-a/spec:/Us
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:57:05
+QR: ABSENT
+23823       00:13 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:57:07
+QR: ABSENT
+23823       00:15 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:57:09
+QR: {"configured":false,"projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","validResult":false,"crapScope":"targets","exitCode":1,"version":1,"operation":"crap","tool":"clojure-alias:crap"}
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:57:11
+QR: {"configured":false,"projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","validResult":false,"crapScope":"targets","exitCode":1,"version":1,"operation":"crap","tool":"clojure-alias:crap"}
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:57:13
+QR: {"configured":false,"projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","validResult":false,"crapScope":"targets","exitCode":1,"version":1,"operation":"crap","tool":"clojure-alias:crap"}
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:57:15
+QR: {"configured":false,"projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","validResult":false,"crapScope":"targets","exitCode":1,"version":1,"operation":"crap","tool":"clojure-alias:crap"}
+TV: {:next-id 8, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:57:17
+QR: {"configured":false,"projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","validResult":false,"crapScope":"targets","exitCode":1,"version":1,"operation":"crap","tool":"clojure-alias:crap"}
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:57:19
+QR: {"configured":false,"projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","validResult":false,"crapScope":"targets","exitCode":1,"version":1,"operation":"crap","tool":"clojure-alias:crap"}
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:57:22
+QR: {"configured":false,"projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","validResult":false,"crapScope":"targets","exitCode":1,"version":1,"operation":"crap","tool":"clojure-alias:crap"}
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:57:24
+QR: {"configured":false,"projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","validResult":false,"crapScope":"targets","exitCode":1,"version":1,"operation":"crap","tool":"clojure-alias:crap"}
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 9, :op :refresh-mutate-all, :target {:id :domain.mailbox, :kind :class, :ns "uml-viewer.domain.mailbox"}} {:id 10, :op :regen}]}
+--- 01:57:26
+QR: ABSENT
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:28
+QR: ABSENT
+24158       00:02 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+24176       00:00 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:30
+QR: ABSENT
+24158       00:04 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+24176       00:02 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:32
+QR: ABSENT
+24158       00:06 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+24176       00:04 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:34
+QR: ABSENT
+24158       00:08 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+24176       00:06 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:36
+QR: ABSENT
+24158       00:10 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+24176       00:08 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:38
+QR: ABSENT
+24158       00:12 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+24176       00:10 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+24264       00:01 /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java -cp /Users/billyq/Dev/unclebob/uml-acc-32/project-a/spec:/Us
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:40
+QR: ABSENT
+24158       00:14 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+24176       00:12 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:42
+QR: ABSENT
+24158       00:16 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+24176       00:14 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3562706478.basis -classpath spec:sr
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:44
+QR: ABSENT
+24158       00:18 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+24335       00:00 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3564727985.basis -classpath spec:sr
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:46
+QR: ABSENT
+24158       00:20 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+24335       00:02 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3564727985.basis -classpath spec:sr
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:48
+QR: ABSENT
+24158       00:23 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+24335       00:05 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3564727985.basis -classpath spec:sr
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:51
+QR: ABSENT
+24158       00:25 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+24335       00:07 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3564727985.basis -classpath spec:sr
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:53
+QR: ABSENT
+24158       00:27 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+24335       00:09 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3564727985.basis -classpath spec:sr
+24404       00:02 /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java -cp /Users/billyq/Dev/unclebob/uml-acc-32/project-a/spec:/Us
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:55
+QR: ABSENT
+24158       00:29 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+24335       00:11 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3564727985.basis -classpath spec:sr
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:57
+QR: ABSENT
+24158       00:31 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3392045918.basis -classpath spec:sr
+24335       00:13 /usr/bin/java -XX:-OmitStackTraceInFastThrow -Dapple.awt.UIElement=true -Dclojure.basis=.cpcache/3564727985.basis -classpath spec:sr
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:57:59
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:58:01
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue [{:id 10, :op :regen}]}
+--- 01:58:03
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:05
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 9, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:07
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 10, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:09
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 10, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:11
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 10, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:13
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 10, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:15
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 10, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:17
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 10, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:19
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 10, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:22
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 10, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:24
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 10, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:26
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 10, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:28
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 10, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:30
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 10, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:32
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 10, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:34
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 10, :queue []} TA: {:next-id 11, :queue []}
+--- 01:58:36
+QR: {"version":1,"exitCode":2,"crapScope":null,"tool":"clojure-alias:mutate","operation":"mutate","projectRoot":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","configured":false,"validResult":false}
+TV: {:next-id 10, :queue []} TA: {:next-id 11, :queue []}
+--- sampler stopped 01:58:38

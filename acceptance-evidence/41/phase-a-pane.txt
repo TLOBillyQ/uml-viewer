@@ -1,0 +1,23 @@
+
+⏺ 我把 domain.mailbox 从真实命名空间树中省略了（mail
+  11）。具体是在 examples/uml-viewer.policy.edn 里加了
+  :omit [:domain.mailbox]。
+
+  IR 退出码 0，之后已发 :display。生成的 EDN 里
+  domain.mailbox 这个类和它的依赖边都还在，:omit
+  只是带进 EDN、交给 viewer
+  在渲染时隐藏。图上它是否已消失，我没有在屏幕上确认。
+
+  收件队列已空。
+
+✻ Baked for 21s · done 2:10 AM
+╭───────────────────────────────────────────────╮ [-]
+│ ◆▾ context40.3k of 200k · compacts at    20%  │
+│                167k                           │
+│                                     │         │
+╰───────────────────────────────────────────────╯
+
+──────────────────────────────────────────────────────
+❯ 排查那 9 个 herdr spec 失败
+──────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ←…

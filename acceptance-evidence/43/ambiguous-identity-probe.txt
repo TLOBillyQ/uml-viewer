@@ -1,0 +1,3 @@
+:probe-start
+UML viewer: companion cleanup: Companion ownership is missing, ambiguous or belongs to another project
+:probe-end

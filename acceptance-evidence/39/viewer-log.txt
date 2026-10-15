@@ -1,0 +1,24 @@
+----- 2026-10-15 00:25:38 starting uml-viewer
+UML viewer: terminal open failed: 689:742: execution error: “Terminal”遇到一个错误：不能将“title displays settings name of tab 1 of window id 18482”设置为“false”。 (-10006) exit 1
+UML viewer: companion retained; open a separate terminal and run: '/opt/homebrew/Cellar/herdr/0.9.4/bin/herdr' session attach 'uml-viewer-5f26e88b-6fc7dc58'
+Watching examples/library.edn
+Double-click a class for its card. Scroll to pan (Shift-scroll for horizontal). Ctrl+/− zoom; Ctrl+0 resets. R reloads. Click the real diagram above Proposals, or a proposal to show it.
+----- 2026-10-15 01:32:58 starting uml-viewer
+UML viewer: terminal open failed: 689:742: execution error: “Terminal”遇到一个错误：不能将“title displays settings name of tab 1 of window id 18491”设置为“false”。 (-10006) exit 1
+UML viewer: companion retained; open a separate terminal and run: '/opt/homebrew/Cellar/herdr/0.9.4/bin/herdr' session attach 'uml-viewer-5f26e88b-06582e8d'
+Watching examples/library.edn
+Double-click a class for its card. Scroll to pan (Shift-scroll for horizontal). Ctrl+/− zoom; Ctrl+0 resets. R reloads. Click the real diagram above Proposals, or a proposal to show it.
+----- 2026-10-15 08:37:42 starting uml-viewer
+UML viewer: terminal open failed: 689:742: execution error: “Terminal”遇到一个错误：不能将“title displays settings name of tab 1 of window id 18563”设置为“false”。 (-10006) exit 1
+UML viewer: companion retained; open a separate terminal and run: '/opt/homebrew/Cellar/herdr/0.9.4/bin/herdr' session attach 'uml-viewer-5f26e88b-bcc99ab2'
+Watching examples/library.edn
+Double-click a class for its card. Scroll to pan (Shift-scroll for horizontal). Ctrl+/− zoom; Ctrl+0 resets. R reloads. Click the real diagram above Proposals, or a proposal to show it.
+----- 2026-10-15 08:39:36 starting uml-viewer
+Watching nil
+Double-click a class for its card. Scroll to pan (Shift-scroll for horizontal). Ctrl+/− zoom; Ctrl+0 resets. R reloads. Click the real diagram above Proposals, or a proposal to show it.
+----- 2026-10-15 08:41:15 starting uml-viewer
+Watching nil
+Double-click a class for its card. Scroll to pan (Shift-scroll for horizontal). Ctrl+/− zoom; Ctrl+0 resets. R reloads. Click the real diagram above Proposals, or a proposal to show it.
+----- 2026-10-15 08:42:09 starting uml-viewer
+Watching nil
+Double-click a class for its card. Scroll to pan (Shift-scroll for horizontal). Ctrl+/− zoom; Ctrl+0 resets. R reloads. Click the real diagram above Proposals, or a proposal to show it.

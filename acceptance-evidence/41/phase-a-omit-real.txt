@@ -1,0 +1,13 @@
+=== 2026-10-15 02:15:38 phase-A post-omit (real diagram)
+policy mtime: Oct 15 02:10:43 2026  diagram mtime: Oct 15 02:10:45 2026
+--- :omit / :proposals lines in policy:
+31: :omit [:domain.mailbox],
+32: :proposals [{:id :p-1791033119418, :name "test", :layers []}],
+--- diagram md5: 9d2c77d4078ef116ffe0a75cd1ae4e9b (pre: a9ab83d6c8f6c4309a9a714875f9f970)
+--- domain.mailbox mentions now: 7 (pre: 7)
+--- diff policy pre vs now:
+30a31
+>  :omit [:domain.mailbox],
+--- class count pre/now:
+0
+0

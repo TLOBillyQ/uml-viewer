@@ -1,0 +1,8 @@
+--- t+2s 02:28:17: A-pids= sessions=1 A-dir=gone
+--- t+4s 02:28:19: A-pids= sessions=1 A-dir=gone
+--- t+6s 02:28:21: A-pids= sessions=1 A-dir=gone
+--- t+8s 02:28:23: A-pids= sessions=1 A-dir=gone
+--- t+10s 02:28:25: A-pids= sessions=1 A-dir=gone
+--- t+12s 02:28:27: A-pids= sessions=1 A-dir=gone
+--- t+14s 02:28:29: A-pids= sessions=1 A-dir=gone
+--- t+16s 02:28:31: A-pids= sessions=1 A-dir=gone

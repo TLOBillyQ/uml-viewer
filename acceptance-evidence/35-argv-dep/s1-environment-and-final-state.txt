@@ -1,0 +1,33 @@
+run timestamps:
+/Users/billyq/Dev/unclebob/uml-acc-32/proj-arg/evidence/s1-stdout.txt birth=Oct 15 00:41:23 2026 mtime=Oct 15 00:41:23 2026
+/Users/billyq/Dev/unclebob/uml-acc-32/proj-arg/evidence/s1b-stdout.txt birth=Oct 15 00:42:00 2026 mtime=Oct 15 00:42:00 2026
+/Users/billyq/Dev/unclebob/uml-acc-32/proj-arg/evidence/s1c-stdout.txt birth=Oct 15 00:42:22 2026 mtime=Oct 15 00:42:22 2026
+/Users/billyq/Dev/unclebob/uml-acc-32/proj-arg/evidence/s2a-stderr.txt birth=Oct 15 00:44:36 2026 mtime=Oct 15 00:44:36 2026
+/Users/billyq/Dev/unclebob/uml-acc-32/proj-arg/evidence/s2b-stderr.txt birth=Oct 15 00:44:53 2026 mtime=Oct 15 00:44:55 2026
+/Users/billyq/Dev/unclebob/uml-acc-32/proj-arg/evidence/s2c-stderr.txt birth=Oct 15 00:45:19 2026 mtime=Oct 15 00:45:20 2026
+/Users/billyq/Dev/unclebob/uml-acc-32/proj-arg/evidence/manifest-snap/launch-21797ee2866546e8b3be560c5b816b16.json birth=Oct 15 00:42:22 2026 mtime=Oct 15 00:42:22 2026
+
+ProductName:		macOS
+ProductVersion:		27.0.1
+BuildVersion:		26A434
+7.6.7
+Clojure CLI version 1.12.6.1673
+5e4407e038a1bc618fd9a5f42c07a5b6e112cc40
+ M uml
+
+S1 .uml-viewer final:
+total 8
+drwxr-xr-x@  4 billyq  staff  128 Oct 15 00:42 .
+drwxr-xr-x@  7 billyq  staff  224 Oct 15 00:41 ..
+drwxr-xr-x@ 18 billyq  staff  576 Oct 15 00:40 uml-viewer
+-rw-r--r--@  1 billyq  staff   45 Oct 15 00:42 viewer-process.json
+viewer-process.json:
+{"pid":92613,"started":"639275929424593470"}
+
+viewer-log:
+----- 2026-10-15 00:41:23 starting uml-viewer
+----- 2026-10-15 00:42:00 starting uml-viewer
+----- 2026-10-15 00:42:22 starting uml-viewer
+residual launch manifests in S1:
+0
+0

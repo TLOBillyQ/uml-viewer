@@ -1,0 +1,23 @@
+  :display. A failed refresh stops that request's
+  IR/display, reports its cause, and leaves later
+  FIFO mail runnable. If there is no pending refresh,
+  restore :display from .uml-viewer/view.edn; never
+  issue an unconditional recovery display after a
+  failed refresh. Then wait for directives.
+
+⏺ Reading mailbox queue and saved view
+  ⎿  $ P=/Users/billyq/Dev/unclebob/uml-acc-32/project
+     -a; ls -la $P/.uml-viewer/; cat
+     $P/.uml-viewer/session.edn 2>/dev/null
+
+✻ Inferring… (14s · ↓ 517 tokens)
+╭───────────────────────────────────────────────╮ [-]
+│ ◆▾ context25.5k of 200k · compacts at    13%  │
+│                167k                           │
+│                                     │         │
+╰───────────────────────────────────────────────╯
+
+──────────────────────────────────────────────────────
+❯
+──────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · e…

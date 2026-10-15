@@ -1,0 +1,21 @@
+=== timestamp: 2026-10-15 01:48:11 +0800
+=== B companion.edn md5: 9bc9d90405128124c6c928ca37c7da5a (pre: 9bc9d90405128124c6c928ca37c7da5a)
+=== B recovery.edn md5: 70adaa3ceffeb4505cb8dc939a770e03 (pre: 70adaa3ceffeb4505cb8dc939a770e03)
+=== B mailboxes: to-viewer={:next-id 2, :queue []} to-agent=ABSENT
+=== B process table:
+19487 19486 Thu Oct 15 01:43:08 2026     /usr/bin/java
+19507     1 Thu Oct 15 01:43:10 2026     /opt/homebrew/Cellar/herdr/0.9.4/bin/herdr
+19644 19487 Thu Oct 15 01:43:12 2026     /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java
+19533 19507 Thu Oct 15 01:43:10 2026     -zsh
+19630 19533 Thu Oct 15 01:43:11 2026     /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java
+19634 19630 Thu Oct 15 01:43:12 2026     /opt/homebrew/bin/claude
+=== B pane tail:
+��──────────
+❯ 运行 ./uml crap 刷新 CRAP 指标
+──────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ←…
+=== herdr session list:
+name                 status   directory                                        socket
+default              stopped  /Users/billyq/.config/herdr                      /Users/billyq/.config/herdr/herdr.sock
+uml-viewer-5f26e88b-06582e8d running  /Users/billyq/.config/herdr/sessions/uml-viewer-5f26e88b-06582e8d /Users/billyq/.config/herdr/sessions/uml-viewer-5f26e88b-06582e8d/herdr.sock
+uml-viewer-7db6871f-aa6c2aa8 running  /Users/billyq/.config/herdr/sessions/uml-viewer-7db6871f-aa6c2aa8 /Users/billyq/.config/herdr/sessions/uml-viewer-7db6871f-aa6c2aa8/herdr.sock

@@ -1,0 +1,16 @@
+=== herdr session list
+name                 status   directory                                        socket
+default              stopped  /Users/billyq/.config/herdr                      /Users/billyq/.config/herdr/herdr.sock
+uml-viewer-5f26e88b-06582e8d running  /Users/billyq/.config/herdr/sessions/uml-viewer-5f26e88b-06582e8d /Users/billyq/.config/herdr/sessions/uml-viewer-5f26e88b-06582e8d/herdr.sock
+=== pane process-info
+{"id":"cli:pane:process_info","result":{"process_info":{"foreground_process_group_id":16481,"foreground_processes":[{"argv":["caffeinate","-i","-t","300"],"argv0":"caffeinate","cmdline":"caffeinate -i -t 300","cwd":"/Users/billyq/Dev/unclebob/uml-acc-32/project-a","name":"caffeinate","pid":16529},{"argv":["/opt/homebrew/bin/claude","--dangerously-skip-permissions","--session-id","ffc3a496-ddd5-4bf4-bb38-466645ed53da","--append-system-prompt","You are the UML-viewer companion. The current working directory is the\nproject being examined (the one whose diagram is on screen), not\nnecessarily uml-viewer itself.\nOn launch: inspect this directory's source, write or update a\nhierarchical policy from the real namespaces (dots after the ns prefix\nare the tree; do not invent Domain/Engine/Adapters packages), then\nregenerate the IR (`./uml ir`) so the\ndiagram matches. Do not edit the generated EDN by hand.\nAfter every later source or policy change:\n1. Keep the policy as namespace nesting only. Do not re-home a ns to\n   fake a layer/component. Layer and component mean the same thing.\n   If the tree is wrong, change the requires or the ns.\n   Preserve :proposals (named components tha
+=== child chain
+16494 16481 /opt/homebrew/bin/claude
+16481 16394 /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java
+16394 16364 -zsh
+=== controller 16502
+16502 16347 /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin/java
+=== viewer 16347
+16347 16343 /usr/bin/java
+=== to-agent queue
+{:next-id 6, :queue []}
