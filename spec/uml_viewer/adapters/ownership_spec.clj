@@ -9,6 +9,11 @@
             [uml-viewer.domain.mailbox :as mailbox]))
 
 (describe "Recorded companion ownership"
+  (around [run-spec]
+    (let [blocked (fn [& args]
+                    (throw (AssertionError. (str "Unexpected ownership process: " (pr-str args)))))]
+      (with-redefs [companion/process! blocked sketch/run-command blocked]
+        (run-spec))))
   (it "keeps startup mail and view ownership when display points into another project's metrics directory"
     (let [a (str (System/getProperty "java.io.tmpdir") "/root-mail-a-" (System/nanoTime))
           b (str (System/getProperty "java.io.tmpdir") "/root-mail-b-" (System/nanoTime))

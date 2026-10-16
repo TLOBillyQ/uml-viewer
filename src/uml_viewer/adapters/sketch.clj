@@ -315,14 +315,13 @@
           "set title displays custom title of agentTab to true\n"
           "set title displays device name of agentTab to false\n"
           "set title displays shell path of agentTab to false\n"
-          "set title displays settings name of agentTab to false\n"
-          "set winID to id of front window\n"
+          "set agentWindow to first window whose selected tab is agentTab\n"
+          "set winID to id of agentWindow\n"
+          "set index of agentWindow to 1\n"
           "end tell\n"
           "tell application \"System Events\"\n"
           "tell process \"Terminal\"\n"
-          "try\n"
-          "perform action \"AXRaise\" of (first window whose name contains \"" title "\")\n"
-          "end try\n"
+          "set frontmost to true\n"
           "end tell\n"
           "end tell\n"
           "return winID"))))
@@ -463,9 +462,23 @@
 (defn- halt-vm! []
   (System/exit 0))
 
+(defn- cleanup-on-exit! []
+  (locking !bridge
+    (when-not (or (:keep-agent @!bridge) (:cleanup-started @!bridge))
+      (swap! !bridge assoc :cleanup-started true)
+      (shutdown-children!))))
+
+(defonce ^:private shutdown-hook (atom nil))
+
+(defn- install-shutdown-hook! []
+  (locking shutdown-hook
+    (when-not @shutdown-hook
+      (let [hook (Thread. ^Runnable (fn [] (cleanup-on-exit!)) "uml-viewer-cleanup")]
+        (.addShutdownHook (Runtime/getRuntime) hook)
+        (reset! shutdown-hook hook)))))
+
 (defn- exit-app! []
-  (when-not (:keep-agent @!bridge)
-    (shutdown-children!))
+  (cleanup-on-exit!)
   (halt-vm!))
 
 (defn- class-title [model]
@@ -951,6 +964,7 @@
      (if restart?
        (remember-companion! root)
        (open-in-terminal! root))
+     (install-shutdown-hook!)
    (q/sketch
     :title "UML viewer"
     :size [window-width window-height]

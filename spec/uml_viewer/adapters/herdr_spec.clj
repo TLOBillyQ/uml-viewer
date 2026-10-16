@@ -7,8 +7,10 @@
             [uml-viewer.adapters.recovery :as recovery]
             [uml-viewer.domain.mailbox :as mailbox]))
 
+;; status! requires a host-absolute socket path; a drive-letter path is relative off Windows.
 (def owned {:backend :herdr :owner-role :companion :session "uml-viewer-A"
-            :socket "C:/herdr/sessions/A/herdr.sock" :workspace "w1" :pane "w1:p1"
+            :socket (if (companion/windows?) "C:/herdr/sessions/A/herdr.sock" "/tmp/herdr/sessions/A/herdr.sock")
+            :workspace "w1" :pane "w1:p1"
             :terminal-id "term_A" :shell-pid 42 :owner-start "shell-start"
             :server-pid "41" :server-start "server-start"
             :cwd (System/getProperty "user.dir") :command ["claude.exe"]})
@@ -114,6 +116,7 @@
                     (fn [argv]
                       (cond
                         (= "pwsh.exe" (first argv)) (response {:pid 41 :start "server-start" :name "herdr"})
+                        (= "/bin/sh" (first argv)) {:exit 0 :out "41" :err ""}
                         (= ["session" "list"] (subvec argv 3 5)) (response {:sessions []})
                         (= ["workspace" "create"] (subvec argv 3 5))
                         (response {:result {:workspace {:workspace_id "w1"}
@@ -186,8 +189,9 @@
 (defn- cli-op [argv] (vec (take 2 (drop 3 argv))))
 
 (describe "Herdr recovery relaunch"
-  (defn launch [calls state]
-    (with-redefs [companion/process! (fake-relaunch-cli calls state)
+  (defn launch [calls state & {:keys [windows?] :or {windows? true}}]
+    (with-redefs [companion/windows? (constantly windows?)
+                  companion/process! (fake-relaunch-cli calls state)
                   companion/selected-herdr (atom {:path "herdr" :release "0.9.3"})
                   herdr/process-owner! (fake-owner state)
                   recovery/write-state! (fn [_ _] nil)
@@ -221,8 +225,7 @@
       (should-not (some #(= ["pane" "send-keys"] (cli-op %)) @calls))))
   (it "skips the ConPTY reset off Windows"
     (let [calls (atom []) state (atom {})]
-      (with-redefs [companion/windows? (constantly false)]
-        (launch calls state))
+      (launch calls state :windows? false)
       (should-not (some #(= "pwsh.exe" (first %)) @calls))
       (should-not (some #(= ["pane" "send-keys"] (cli-op %)) @calls))
       (should (some #(= ["pane" "run"] (cli-op %)) @calls))))

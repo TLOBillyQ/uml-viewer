@@ -215,6 +215,18 @@ pty canonical mode），证据见 acceptance-evidence/acceptance-log.md。
 低于 0.9.3 或 protocol 不为 22 的版本不接受；高于 0.9.4 的版本未验收。
 Linux/WSL companion 不受支持；独立扫描/质量命令保持各自平台要求。
 
+2026-10-16 的 #49 定向复验在解锁的 macOS、Herdr 0.9.5 / protocol 22 上，
+已验证修复候选的公共 Terminal 打开、目标窗口归属、键盘聚焦及准确 session
+标题；其他既有窗口保留且相对顺序不变。历史 -10006 可由对 tab 设置不支持的
+`title displays settings name` 属性在解锁环境复现，不能仅归因于锁屏或权限。
+证据与未验证边界见 [定向运行记录](../acceptance-evidence/issue-49-terminal-attach.md)。
+这不是 0.9.5 的完整生命周期验收；中文输入、人眼视觉和 attach 客户端 detach
+退出仍未验证，宿主未主动重新锁屏。修复与定向验收证据随本次变更一起交付。
+
+#48 的同次定向检查已验证真实 JVM shutdown hook 取消恢复并释放完整 ownership
+所属的 Herdr server、shell、受监督子进程及 controller；重启保留分支另有受控
+JVM 证据。它不替代实际 ⌘Q / Dock 事件或恢复退避窗口的原生复验。
+
 ### 本地收尾记录 — 2026-10-12（#13 / #23）
 
 Herdr 迁移及旧后端退役实现（604aadb）已通过 cc57110 合入本地 `lua`。

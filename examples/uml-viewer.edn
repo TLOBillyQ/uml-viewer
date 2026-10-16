@@ -69,6 +69,7 @@
   {:from :main.ir-generator,
    :to :typescript-language.graph-typescript,
    :kind :dependency}
+  {:from :main.uml-viewer, :to :adapters.sketch, :kind :dependency}
   {:from :clojure-language.source-clojure, :to :source, :kind :implements}
   {:from :adapters.draw, :to :application.document, :kind :dependency}
   {:from :adapters.sketch, :to :adapters.companion, :kind :dependency}
@@ -113,8 +114,10 @@
   {:from :engine.compose, :to :engine.route, :kind :dependency}
   {:from :application.events, :to :engine.layout, :kind :dependency}
   {:from :adapters.sketch, :to :quil, :kind :dependency}
+  {:from :adapters.recovery, :to :domain.mailbox, :kind :dependency}
   {:from :engine.compose, :to :domain.geom, :kind :dependency}
   {:from :main.ir-generator, :to :rust-language.graph-rust, :kind :dependency}
+  {:from :adapters.recovery, :to :adapters.companion, :kind :dependency}
   {:from :engine.route, :to :engine.layout, :kind :dependency}
   {:from :domain.hierarchy, :to :domain.policy, :kind :dependency}
   {:from :adapters.draw, :to :domain.hierarchy, :kind :dependency}

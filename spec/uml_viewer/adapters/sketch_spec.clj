@@ -26,6 +26,11 @@
 (defn- call [sym & args]
   (apply (sk sym) args))
 
+;; High-level startup mocks cover the expected branch only. Mutants can take
+;; the other branch; keep both process entry points blocked around unit specs.
+(defn- unexpected-process! [& args]
+  (throw (AssertionError. (str "Unexpected external process in unit spec: " (pr-str args)))))
+
 (defn- empty-bridge []
   {:applet nil :model nil :pick nil :closed? false :exiting false})
 
@@ -238,6 +243,22 @@
         (call 'exit-app!)
         (should= [:claude :halt] @order))))
 
+  (it "cleans up only once across window close and JVM shutdown"
+    (let [calls (atom 0)]
+      (with-redefs [sketch/shutdown-children! (fn [] (swap! calls inc))
+                    uml-viewer.adapters.sketch/halt-vm! (fn [])]
+        (call 'exit-app!)
+        (call 'cleanup-on-exit!)
+        (should= 1 @calls))))
+
+  (it "serializes concurrent exit cleanup before returning"
+    (let [calls (atom 0)]
+      (with-redefs [sketch/shutdown-children! (fn [] (swap! calls inc))]
+        (let [a (future (call 'cleanup-on-exit!))
+              b (future (call 'cleanup-on-exit!))]
+          @a @b
+          (should= 1 @calls)))))
+
   (it "keeps claude alive when the bridge says keep-agent"
     (let [order (atom [])]
       (reset! sketch/!bridge (assoc (empty-bridge) :keep-agent true))
@@ -339,6 +360,25 @@
 
 (describe "sketch keys and lifecycle"
   (before (reset! sketch/!bridge (empty-bridge)))
+  (around [run-spec]
+    (with-redefs [uml-viewer.adapters.sketch/install-shutdown-hook! (fn [])
+                  companion/process! unexpected-process!
+                  sketch/run-command unexpected-process!]
+      (run-spec)))
+
+  (it "blocks both process boundaries even when startup mocks are bypassed"
+    (doseq [run [companion/process! sketch/run-command]]
+      (should-throw AssertionError (run ["herdr" "--session" "must-not-start" "server"])))
+    (should-throw AssertionError (companion/process! ["wt.exe"] 10000 ["HERDR_ENV"])))
+
+  (it "stops the real creation path if a restart branch bypasses remember-companion!"
+    ;; start!'s if-to-if-not mutant sends the saved-detail restart example here.
+    ;; Keep ownership entirely in memory; the real create! must hit the guard.
+    (with-redefs [mailbox/read-companion (constantly {})
+                  mailbox/write-companion! (fn [& _])
+                  sketch/claude-executable (constantly "claude.exe")]
+      (should-throw AssertionError #"session.*list"
+                    (sketch/open-in-terminal! "root"))))
 
   (it "closes the detail window on escape without quitting Processing"
     (let [closed (atom false)]
@@ -502,6 +542,11 @@
 
 (describe "sketch main window"
   (before (reset! sketch/!bridge (empty-bridge)))
+  (around [run-spec]
+    (with-redefs [uml-viewer.adapters.sketch/install-shutdown-hook! (fn [])
+                  companion/process! unexpected-process!
+                  sketch/run-command unexpected-process!]
+      (run-spec)))
 
   (it "opens a class card on a click of a dependency port"
     (let [s (state)
@@ -648,12 +693,15 @@
   (it "starts the main sketch and wires the handlers"
     (let [opts (atom nil)
           moved (atom nil)
-          keyed (atom nil)]
-      (with-redefs [q/sketch (fn [& args]
+          keyed (atom nil)
+          hooked (atom 0)]
+      (with-redefs [uml-viewer.adapters.sketch/install-shutdown-hook! (fn [] (swap! hooked inc))
+                    q/sketch (fn [& args]
                                (reset! opts (apply hash-map args))
                                :main-applet)
                     uml-viewer.adapters.sketch/open-in-terminal! (fn [& _])]
         (should= :main-applet (sketch/start! "doc.edn" :source-impl))
+        (should= 1 @hooked)
         (should= "UML viewer" (:title @opts))
         (should= [sketch/window-width sketch/window-height] (:size @opts))
         (should= [:resizable] (:features @opts))
@@ -700,7 +748,9 @@
 
 (describe "claude session"
   (around [run-spec]
-    (with-redefs [companion/process! (fn [argv] (throw (ex-info "Unexpected external process in unit spec" {:argv argv})))]
+    (with-redefs [uml-viewer.adapters.sketch/install-shutdown-hook! (fn [])
+                  companion/process! unexpected-process!
+                  sketch/run-command unexpected-process!]
       (run-spec)))
 
   (it "does not use another project's in-memory session as a wake candidate"
@@ -792,9 +842,22 @@
       (should (re-find #"^tell application \"Terminal\"\nlaunch" script))
       (should (re-find #"custom title of agentTab to \"uml-viewer-A\"" script))
       (should (re-find #"background color of agentTab to \{5654, 7196, 8224\}" script))
-      (should (re-find #"AXRaise" script))
+      (should (re-find #"set index of agentWindow to 1" script))
       (should (re-find #"return winID" script))
       (should-not (re-find #"activate" script))))
+
+  (it "returns and focuses only the window containing the newly created tab"
+    (let [script (sketch/osascript "printf attach-probe" "uml-viewer-A")]
+      (should (re-find #"set agentWindow to first window whose selected tab is agentTab" script))
+      (should (re-find #"set winID to id of agentWindow" script))
+      (should (re-find #"set index of agentWindow to 1" script))
+      (should (re-find #"set frontmost to true" script))
+      (should-not (re-find #"AXRaise" script))))
+
+  (it "sets only title properties supported by a Terminal tab"
+    (let [script (sketch/osascript "printf attach-probe" "uml-viewer-A")
+          properties (map second (re-seq #"set title displays ([^\n]+?) of agentTab to" script))]
+      (should= ["custom title" "device name" "shell path"] properties)))
 
   (it "closes only this viewer's Terminal window by id"
     (let [script (sketch/close-terminal-script "42")]

@@ -1,9 +1,17 @@
 (ns uml-viewer.adapters.core-spec
   (:require [speclj.core :refer :all]
             [uml-viewer.adapters.core :as core]
+            [uml-viewer.adapters.companion :as companion]
             [uml-viewer.adapters.sketch :as sketch]))
 
+(defn- without-processes [run-spec]
+  (let [blocked (fn [& args]
+                  (throw (AssertionError. (str "Unexpected startup process: " (pr-str args)))))]
+    (with-redefs [companion/process! blocked sketch/run-command blocked]
+      (run-spec))))
+
 (describe "cli args"
+  (around [run-spec] (without-processes run-spec))
   (it "defaults the path and does not restart"
     (should= {:path "examples/library.edn" :restart? false :help? false}
              (core/parse-args nil))
@@ -42,6 +50,7 @@
           (should (re-find #"real diagram above Proposals" out)))))))
 
 (describe "backend selection before viewer creation"
+  (around [run-spec] (without-processes run-spec))
   (it "preserves positional argv and diagnoses missing duplicate and unknown selection"
     (should= {:path "with spaces.edn" :restart? true :help? false :backend :herdr}
              (core/parse-args ["with spaces.edn" "--backend" "herdr" "--restart"]))

@@ -57,6 +57,14 @@
           {:exit 0 :out (str "Sun Oct 11 12:00:00 2026 " (if server? "herdr" "sh"))})))))
 
 (describe "Herdr companion lifecycle"
+  ;; A mutated startup branch can bypass create!/open-herdr-companion! mocks.
+  ;; Per-example CLI fakes below may override this fail-closed outer boundary.
+  (around [run-spec]
+    (let [blocked (fn [& args]
+                    (throw (AssertionError. (str "Unexpected lifecycle process: " (pr-str args)))))]
+      (with-redefs [companion/process! blocked
+                    sketch/run-command blocked]
+        (run-spec))))
   (it "routes FIFO mail through the recorded backend and returns display only to its project"
     (let [a (lifecycle-project "A") b (lifecycle-project "B")
           projects (into {} (map (fn [p] [(get-in p [:record :session]) p]) [a b]))
@@ -214,6 +222,7 @@
       (with-redefs [sketch/open-herdr-companion!
                     (fn [_] (mailbox/write-command! (mailbox/to-viewer root) :display {:path (.getPath diagram)}))
                     q/sketch (fn [& args] (reset! opts (apply hash-map args)))
+                    uml-viewer.adapters.sketch/install-shutdown-hook! (fn [])
                     sketch/setup (fn [_ _] (document/waiting-state "waiting.edn" root))]
         (sketch/start! "waiting.edn" :source false root :herdr)
         (let [state (document/poll-mail ((:setup @opts)))]
